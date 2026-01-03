@@ -5,88 +5,83 @@
 <title>Analytics Dashboard</title>
 <link rel="stylesheet" href="/style.css">
 
-<!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <style>
-.dashboard-container { max-width: 1000px; margin: auto; }
+
+.container {
+    max-width: 960px;
+    margin: auto;
+}
+
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit,minmax(200px,1fr));
+    gap: 14px;
+}
 
 .stat-card {
     background: rgba(0,0,0,.75);
-    border: 1px solid rgba(255,255,255,.3);
-    padding: 14px;
+    border: 1px solid rgba(255,255,255,.25);
+    padding: 12px;
     border-radius: 10px;
-    margin: 12px 0;
+    text-align:center;
+    box-shadow: 0 0 25px rgba(0,0,0,.9);
 }
 
-.stat-title {
-    font-size: 20px;
+.big {
+    font-size: 30px;
     font-weight: bold;
-    margin-bottom: 6px;
 }
 
-.chartCard {
-    background: rgba(0,0,0,.75);
-    border: 1px solid rgba(255,255,255,.3);
-    padding: 14px;
-    border-radius: 10px;
-    margin: 14px 0;
+.good { color:#00ff80; }
+.warn { color:#ffeb3b; }
+.bad  { color:#ff5050; }
+
+.section {
+    margin-top:18px;
+    padding:12px;
+    border-radius:10px;
+    background:rgba(0,0,0,.65);
+    border:1px solid rgba(255,255,255,.25);
 }
+
+.barRow {
+    margin:6px 0;
+    background:rgba(255,255,255,.1);
+    border-radius:6px;
+    overflow:hidden;
+}
+
+.barFill {
+    background:linear-gradient(90deg,#ff4d4d,#ffae00);
+    height:18px;
+}
+
+.barLabel {
+    font-size:13px;
+}
+
 </style>
-
 </head>
 
 <body>
+<div class="container">
 
-<div class="container dashboard-container">
+<h1 class="hero-title">
+📊 Performance & Study Analytics
+</h1>
 
-    <h1 class="hero-title">
-        📊 Server+ Analytics Dashboard
-    </h1>
+<div id="analytics"></div>
 
-    <div id="overview" class="stat-card">Loading analytics…</div>
-
-    <div id="progress" class="stat-card"></div>
-
-    <div id="sets" class="stat-card"></div>
-
-    <div id="timeStats" class="stat-card"></div>
-
-    <!-- INTELLIGENCE CARDS -->
-    <div id="trendMessage" class="stat-card"></div>
-
-    <div id="heatmap" class="stat-card"></div>
-
-    <!-- CHARTS -->
-    <div class="chartCard">
-        <div class="stat-title">📈 Score Trend Over Time</div>
-        <canvas id="trendChart"></canvas>
-    </div>
-
-    <div class="chartCard">
-        <div class="stat-title">📘 Average Score by Quiz Set</div>
-        <canvas id="setChart"></canvas>
-    </div>
-
-    <div class="chartCard">
-        <div class="stat-title">⏱ Time Used Per Attempt (Minutes)</div>
-        <canvas id="timeChart"></canvas>
-    </div>
-
-    <br>
-    <button onclick="location.href='/'">⬅ Back to Portal</button>
-    <button onclick="location.href='/history.html'">📜 View History</button>
+<br>
+<button onclick="location.href='/'">🏠 Back to Portal</button>
+<button onclick="location.href='/history.html'">📜 View Detailed History</button>
 
 </div>
-
 
 <script>
 const HISTORY_KEY = "serverplus_history_v2";
 
-/* =========================
-   LOAD HISTORY
-========================= */
-function loadHistoryStore() {
+function loadHistory() {
     try {
         return JSON.parse(localStorage.getItem(HISTORY_KEY) || "{}");
     } catch {
@@ -94,256 +89,105 @@ function loadHistoryStore() {
     }
 }
 
-/* =========================
-   TREND MESSAGE
-========================= */
-function buildTrendMessage(allAttempts) {
-    const box = document.getElementById("trendMessage");
-    const scores = allAttempts.map(a=>a.percent);
+function buildDashboard() {
+    const div = document.getElementById("analytics");
+    const store = loadHistory();
+    const quizKeys = Object.keys(store);
 
-    let msg = "";
-    let color = "#00ff80";
-    let arrow = "⬆";
-
-    if (scores.length < 3) {
-        msg = "Not enough attempts yet to calculate meaningful trend.";
-        color = "#bbb";
-        arrow = "➖";
-    } else {
-        const recent = scores.slice(-3);
-        const avgRecent = recent.reduce((a,b)=>a+b,0)/3;
-        const avgAll = scores.reduce((a,b)=>a+b,0)/scores.length;
-
-        if (avgRecent > avgAll + 3) {
-            msg = "Great job! Your performance is trending UP!";
-            color = "#00ff80";
-            arrow = "⬆⬆";
-        }
-        else if (avgRecent < avgAll - 3) {
-            msg = "Performance dipped recently. Review missed questions to bounce back!";
-            color = "#ff4d4d";
-            arrow = "⬇⬇";
-        }
-        else {
-            msg = "Performance is steady. Keep practicing to push upward!";
-            color = "#ffe066";
-            arrow = "➡";
-        }
+    if (!quizKeys.length) {
+        div.innerHTML = "<p>No data yet. Take some exams 😊</p>";
+        return;
     }
 
-    box.innerHTML = `
-        <div class="stat-title">📊 Performance Trend</div>
-        <div style="color:${color}; font-size:18px;">
-            ${arrow} ${msg}
-        </div>
-    `;
-}
+    let attempts = [];
+    quizKeys.forEach(k => attempts.push(...store[k]));
 
-/* =========================
-   HEATMAP (FIXED)
-========================= */
-function buildHeatmap(store) {
-    const box = document.getElementById("heatmap");
+    if (!attempts.length) {
+        div.innerHTML = "<p>No attempts recorded yet.</p>";
+        return;
+    }
 
-    let misses = [];
+    const scores = attempts.map(a => a.percent);
+    const avg = Math.round(scores.reduce((a,b)=>a+b,0) / scores.length);
+    const best = Math.max(...scores);
+    const passes = attempts.filter(a=>a.percent>=75).length;
+    const passRate = Math.round((passes / attempts.length) * 100);
 
-    Object.values(store).forEach(attempts=>{
-        attempts.forEach(a=>{
-            if (a.missed)
-                misses = misses.concat(a.missed);
+    let trendMsg = "Keep going!";
+    let trendClass = "";
+    if (attempts.length >= 2) {
+        const last = attempts[attempts.length-1].percent;
+        const prev = attempts[attempts.length-2].percent;
+        if (last > prev) { trendMsg = "📈 Improving — Great work!"; trendClass="good"; }
+        else if (last < prev) { trendMsg = "📉 Slight drop — Review missed topics"; trendClass="bad"; }
+        else { trendMsg = "➡️ Holding steady"; trendClass="warn"; }
+    }
+
+    let missedMap = {};
+    attempts.forEach(a=>{
+        if (!a.missed) return;
+        a.missed.forEach(m=>{
+            missedMap[m] = (missedMap[m]||0)+1;
         });
     });
 
-    if (!misses.length) {
-        box.innerHTML = `
-            <div class="stat-title">🔥 Most Missed Questions</div>
-            <div>No missed question data yet 🎉</div>
-        `;
-        return;
-    }
-
-    // Normalize + filter
-    const clean = misses
-        .map(m => {
-            if (typeof m === "number") return m;
-            if (typeof m === "string" && /^\d+$/.test(m)) return Number(m);
-            if (typeof m === "object" && m !== null)
-                return m.number ?? m.id ?? m.q ?? m.index ?? null;
-            return null;
-        })
-        .filter(m => typeof m === "number" && !isNaN(m));
-
-    const map = {};
-    clean.forEach(m=>{
-        if (!map[m]) map[m] = 0;
-        map[m]++;
-    });
-
-    const sorted = Object.entries(map)
-        .sort((a,b)=>b[1]-a[1])
-        .slice(0,10);
-
-    let html = `<div class="stat-title">🔥 Most Missed Questions</div>`;
-    html += `<div>(Higher bar = missed more often)</div><br>`;
-
-    sorted.forEach(([q,count])=>{
-        const width = Math.min(count*25, 300);
-        const color =
-            count >= 6 ? "#ff4d4d" :
-            count >= 3 ? "#ff9933" :
-            "#ffe066";
-
-        html += `
-            <div>
-                Q${q}
-                <div style="
-                    display:inline-block;
-                    height:12px;
-                    width:${width}px;
-                    background:${color};
-                    margin-left:8px;">
-                </div>
-                <small> (${count} misses)</small>
+    let missedHtml = "<p>No common misses yet 🎉</p>";
+    const missedKeys = Object.keys(missedMap);
+    if (missedKeys.length) {
+        missedHtml = missedKeys
+            .sort((a,b)=>missedMap[b]-missedMap[a])
+            .map(q=>`
+            <div class="barRow">
+                <div class="barFill" style="width:${Math.min(missedMap[q]*20,100)}%"></div>
             </div>
-        `;
-    });
-
-    box.innerHTML = html;
-}
-
-/* =========================
-   MAIN DASHBOARD
-========================= */
-function buildDashboard() {
-    const store = loadHistoryStore();
-    const quizKeys = Object.keys(store);
-
-    const overview = document.getElementById("overview");
-    const progress = document.getElementById("progress");
-    const sets = document.getElementById("sets");
-    const timeStats = document.getElementById("timeStats");
-
-    if (!quizKeys.length) {
-        overview.innerHTML = "❌ No quiz history yet. Take some exams first.";
-        return;
+            <div class="barLabel">Question ${q} — ${missedMap[q]} misses</div>
+        `).join("");
     }
 
-    let allAttempts = [];
-    quizKeys.forEach(key => allAttempts = allAttempts.concat(store[key]));
-    allAttempts.sort((a,b)=> new Date(a.date) - new Date(b.date));
+    const studyCount = attempts.filter(a=>a.mode==="Study").length;
+    const examCount = attempts.filter(a=>a.mode==="Exam").length;
 
-    const scores = allAttempts.map(a => a.percent);
-    const avg = Math.round(scores.reduce((a,b)=>a+b,0) / scores.length);
-    const best = Math.max(...scores);
-    const worst = Math.min(...scores);
-
-    overview.innerHTML = `
-        <div class="stat-title">⭐ Overall Performance</div>
-        <div><b>Total Attempts:</b> ${allAttempts.length}</div>
-        <div><b>Average Score:</b> ${avg}%</div>
-        <div><b>Best Score:</b> ${best}%</div>
-        <div><b>Worst Score:</b> ${worst}%</div>
-    `;
-
-    const first = scores[0];
-    const last = scores[scores.length-1];
-    const diff = last - first;
-
-    progress.innerHTML = `
-        <div class="stat-title">📈 Progress Over Time</div>
-        <div><b>First Attempt:</b> ${first}%</div>
-        <div><b>Latest Attempt:</b> ${last}%</div>
-        <div><b>Change:</b>
-            <span style="color:${diff>=0?"#00ff80":"#ff4d4d"}">
-                ${diff>=0?"+":""}${diff}%
-            </span>
+    div.innerHTML = `
+    <div class="stat-grid">
+        <div class="stat-card">
+            <div>Total Attempts</div>
+            <div class="big">${attempts.length}</div>
         </div>
+
+        <div class="stat-card">
+            <div>Average Score</div>
+            <div class="big">${avg}%</div>
+        </div>
+
+        <div class="stat-card">
+            <div>Best Score</div>
+            <div class="big good">${best}%</div>
+        </div>
+
+        <div class="stat-card">
+            <div>Pass Rate</div>
+            <div class="big ${passRate>=75?'good':passRate>=50?'warn':'bad'}">
+                ${passRate}%
+            </div>
+        </div>
+    </div>
+
+    <div class="section ${trendClass}">
+        <h2>📈 Performance Trend</h2>
+        <p>${trendMsg}</p>
+    </div>
+
+    <div class="section">
+        <h2>🔥 Most Missed Questions</h2>
+        ${missedHtml}
+    </div>
+
+    <div class="section">
+        <h2>🧪 Mode Usage</h2>
+        Study Mode: <b>${studyCount}</b><br>
+        Exam Mode: <b>${examCount}</b>
+    </div>
     `;
-
-    let setHtml = `<div class="stat-title">📘 Performance by Quiz Set</div>`;
-    const setLabels = [];
-    const setValues = [];
-
-    quizKeys.forEach(k=>{
-        const attempts = store[k];
-        const avg = Math.round(attempts.reduce((a,b)=>a+b.percent,0)/attempts.length);
-
-        setLabels.push(k.replace("/data/",""));
-        setValues.push(avg);
-
-        setHtml += `
-            <div>
-                ${k.replace("/data/","")} —
-                <b>${avg}% avg</b>
-                <small>(${attempts.length} attempts)</small>
-            </div>`;
-    });
-
-    sets.innerHTML = setHtml;
-
-    const times = allAttempts.map(a => (90*60 - a.timeRemaining) / 60);
-    const avgTime = Math.round(times.reduce((a,b)=>a+b,0) / times.length);
-    const fastest = Math.round(Math.min(...times));
-    const slowest = Math.round(Math.max(...times));
-
-    timeStats.innerHTML = `
-        <div class="stat-title">⏱ Time Behavior</div>
-        <div><b>Average Time Used:</b> ${avgTime} min</div>
-        <div><b>Fastest:</b> ${fastest} min</div>
-        <div><b>Slowest:</b> ${slowest} min</div>
-    `;
-
-    buildTrendMessage(allAttempts);
-    buildHeatmap(store);
-
-    renderCharts(allAttempts, setLabels, setValues);
-}
-
-/* =========================
-   CHARTS
-========================= */
-function renderCharts(attempts, setLabels, setValues) {
-
-    new Chart(document.getElementById("trendChart"), {
-        type: "line",
-        data: {
-            labels: attempts.map((a,i)=>`Attempt ${i+1}`),
-            datasets: [{
-                label: "Score %",
-                data: attempts.map(a=>a.percent),
-                borderColor: "#00ff80",
-                backgroundColor: "rgba(0,255,128,0.2)",
-                tension: .3
-            }]
-        },
-        options: { scales: { y: { beginAtZero:true, max:100 } } }
-    });
-
-    new Chart(document.getElementById("setChart"), {
-        type: "bar",
-        data: {
-            labels: setLabels,
-            datasets: [{
-                label: "Average Score %",
-                data: setValues,
-                backgroundColor: "#0096ff"
-            }]
-        },
-        options: { scales: { y: { beginAtZero:true, max:100 } } }
-    });
-
-    new Chart(document.getElementById("timeChart"), {
-        type: "bar",
-        data: {
-            labels: attempts.map((a,i)=>`Attempt ${i+1}`),
-            datasets: [{
-                label: "Minutes Used",
-                data: attempts.map(a=> Math.round((90*60 - a.timeRemaining) / 60)),
-                backgroundColor: "#ffcc00"
-            }]
-        },
-        options: { scales: { y: { beginAtZero:true } } }
-    });
 }
 
 buildDashboard();
