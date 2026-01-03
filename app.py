@@ -142,6 +142,9 @@ def delete_quiz(html_name):
 def quiz_library():
     quizzes = sorted(load_registry(), key=lambda x: x["timestamp"], reverse=True)
 
+    # ✅ Get saved portal title
+    portal_title = get_portal_title()
+
     return render_template_string("""
     <html>
     <head>
@@ -153,7 +156,8 @@ def quiz_library():
     <div class="container">
 
         <h1 class="hero-title">
-            📚 Quiz Library
+            {{portal_title}}<br>
+            <span style="font-size:22px;opacity:.85">📚 Quiz Library</span>
         </h1>
 
         <div class="card">
@@ -235,7 +239,8 @@ def quiz_library():
     </div>
     </body>
     </html>
-    """, quizzes=quizzes)
+    """, quizzes=quizzes, portal_title=portal_title)
+
 
 
 
@@ -265,12 +270,7 @@ def upload_page():
 
             <form action="/process" method="POST" enctype="multipart/form-data">
 
-                <h3>Portal Title</h3>
-                <input type="text" name="portal_title"
-                       value="{portal_title}"
-                       required style="width:100%;padding:6px">
-
-                <br><br>
+                
 
                 <h3>Quiz Display Title</h3>
                 <input type="text" name="quiz_title"
@@ -320,8 +320,7 @@ def process_file():
 
 
     quiz_title = request.form.get("quiz_title", "Generated Quiz")
-    portal_title = request.form.get("portal_title", "Training & Practice Center")
-    save_portal_title(portal_title)
+    
 
     if not file:
         return "No file uploaded", 400
@@ -353,17 +352,71 @@ def process_file():
         json.dump(quiz_data, f, indent=4)
 
     build_quiz_html(
-        html_name,
-        json_name,
-        os.path.join(QUIZ_FOLDER, html_name),
-        portal_title,
-        quiz_title,
-        logo_filename
-    )
+    html_name,
+    json_name,
+    os.path.join(QUIZ_FOLDER, html_name),
+    get_portal_title(),   # <-- always current saved title
+    quiz_title,
+    logo_filename
+)
+
 
     add_quiz_to_registry(html_name, quiz_title, logo_filename)
 
     return redirect("/library")
+
+
+# =========================
+# SETTINGS PAGE
+# =========================
+@app.route("/settings")
+def settings_page():
+    portal_title = get_portal_title()
+
+    return render_template_string("""
+    <html>
+    <head>
+    <title>Portal Settings</title>
+    <link rel="stylesheet" href="/style.css">
+    </head>
+
+    <body>
+    <div class="container">
+
+        <h1 class="hero-title">
+            ⚙️ Portal Configuration
+        </h1>
+
+        <div class="card">
+
+            <form action="/save_settings" method="POST">
+
+                <h3>Training Portal Title</h3>
+                <input type="text"
+                       name="portal_title"
+                       value="{{portal_title}}"
+                       required style="width:100%; padding:6px">
+
+                <br><br>
+
+                <button type="submit">💾 Save Settings</button>
+            </form>
+
+            <br>
+            <button onclick="location.href='/'">⬅ Back To Portal</button>
+
+        </div>
+
+    </div>
+    </body>
+    </html>
+    """, portal_title=portal_title)
+
+@app.route("/save_settings", methods=["POST"])
+def save_settings():
+    title = request.form.get("portal_title", "Training & Practice Center")
+    save_portal_title(title)
+    return redirect("/")
 
 
 # =========================
@@ -541,6 +594,10 @@ const QUIZ_FILE = "/data/{jsonfile}";
 """
     with open(outpath, "w") as f:
         f.write(html)
+
+
+
+
 
 
 
