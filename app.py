@@ -483,135 +483,107 @@ def parse_questions(filepath):
 # QUIZ HTML BUILDER
 # =========================
 def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_filename):
-    logo_html = ""
+    # Optional logo for mode banner (left/right)
     if logo_filename:
-        logo_html = f'<img src="/static/logos/{logo_filename}" style="max-height:120px; margin-bottom:10px;">'
+        mode_logo = f'<img src="/static/logos/{logo_filename}" class="mode-badge">'
+    else:
+        mode_logo = ""
 
-    left_logo = f'<img src="/static/logos/{logo_filename}" style="max-height:90px;">' if logo_filename else ""
-    right_logo = left_logo
-
-    html = f"""
-<!DOCTYPE html>
+    html = f"""<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
 <title>{quiz_title}</title>
 <link rel="stylesheet" href="/style.css">
-
-<style>
-#pauseOverlay {{
-    position: fixed;
-    top:0; left:0; right:0; bottom:0;
-    background: rgba(0,0,0,0.85);
-    backdrop-filter: blur(10px);
-    display:none;
-    align-items:center;
-    justify-content:center;
-    z-index: 99999;
-}}
-.pause-box {{
-    background: rgba(0,0,0,.8);
-    padding:25px;
-    border-radius:12px;
-    text-align:center;
-    border:1px solid rgba(255,255,255,.3);
-}}
-</style>
-
 </head>
 
 <body>
 
-<div class="container">
-
-<div style="text-align:center">
-    {logo_html}
-    <h1 class="hero-title">
-        {portal_title}<br>
-        <span style="font-size:20px;opacity:.85">{quiz_title}</span>
-    </h1>
+<!-- 🔹 Overlay shown when exam is paused -->
+<div id="pauseOverlay" class="pause-overlay">
+    <div class="pause-overlay-content">
+        <h2>Exam Paused</h2>
+        <p>Your time is frozen. Click Resume to continue.</p>
+        <button onclick="resumeExam()">Resume</button>
+    </div>
 </div>
 
-<div id="modeSelect" class="card">
+<!-- 🔹 Everything that should blur goes inside this wrapper -->
+<div id="quizWrapper" class="blur-wrapper">
+    <div class="container">
 
-    <div style="
-        display:flex;
-        align-items:center;
-        justify-content:space-between;
-        gap:25px;
-        flex-wrap:wrap;
-    ">
+        <!-- Readable Centered Banner -->
+        <h1 class="hero-title">
+            {portal_title}<br>
+            <span style="font-size:20px;opacity:.85">{quiz_title}</span>
+        </h1>
 
-        {left_logo}
-
-        <div style="text-align:center; flex-grow:1;">
-            <h2>Select Mode</h2>
-
-            <button onclick="startQuiz(false)">Study Mode</button>
-            <button onclick="startQuiz(true)">Exam Mode</button>
+        <!-- Mode Select -->
+        <div id="modeSelect" class="card">
+            <div class="mode-banner">
+                {mode_logo}
+                <div class="mode-center">
+                    <h2>Select Mode</h2>
+                    <button onclick="startQuiz(false)">Study Mode</button>
+                    <button onclick="startQuiz(true)">Exam Mode</button>
+                </div>
+                {mode_logo}
+            </div>
         </div>
 
-        {right_logo}
+        <!-- Quiz Area -->
+        <div id="quiz" class="hidden">
 
-    </div>
+            <!-- Progress Bar -->
+            <div id="progressBarOuter">
+                <div id="progressBarInner"></div>
+            </div>
 
-</div>
+            <button onclick="document.body.classList.toggle('high-contrast')">
+                🌓 Toggle High Contrast
+            </button>
 
-<div id="timer" class="hidden">
-    <h3>Exam Timer: <span id="timeDisplay">90:00</span></h3>
-</div>
+            <!-- Exam Timer -->
+            <div id="timer" class="hidden timerBox">
+                <b>Time Remaining:</b>
+                <span id="timeDisplay">--:--</span>
 
-<div id="quiz" class="hidden">
+                <button id="pauseBtn" onclick="pauseExam()">Pause</button>
+                <button id="resumeBtn" class="hidden" onclick="resumeExam()">Resume</button>
+            </div>
 
-    <h2 id="qHeader"></h2>
-    <div id="qText" class="question-text"></div>
+            <div id="qHeader"></div>
+            <div id="qText"></div>
+            <div id="choices"></div>
 
-    <div id="choices" class="choices"></div>
+            <div class="controls">
+                <button onclick="prev()">Prev</button>
+                <button onclick="next()">Next</button>
+                <button onclick="submitQuiz()">Submit Exam</button>
+            </div>
+        </div>
 
-    <div class="nav-buttons">
-        <button onclick="prev()">Previous</button>
-        <button onclick="next()">Next</button>
-        <button onclick="submitQuiz()">Submit Exam</button>
+        <div id="result" class="hidden"></div>
 
-        <button id="pauseBtn" class="hidden" onclick="togglePause()">
-            ⏸ Pause Exam
-        </button>
-    </div>
+        <br>
+        <button onclick="location.href='/'">🏠 Return To Portal</button>
+        <button onclick="location.href='/library'">📚 Return To Quiz Library</button>
 
-    <div id="progressBar">
-        <div id="progressBarInner"></div>
-    </div>
-</div>
-
-<div id="result" class="hidden"></div>
-
-<div id="pauseOverlay">
-    <div class="pause-box">
-        <h1>⏸ Exam Paused</h1>
-        <p>Click resume to continue</p>
-        <button onclick="togglePause()">▶ Resume Exam</button>
     </div>
 </div>
 
 <script>
-const QUIZ_FILE = "/data/{jsonfile}";
+  /* This tells script.js which JSON file to load for this quiz */
+  const QUIZ_FILE = "/data/{jsonfile}";
 </script>
 
 <script src="/script.js"></script>
-
-<br>
-
-<div style="text-align:center;">
-    <button onclick="location.href='/'">🏠 Return To Portal</button>
-    <button onclick="location.href='/library'">📚 Return To Quiz Library</button>
-</div>
-
-</div>
 </body>
 </html>
 """
-    with open(outpath, "w") as f:
+    with open(outpath, "w", encoding="utf-8") as f:
         f.write(html)
+
 
 
 
