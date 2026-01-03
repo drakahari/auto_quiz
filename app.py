@@ -75,9 +75,20 @@ def add_quiz_to_registry(html_name, quiz_title, logo_filename):
 # ROOT + STATIC (ORDER MATTERS)
 # =========================
 
+# =========================
+# HOME PAGE (DYNAMIC)
+# =========================
 @app.route("/")
 def home():
-    return send_from_directory(".", "index.html")
+    portal_title = get_portal_title()
+
+    # Load index.html so we keep your existing layout
+    with open(os.path.join(BASE_DIR, "index.html"), "r", encoding="utf-8") as f:
+        html = f.read()
+
+    # Render it as a Jinja template so {{ portal_title }} works
+    return render_template_string(html, portal_title=portal_title)
+
 
 
 @app.route("/data/<path:filename>")
