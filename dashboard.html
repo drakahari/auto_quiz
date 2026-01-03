@@ -144,9 +144,6 @@ function buildDashboard() {
         `).join("");
     }
 
-    const studyCount = attempts.filter(a=>a.mode==="Study").length;
-    const examCount = attempts.filter(a=>a.mode==="Exam").length;
-
     div.innerHTML = `
     <div class="stat-grid">
         <div class="stat-card">
@@ -180,12 +177,6 @@ function buildDashboard() {
     <div class="section">
         <h2>🔥 Most Missed Questions</h2>
         ${missedHtml}
-    </div>
-
-    <div class="section">
-        <h2>🧪 Mode Usage</h2>
-        Study Mode: <b>${studyCount}</b><br>
-        Exam Mode: <b>${examCount}</b>
     </div>
     `;
 }

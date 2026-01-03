@@ -162,46 +162,64 @@ def quiz_library():
                 <h2>Available Quizzes</h2>
 
                 {% for q in quizzes %}
-                    <div class="quiz-card"
-     style="padding:12px; margin:10px; background:rgba(0,0,0,.6); border-radius:8px;">
+                <div class="quiz-card"
+                     style="padding:12px; margin:10px; background:rgba(0,0,0,.6); border-radius:8px;">
 
-    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                        
+                        <!-- LEFT SIDE TEXT -->
+                        <div>
+                            <h3 style="margin:0;">
+                                {{q['title']}}
+                            </h3>
+                            <small>{{q['html']}}</small>
+                        </div>
 
-        <!-- LEFT SIDE (Clickable Area) -->
-        <div style="cursor:pointer"
-             onclick="location.href='/quizzes/{{q['html']}}'">
-            <h3 style="margin:0;">
-                {{q['title']}}
-            </h3>
-            <small>{{q['html']}}</small>
-        </div>
+                        <!-- RIGHT SIDE LOGO -->
+                        {% if q.get('logo') %}
+                        <img src="/static/logos/{{q['logo']}}"
+                             style="max-height:70px; width:auto;">
+                        {% endif %}
+                    </div>
 
-        <!-- RIGHT LOGO -->
-        {% if q.get('logo') %}
-        <img src="/static/logos/{{q['logo']}}"
-             style="max-height:70px; width:auto; margin-left:10px;">
-        {% endif %}
-    </div>
+                    <!-- BUTTON ROW -->
+                    <div style="margin-top:10px; display:flex; gap:10px;">
 
-    <!-- DELETE BUTTON (NOT CLICKABLE AREA) -->
-    <form method="POST"
-          action="/delete_quiz/{{q['html']}}"
-          onsubmit="return confirm('Delete this quiz permanently?');"
-          style="margin-top:8px;">
+                        <!-- OPEN BUTTON -->
+                        <button
+                            onclick="location.href='/quizzes/{{q['html']}}'"
+                            style="
+                                background:#1e9bff;
+                                color:white;
+                                border:none;
+                                padding:6px 12px;
+                                border-radius:6px;
+                                cursor:pointer;
+                                font-size:14px;">
+                            ▶️ Open Quiz
+                        </button>
 
-        <button type="submit" style="
-            background:#a30000;
-            color:white;
-            border:none;
-            padding:6px 10px;
-            border-radius:6px;
-            cursor:pointer;">
-            Delete
-        </button>
-    </form>
+                        <!-- DELETE BUTTON -->
+                        <form method="POST"
+                              action="/delete_quiz/{{q['html']}}"
+                              onsubmit="return confirm('Delete this quiz permanently?');">
 
-</div>
+                            <button type="submit" style="
+                                background:#7a0000;
+                                color:white;
+                                border:none;
+                                padding:4px 8px;
+                                font-size:12px;
+                                border-radius:6px;
+                                opacity:.8;
+                                cursor:pointer;">
+                                🗑 Delete
+                            </button>
 
+                        </form>
+                    </div>
+
+                </div>
                 {% endfor %}
 
             {% else %}
@@ -211,12 +229,14 @@ def quiz_library():
             <br>
             <button onclick="location.href='/upload'">📤 Upload New Quiz</button>
             <button onclick="location.href='/'">⬅ Back To Portal</button>
+
         </div>
 
     </div>
     </body>
     </html>
     """, quizzes=quizzes)
+
 
 
 
@@ -259,15 +279,19 @@ def upload_page():
 
                 <br><br>
 
-                <h3>Select questions.txt</h3>
-                <input type="file" name="file" required>
+                <h3>Select Quiz Text File</h3>
+                <p style="opacity:.7; font-size:12px">
+                    Upload any properly formatted .txt file
+                </p>
+
+                <input type="file" name="file" accept=".txt" required>
 
                 <br><br>
 
                 <h3>Upload Logo (Optional)</h3>
                 <input type="file" name="quiz_logo" accept="image/*">
                 <p style="opacity:0.7; font-size:12px">
-                Supported: PNG / JPG / GIF
+                    Supported: PNG / JPG / GIF
                 </p>
 
                 <button type="submit">Upload & Build Quiz</button>
@@ -282,12 +306,18 @@ def upload_page():
     """)
 
 
+
 # =========================
 # PROCESS UPLOAD
 # =========================
 @app.route("/process", methods=["POST"])
 def process_file():
     file = request.files["file"]
+
+    # Ensure file is a .txt
+    if not file.filename.lower().endswith(".txt"):
+        return "Only .txt files are supported.", 400
+
 
     quiz_title = request.form.get("quiz_title", "Generated Quiz")
     portal_title = request.form.get("portal_title", "Training & Practice Center")
