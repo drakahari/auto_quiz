@@ -549,7 +549,7 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
                 <span id="timeDisplay">--:--</span>
 
                 <button id="pauseBtn" onclick="pauseExam()">Pause</button>
-                <button id="resumeBtn" class="hidden" onclick="resumeExam()">Resume</button>
+                
             </div>
 
             <div id="qHeader"></div>
