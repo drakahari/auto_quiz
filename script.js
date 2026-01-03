@@ -5,6 +5,9 @@ let quiz = [];
 let index = 0;
 let userAnswers = {};
 let examMode = false;
+let paused = false;
+let savedTime = 0;
+
 
 const HISTORY_KEY = "serverplus_history_v2";
 
@@ -268,35 +271,56 @@ function saveHistory(score, percent, missed, attemptId) {
 }
 
 /* =====================================================
-      TIMER
+      EXAM TIMER + PAUSE
 ===================================================== */
-let timerInterval = null;
-let timeRemaining = 90 * 60;
+
+let examTimer = null;
+/*let paused = false; */
+let timeRemaining = 90 * 60;   // 90 minutes default
 
 function startExamTimer() {
-    timeRemaining = 90 * 60;
-    clearInterval(timerInterval);
+    const timeDisplay = document.getElementById("timeDisplay");
 
-    const timer = document.getElementById("timer");
-    const display = document.getElementById("timeDisplay");
-    if (timer) timer.classList.remove("hidden");
+    // Prevent multiple timers
+    if (examTimer) clearInterval(examTimer);
 
-    timerInterval = setInterval(() => {
+    examTimer = setInterval(() => {
+        if (paused) return;
+
         timeRemaining--;
+
         const m = Math.floor(timeRemaining / 60);
         const s = timeRemaining % 60;
 
-        if (display) display.innerText = `${m}:${s.toString().padStart(2, "0")}`;
+        timeDisplay.innerText = `${m}:${s.toString().padStart(2, "0")}`;
 
         if (timeRemaining <= 0) {
-            clearInterval(timerInterval);
+            clearInterval(examTimer);
             submitQuiz();
         }
+
     }, 1000);
 }
 
+function togglePause() {
+    const overlay = document.getElementById("pauseOverlay");
+    const btn = document.getElementById("pauseBtn");
+
+    paused = !paused;
+
+    if (paused) {
+        overlay.classList.remove("hidden");
+        overlay.style.display = "flex";
+        btn.innerText = "▶ Resume Exam";
+    } else {
+        overlay.classList.add("hidden");
+        overlay.style.display = "none";
+        btn.innerText = "⏸ Pause Exam";
+    }
+}
+
 function stopExamTimer() {
-    clearInterval(timerInterval);
+    if (examTimer) clearInterval(examTimer);
 }
 
 /* =====================================================

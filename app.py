@@ -82,13 +82,10 @@ def add_quiz_to_registry(html_name, quiz_title, logo_filename):
 def home():
     portal_title = get_portal_title()
 
-    # Load index.html so we keep your existing layout
     with open(os.path.join(BASE_DIR, "index.html"), "r", encoding="utf-8") as f:
         html = f.read()
 
-    # Render it as a Jinja template so {{ portal_title }} works
     return render_template_string(html, portal_title=portal_title)
-
 
 
 @app.route("/data/<path:filename>")
@@ -152,8 +149,6 @@ def delete_quiz(html_name):
 @app.route("/library")
 def quiz_library():
     quizzes = sorted(load_registry(), key=lambda x: x["timestamp"], reverse=True)
-
-    # ✅ Get saved portal title
     portal_title = get_portal_title()
 
     return render_template_string("""
@@ -182,7 +177,6 @@ def quiz_library():
 
                     <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
                         
-                        <!-- LEFT SIDE TEXT -->
                         <div>
                             <h3 style="margin:0;">
                                 {{q['title']}}
@@ -190,17 +184,14 @@ def quiz_library():
                             <small>{{q['html']}}</small>
                         </div>
 
-                        <!-- RIGHT SIDE LOGO -->
                         {% if q.get('logo') %}
                         <img src="/static/logos/{{q['logo']}}"
                              style="max-height:70px; width:auto;">
                         {% endif %}
                     </div>
 
-                    <!-- BUTTON ROW -->
                     <div style="margin-top:10px; display:flex; gap:10px;">
 
-                        <!-- OPEN BUTTON -->
                         <button
                             onclick="location.href='/quizzes/{{q['html']}}'"
                             style="
@@ -214,7 +205,6 @@ def quiz_library():
                             ▶️ Open Quiz
                         </button>
 
-                        <!-- DELETE BUTTON -->
                         <form method="POST"
                               action="/delete_quiz/{{q['html']}}"
                               onsubmit="return confirm('Delete this quiz permanently?');">
@@ -253,9 +243,6 @@ def quiz_library():
     """, quizzes=quizzes, portal_title=portal_title)
 
 
-
-
-
 # =========================
 # UPLOAD PAGE
 # =========================
@@ -274,14 +261,12 @@ def upload_page():
     <div class="container">
 
         <h1 class="hero-title">
-            📤 Upload Quiz / Configure Portal
+            📤 Upload Quiz
         </h1>
 
         <div class="card">
 
             <form action="/process" method="POST" enctype="multipart/form-data">
-
-                
 
                 <h3>Quiz Display Title</h3>
                 <input type="text" name="quiz_title"
@@ -317,7 +302,6 @@ def upload_page():
     """)
 
 
-
 # =========================
 # PROCESS UPLOAD
 # =========================
@@ -325,13 +309,10 @@ def upload_page():
 def process_file():
     file = request.files["file"]
 
-    # Ensure file is a .txt
     if not file.filename.lower().endswith(".txt"):
         return "Only .txt files are supported.", 400
 
-
     quiz_title = request.form.get("quiz_title", "Generated Quiz")
-    
 
     if not file:
         return "No file uploaded", 400
@@ -339,7 +320,6 @@ def process_file():
     path = os.path.join(UPLOAD_FOLDER, "latest.txt")
     file.save(path)
 
-    # ---- LOGO HANDLING ----
     logo_file = request.files.get("quiz_logo")
     logo_filename = None
 
@@ -363,14 +343,13 @@ def process_file():
         json.dump(quiz_data, f, indent=4)
 
     build_quiz_html(
-    html_name,
-    json_name,
-    os.path.join(QUIZ_FOLDER, html_name),
-    get_portal_title(),   # <-- always current saved title
-    quiz_title,
-    logo_filename
-)
-
+        html_name,
+        json_name,
+        os.path.join(QUIZ_FOLDER, html_name),
+        get_portal_title(),
+        quiz_title,
+        logo_filename
+    )
 
     add_quiz_to_registry(html_name, quiz_title, logo_filename)
 
@@ -422,6 +401,7 @@ def settings_page():
     </body>
     </html>
     """, portal_title=portal_title)
+
 
 @app.route("/save_settings", methods=["POST"])
 def save_settings():
@@ -507,7 +487,6 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
     if logo_filename:
         logo_html = f'<img src="/static/logos/{logo_filename}" style="max-height:120px; margin-bottom:10px;">'
 
-    # Logos for left + right of Mode block
     left_logo = f'<img src="/static/logos/{logo_filename}" style="max-height:90px;">' if logo_filename else ""
     right_logo = left_logo
 
@@ -518,6 +497,27 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
 <meta charset="UTF-8">
 <title>{quiz_title}</title>
 <link rel="stylesheet" href="/style.css">
+
+<style>
+#pauseOverlay {{
+    position: fixed;
+    top:0; left:0; right:0; bottom:0;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(10px);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index: 99999;
+}}
+.pause-box {{
+    background: rgba(0,0,0,.8);
+    padding:25px;
+    border-radius:12px;
+    text-align:center;
+    border:1px solid rgba(255,255,255,.3);
+}}
+</style>
+
 </head>
 
 <body>
@@ -532,7 +532,6 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
     </h1>
 </div>
 
-<!-- Mode Select -->
 <div id="modeSelect" class="card">
 
     <div style="
@@ -558,12 +557,10 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
 
 </div>
 
-<!-- TIMER -->
 <div id="timer" class="hidden">
     <h3>Exam Timer: <span id="timeDisplay">90:00</span></h3>
 </div>
 
-<!-- QUIZ AREA -->
 <div id="quiz" class="hidden">
 
     <h2 id="qHeader"></h2>
@@ -575,6 +572,10 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
         <button onclick="prev()">Previous</button>
         <button onclick="next()">Next</button>
         <button onclick="submitQuiz()">Submit Exam</button>
+
+        <button id="pauseBtn" class="hidden" onclick="togglePause()">
+            ⏸ Pause Exam
+        </button>
     </div>
 
     <div id="progressBar">
@@ -582,8 +583,15 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
     </div>
 </div>
 
-<!-- RESULT -->
 <div id="result" class="hidden"></div>
+
+<div id="pauseOverlay">
+    <div class="pause-box">
+        <h1>⏸ Exam Paused</h1>
+        <p>Click resume to continue</p>
+        <button onclick="togglePause()">▶ Resume Exam</button>
+    </div>
+</div>
 
 <script>
 const QUIZ_FILE = "/data/{jsonfile}";
@@ -601,14 +609,9 @@ const QUIZ_FILE = "/data/{jsonfile}";
 </div>
 </body>
 </html>
-
 """
     with open(outpath, "w") as f:
         f.write(html)
-
-
-
-
 
 
 
