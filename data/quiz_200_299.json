@@ -1,0 +1,2623 @@
+[
+  {
+    "number": 200,
+    "question": "After the installation of an additional network card into a server, the server will not boot into the OS. A technician tests the network card in a different server with a different OS and verifies the card functions correctly. Which of the following should the technician do NEXT to troubleshoot this issue?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Remove the original network card and attempt to boot using only the new network card."
+      },
+      {
+        "letter": "B",
+        "text": "Check that the BIOS is configured to recognize the second network card."
+      },
+      {
+        "letter": "C",
+        "text": "Ensure the server has enough RAM to run a second network card."
+      },
+      {
+        "letter": "D",
+        "text": "Verify the network card is on the HCL for the OS."
+      }
+    ],
+    "correct_answers": [
+      "D"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 201,
+    "question": "A server room contains ten physical servers that are running applications and a cluster of three dedicated hypervisors. The hypervisors are new and only have 10% utilization. The Chief Financial Officer has asked that the IT department do what it can to cut back on power consumption and maintenance costs in the data center. Which of the following would address the request with minimal server downtime?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Unplug the power cables from the redundant power supplies, leaving just the minimum required."
+      },
+      {
+        "letter": "B",
+        "text": "Convert the physical servers to the hypervisors and retire the ten servers."
+      },
+      {
+        "letter": "C",
+        "text": "Reimage the physical servers and retire all ten servers after the migration is complete."
+      },
+      {
+        "letter": "D",
+        "text": "Convert the ten servers to power-efficient core editions."
+      }
+    ],
+    "correct_answers": [
+      "B"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 202,
+    "question": "A company needs to increase the security controls on its servers. An administrator is implementing MFA on all servers using cost-effective techniques. Which of the following should the administrator use to satisfy the MFA requirement?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Biometrics"
+      },
+      {
+        "letter": "B",
+        "text": "Push notifications"
+      },
+      {
+        "letter": "C",
+        "text": "Smart cards"
+      },
+      {
+        "letter": "D",
+        "text": "Physical tokens"
+      }
+    ],
+    "correct_answers": [
+      "B"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 203,
+    "question": "An organization implements split encryption keys for sensitive files. Which of the following types of risks does this mitigate?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Hardware failure"
+      },
+      {
+        "letter": "B",
+        "text": "Malware"
+      },
+      {
+        "letter": "C",
+        "text": "Data corruption"
+      },
+      {
+        "letter": "D",
+        "text": "Insider threat"
+      }
+    ],
+    "correct_answers": [
+      "D"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 204,
+    "question": "An administrator is installing a new file server that has four drive bays available. Which of the following RAID types would provide the MOST storage as well as disk redundancy?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "RAID 0"
+      },
+      {
+        "letter": "B",
+        "text": "RAID 1"
+      },
+      {
+        "letter": "C",
+        "text": "RAID 5"
+      },
+      {
+        "letter": "D",
+        "text": "RAID 10"
+      }
+    ],
+    "correct_answers": [
+      "C"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 205,
+    "question": "A company\u2019s servers are all displaying the wrong time. The server administrator confirms the time source is correct. Which of the following is MOST likely preventing the servers from obtaining the correct time?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "A firewall"
+      },
+      {
+        "letter": "B",
+        "text": "An antivirus"
+      },
+      {
+        "letter": "C",
+        "text": "A HIDS"
+      },
+      {
+        "letter": "D",
+        "text": "User account control"
+      }
+    ],
+    "correct_answers": [
+      "A"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 206,
+    "question": "A server administrator encounters some issues with the server OS after applying monthly patches. Which of the following troubleshooting steps should the administrator perform?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Implement rollback procedures."
+      },
+      {
+        "letter": "B",
+        "text": "Upgrade the drivers."
+      },
+      {
+        "letter": "C",
+        "text": "Reinstall the OS."
+      },
+      {
+        "letter": "D",
+        "text": "Reboot the server."
+      }
+    ],
+    "correct_answers": [
+      "A"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 207,
+    "question": "An administrator notices that a file server is filling up quickly but has many of the same files in different directories. Which of the following storage management techniques would resolve this issue?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Provisioning"
+      },
+      {
+        "letter": "B",
+        "text": "Encryption"
+      },
+      {
+        "letter": "C",
+        "text": "Deduplication"
+      },
+      {
+        "letter": "D",
+        "text": "Partitioning"
+      }
+    ],
+    "correct_answers": [
+      "C"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 208,
+    "question": "An administrator is configuring a new server for use as a database server. It will have two mirrored drives to hold the operating system, and there will be three drive bays remaining for storage. Which of the following RAID levels will yield the BEST combination of available space and redundancy?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "RAID 0"
+      },
+      {
+        "letter": "B",
+        "text": "RAID 1"
+      },
+      {
+        "letter": "C",
+        "text": "RAID 5"
+      },
+      {
+        "letter": "D",
+        "text": "RAID 10"
+      }
+    ],
+    "correct_answers": [
+      "C"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 209,
+    "question": "Hosting data in different regional locations but not moving it for long periods of time describes:",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "a cold site."
+      },
+      {
+        "letter": "B",
+        "text": "data at rest."
+      },
+      {
+        "letter": "C",
+        "text": "on-site retention."
+      },
+      {
+        "letter": "D",
+        "text": "off-site storage."
+      }
+    ],
+    "correct_answers": [
+      "B"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 210,
+    "question": "A technician learns users are unable to log in to a Linux server with known-working LDAP credentials. The technician logs in to the server with a local account and confirms the system is functional, can communicate over the network, and is configured correctly. However, the server log has entries regarding Kerberos errors. Which of the following is the MOST likely source of the issue?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "A local firewall is blocking authentication requests."
+      },
+      {
+        "letter": "B",
+        "text": "The users have expired passwords."
+      },
+      {
+        "letter": "C",
+        "text": "The system clock is off by more than five minutes."
+      },
+      {
+        "letter": "D",
+        "text": "The server has no access to the LDAP host."
+      }
+    ],
+    "correct_answers": [
+      "C"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 211,
+    "question": "A senior administrator instructs a technician to run the following script on a Linux server: for i in {1..65536}; do echo $i; telnet localhost $i; done The script mostly returns the following message: Connection refused. However, there are several entries in the console display that look like this: 80 Connected to localhost - 443 Connected to localhost - Which of the following actions should the technician perform NEXT?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Look for an unauthorized HTTP service on this server."
+      },
+      {
+        "letter": "B",
+        "text": "Look for a virus infection on this server."
+      },
+      {
+        "letter": "C",
+        "text": "Look for an unauthorized Telnet service on this server."
+      },
+      {
+        "letter": "D",
+        "text": "Look for an unauthorized port scanning service on this server."
+      }
+    ],
+    "correct_answers": [
+      "A"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 212,
+    "question": "A VLAN needs to be configured within a virtual environment for a new VM. Which of the following will ensure the VM receives a correct IP address?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "A virtual router"
+      },
+      {
+        "letter": "B",
+        "text": "A host NIC"
+      },
+      {
+        "letter": "C",
+        "text": "AVPN"
+      },
+      {
+        "letter": "D",
+        "text": "A virtual switch"
+      },
+      {
+        "letter": "E",
+        "text": "A vNIC"
+      }
+    ],
+    "correct_answers": [
+      "E"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 213,
+    "question": "A user logs in to a Linux server and attempts to run the following command: sudo emacs /root/file However, the user gets the following message: User userid is not allowed to execute \u2018emacs\u2019 on this server. Which of the following would BEST allow the user to find out which commands can be used?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "visudo | grep userid"
+      },
+      {
+        "letter": "B",
+        "text": "sudo -1 -U userid"
+      },
+      {
+        "letter": "C",
+        "text": "cat /etc/passwd"
+      },
+      {
+        "letter": "D",
+        "text": "userlist | grep userid"
+      }
+    ],
+    "correct_answers": [
+      "B"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 214,
+    "question": "A server administrator is connecting a new storage array to a server. The administrator has obtained multiple IP addresses for the array. Which of the following connection types is the server MOST likely using to connect to the array?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "eSATA"
+      },
+      {
+        "letter": "B",
+        "text": "USB"
+      },
+      {
+        "letter": "C",
+        "text": "FC"
+      },
+      {
+        "letter": "D",
+        "text": "iSCSI"
+      }
+    ],
+    "correct_answers": [
+      "D"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 215,
+    "question": "A newly installed server is accessible to local users, but remote users are unable to connect. Which of the following is MOST likely misconfigured?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "The IP address"
+      },
+      {
+        "letter": "B",
+        "text": "The default gateway"
+      },
+      {
+        "letter": "C",
+        "text": "The VLAN"
+      },
+      {
+        "letter": "D",
+        "text": "The subnet mask"
+      }
+    ],
+    "correct_answers": [
+      "B"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 216,
+    "question": "A company\u2019s security team has noticed employees seem to be blocking the door in the main data center when they are working on equipment to avoid having to gain access each time. Which of the following should be implemented to force the employees to enter the data center properly?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "A security camera"
+      },
+      {
+        "letter": "B",
+        "text": "A mantrap"
+      },
+      {
+        "letter": "C",
+        "text": "A security guard"
+      },
+      {
+        "letter": "D",
+        "text": "A proximity card"
+      }
+    ],
+    "correct_answers": [
+      "B"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 217,
+    "question": "Users are able to connect to the wireless network, but they are unable to access the internet. The network administrator verifies connectivity to all network devices, and there are no ISP outages. The server administrator removes the old address leases from the active leases pool, which allows users to access the internet. Which of the following is MOST likely causing the internet issue?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "The DHCP exclusion needs to be removed."
+      },
+      {
+        "letter": "B",
+        "text": "The DHGP scope is full."
+      },
+      {
+        "letter": "C",
+        "text": "The DHCP scope options are misconfigured."
+      },
+      {
+        "letter": "D",
+        "text": "The DHCP lease times are too short."
+      },
+      {
+        "letter": "E",
+        "text": "The DHCP reservations need to be configured."
+      }
+    ],
+    "correct_answers": [
+      "B"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 218,
+    "question": "Which of the following commands would MOST likely be used to register a new service on a Windows OS?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "set-service"
+      },
+      {
+        "letter": "B",
+        "text": "net"
+      },
+      {
+        "letter": "C",
+        "text": "sc"
+      },
+      {
+        "letter": "D",
+        "text": "services.msc"
+      }
+    ],
+    "correct_answers": [
+      "C"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 219,
+    "question": "An administrator receives an alert stating a S.M.A.R.T. error has been detected. Which of the following should the administrator run FIRST to determine the issue?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "A hard drive test"
+      },
+      {
+        "letter": "B",
+        "text": "A RAM test"
+      },
+      {
+        "letter": "C",
+        "text": "A power supply swap"
+      },
+      {
+        "letter": "D",
+        "text": "A firmware update"
+      }
+    ],
+    "correct_answers": [
+      "A"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 220,
+    "question": "A storage administrator needs to implement SAN-based shared storage that can transmit at 16Gb over an optical connection. Which of the following connectivity options would BEST meet this requirement?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Fibre Channel"
+      },
+      {
+        "letter": "B",
+        "text": "FCoE"
+      },
+      {
+        "letter": "C",
+        "text": "iSCSI"
+      },
+      {
+        "letter": "D",
+        "text": "eSATA"
+      }
+    ],
+    "correct_answers": [
+      "A"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 221,
+    "question": "In which of the following media rotation schemes are daily, weekly, and monthly backup media utilized in a first-in, first-out method?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Waterfall"
+      },
+      {
+        "letter": "B",
+        "text": "Synthetic full"
+      },
+      {
+        "letter": "C",
+        "text": "Tower of Hanoi"
+      },
+      {
+        "letter": "D",
+        "text": "Grandfather-father-son"
+      }
+    ],
+    "correct_answers": [
+      "D"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 222,
+    "question": "A company has a data center that is located at its headquarters, and it has a warm site that is located 20mi (32km) away, which serves as a DR location. Which of the following should the company design and implement to ensure its DR site is adequate?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Set up the warm site as a DR cold site."
+      },
+      {
+        "letter": "B",
+        "text": "Set up a DR site that is in the cloud and in the same region."
+      },
+      {
+        "letter": "C",
+        "text": "Set up the warm site as a DR hot site."
+      },
+      {
+        "letter": "D",
+        "text": "Set up a DR site that is geographically located in another region."
+      }
+    ],
+    "correct_answers": [
+      "D"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 223,
+    "question": "Which of the following cloud models is BEST described as running workloads on resources that are owned by the company and hosted in a company-owned data center, as well as on rented servers in another company\u2019s data center?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Private"
+      },
+      {
+        "letter": "B",
+        "text": "Hybrid"
+      },
+      {
+        "letter": "C",
+        "text": "Community"
+      },
+      {
+        "letter": "D",
+        "text": "Public"
+      }
+    ],
+    "correct_answers": [
+      "B"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 224,
+    "question": "Which of the following backup types resets the archive bit each time it is run?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Differential"
+      },
+      {
+        "letter": "B",
+        "text": "Snapshot"
+      },
+      {
+        "letter": "C",
+        "text": "Incremental"
+      },
+      {
+        "letter": "D",
+        "text": "Synthetic full"
+      }
+    ],
+    "correct_answers": [
+      "C"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 225,
+    "question": "A server administrator is connecting a Linux server to a storage array. The administrator wants to use a file-based storage protocol to store data on the server. Which of the following protocols will the administrator MOST likely use?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "NFS"
+      },
+      {
+        "letter": "B",
+        "text": "FCoE"
+      },
+      {
+        "letter": "C",
+        "text": "iSCSI"
+      },
+      {
+        "letter": "D",
+        "text": "CIFS"
+      }
+    ],
+    "correct_answers": [
+      "A"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 226,
+    "question": "A hardware technician is installing 19 1U servers in a 42-unit rack. The technician needs to allocate enough space per server for optimal air flow. Which of the following unit sizes should be allocated per server?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "1U"
+      },
+      {
+        "letter": "B",
+        "text": "2U"
+      },
+      {
+        "letter": "C",
+        "text": "3U"
+      },
+      {
+        "letter": "D",
+        "text": "4U"
+      }
+    ],
+    "correct_answers": [
+      "A"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 227,
+    "question": "A server administrator needs to ensure all Window-based servers within a data center have RDP disabled. There are thousands of servers performing various roles. Which of the following is the BEST way to meet this requirement?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Run chkconfig --level 345 RDP off."
+      },
+      {
+        "letter": "B",
+        "text": "Create a PowerShell script to disable the RDP service."
+      },
+      {
+        "letter": "C",
+        "text": "Run chkconfig --list RDP."
+      },
+      {
+        "letter": "D",
+        "text": "Create a Bash shell script to disable the Windows Remote Management service."
+      },
+      {
+        "letter": "E",
+        "text": "Create a GPO to disable the Windows Remote Management service"
+      }
+    ],
+    "correct_answers": [
+      "B"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 228,
+    "question": "A server administrator is installing servers in a rack that does not have rack unit markings on the sides. The available open space for the new servers is approximately 3.5in (8.9cm) high. Which of the following is the LARGEST server size that can fit in this space?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "1U"
+      },
+      {
+        "letter": "B",
+        "text": "2U"
+      },
+      {
+        "letter": "C",
+        "text": "3U"
+      },
+      {
+        "letter": "D",
+        "text": "4U"
+      }
+    ],
+    "correct_answers": [
+      "B"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 229,
+    "question": "Which of the following backup types will MOST likely have a third party hosting the backup data?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Tape"
+      },
+      {
+        "letter": "B",
+        "text": "Local"
+      },
+      {
+        "letter": "C",
+        "text": "Cloud"
+      },
+      {
+        "letter": "D",
+        "text": "Disk"
+      }
+    ],
+    "correct_answers": [
+      "C"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 230,
+    "question": "A staff member who is monitoring a data center reports one rack is experiencing higher temperatures than the racks next to it, despite the hardware in each rack being the same. Which of the following actions would MOST likely remediate the heat issue?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Installing blanking panels in all the empty rack spaces"
+      },
+      {
+        "letter": "B",
+        "text": "Installing an additional PDU and spreading out the power cables"
+      },
+      {
+        "letter": "C",
+        "text": "Installing servers on the shelves instead of sliding rails"
+      },
+      {
+        "letter": "D",
+        "text": "Installing front bezels on all the servers in the rack"
+      }
+    ],
+    "correct_answers": [
+      "A"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 231,
+    "question": "An administrator is designing a server for use in a factory environment that contains many pieces of large electrical equipment. Which of the following would be the BEST type of cable for the administrator to use to minimize networking issues?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Coaxial"
+      },
+      {
+        "letter": "B",
+        "text": "Cat 5"
+      },
+      {
+        "letter": "C",
+        "text": "Cat 6"
+      },
+      {
+        "letter": "D",
+        "text": "Fiber optic"
+      }
+    ],
+    "correct_answers": [
+      "D"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 232,
+    "question": "A junior administrator reported that the website used for anti-malware updates is not working. The senior administrator then discovered all requests to the anti-malware site are being redirected to a malicious site. Which of the following tools should the senior administrator check FIRST to identify the potential cause of the issue?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Data loss prevention"
+      },
+      {
+        "letter": "B",
+        "text": "File integrity monitor"
+      },
+      {
+        "letter": "C",
+        "text": "Port scanner"
+      },
+      {
+        "letter": "D",
+        "text": "Sniffer"
+      }
+    ],
+    "correct_answers": [
+      "D"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 233,
+    "question": "A technician is deploying a new workstation. The workstation uses DHCP and can ping other devices on the same VLAN, but it cannot access anything on a different VLAN. Which of the following steps should the technician perform NEXT?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Enable IPv6 on the workstation."
+      },
+      {
+        "letter": "B",
+        "text": "Create a local hosts file."
+      },
+      {
+        "letter": "C",
+        "text": "Examine the DHCP scope configuration."
+      },
+      {
+        "letter": "D",
+        "text": "Configure an APIPA reservation."
+      }
+    ],
+    "correct_answers": [
+      "C"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 234,
+    "question": "A server administrator is gathering business requirements to determine how frequently backups need to be performed on an application server. Which of the following is the administrator attempting to establish?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "MTBF"
+      },
+      {
+        "letter": "B",
+        "text": "RPO"
+      },
+      {
+        "letter": "C",
+        "text": "MTTR"
+      },
+      {
+        "letter": "D",
+        "text": "RFC"
+      }
+    ],
+    "correct_answers": [
+      "B"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 235,
+    "question": "The network's IDS is giving multiple alerts that unauthorized traffic from a critical application server is being sent to a known-bad public IP address. One of the alerts contains the following information: Exploit Alert - Attempted User Privilege Gain - 2/2/07-3:09:09 10.1.200.32 --> 208.206.12.9:80 This server application is part of a cluster in which two other servers are also servicing clients. The server administrator has verified the other servers are not sending out traffic to that public IP address. The IP address subnet of the application servers is 10.1.200.0/26. Which of the following should the administrator perform to ensure only authorized traffic is being sent from the application server and downtime is minimized? (Choose two.)",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Disable all services on the affected application server."
+      },
+      {
+        "letter": "B",
+        "text": "Perform a vulnerability scan on all the servers within the cluster and patch accordingly."
+      },
+      {
+        "letter": "C",
+        "text": "Block access to 208.206.12.9 from all servers on the network."
+      },
+      {
+        "letter": "D",
+        "text": "Change the IP address of all the servers in the cluster to the 208.206.12.0/26 subnet."
+      },
+      {
+        "letter": "E",
+        "text": "Enable GPO to install an antivirus on all the servers and perform a weekly reboot."
+      },
+      {
+        "letter": "F",
+        "text": "Perform an antivirus scan on all servers within the cluster and reboot each server."
+      }
+    ],
+    "correct_answers": [
+      "B",
+      "C"
+    ],
+    "is_multi": true
+  },
+  {
+    "number": 236,
+    "question": "A technician has been tasked to install a new CPU. Prior to the installation, the server must be configured. Which of the following should the technician update?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "The RAID card"
+      },
+      {
+        "letter": "B",
+        "text": "The BIOS"
+      },
+      {
+        "letter": "C",
+        "text": "The backplane"
+      },
+      {
+        "letter": "D",
+        "text": "The HBA"
+      }
+    ],
+    "correct_answers": [
+      "B"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 237,
+    "question": "Which of the following is a type of replication in which all files are replicated, all of the time?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Constant"
+      },
+      {
+        "letter": "B",
+        "text": "Application consistent"
+      },
+      {
+        "letter": "C",
+        "text": "Synthetic full"
+      },
+      {
+        "letter": "D",
+        "text": "Full"
+      }
+    ],
+    "correct_answers": [
+      "A"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 238,
+    "question": "A technician installed a kernel upgrade to a Linux server. The server now crashes regularly. Which of the following is the MOST likely cause?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Necessary dependencies were installed for multiple architectures."
+      },
+      {
+        "letter": "B",
+        "text": "There is not enough hard drive space."
+      },
+      {
+        "letter": "C",
+        "text": "The server is infected with a virus."
+      },
+      {
+        "letter": "D",
+        "text": "Some modules are not compatible."
+      }
+    ],
+    "correct_answers": [
+      "D"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 239,
+    "question": "An application server cannot communicate with a newly installed database server. The database server, which has static IP information, is reading the following output from ipconfig: IP: 10.0.10.240 - Mask: 255.255.255.128 - Gateway: 10.0.10.1 - The application server is reading the following output from ipconfig: IP: 10.0.10.25 - Mask: 255.255.255.128 - Gateway: 10.0.10.1 - Which of the following MOST likely contains an error?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "IP address"
+      },
+      {
+        "letter": "B",
+        "text": "DHCP"
+      },
+      {
+        "letter": "C",
+        "text": "Gateway"
+      },
+      {
+        "letter": "D",
+        "text": "Subnet mask"
+      }
+    ],
+    "correct_answers": [
+      "A"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 240,
+    "question": "A technician is setting up a small office that consists of five Windows 10 computers. The technician has been asked to use a simple IP configuration without manually adding any IP addresses. Which of the following will the technician MOST likely use for the IP address assignment?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Static"
+      },
+      {
+        "letter": "B",
+        "text": "Router-assigned"
+      },
+      {
+        "letter": "C",
+        "text": "APIPA"
+      },
+      {
+        "letter": "D",
+        "text": "DHCP"
+      }
+    ],
+    "correct_answers": [
+      "D"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 241,
+    "question": "Ann, an administrator, has been troubleshooting a server issue. She carefully questioned the users and examined the available logs. Using this information, she was able to rule out several possible causes and develop a theory as to what the issue might be. Through further testing, her theory proved to be correct. Which of the following should be the NEXT step to troubleshoot the issue?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Document the findings and actions."
+      },
+      {
+        "letter": "B",
+        "text": "Escalate the issue to the management team."
+      },
+      {
+        "letter": "C",
+        "text": "Implement the solution."
+      },
+      {
+        "letter": "D",
+        "text": "Establish an action plan"
+      }
+    ],
+    "correct_answers": [
+      "D"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 242,
+    "question": "Which of the following script types would MOST likely be used on a modern Windows server OS?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Batch"
+      },
+      {
+        "letter": "B",
+        "text": "VBS"
+      },
+      {
+        "letter": "C",
+        "text": "Bash"
+      },
+      {
+        "letter": "D",
+        "text": "PowerShell"
+      }
+    ],
+    "correct_answers": [
+      "D"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 243,
+    "question": "Which of the following should a technician verify FIRST before decommissioning and wiping a file server?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "The media destruction method"
+      },
+      {
+        "letter": "B",
+        "text": "The recycling policy"
+      },
+      {
+        "letter": "C",
+        "text": "Asset management documentation"
+      },
+      {
+        "letter": "D",
+        "text": "Non-utilization"
+      }
+    ],
+    "correct_answers": [
+      "C"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 244,
+    "question": "A server administrator needs to implement load balancing without purchasing any new hardware or implementing any new software. Which of the following will the administrator MOST likely implement?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Round robin"
+      },
+      {
+        "letter": "B",
+        "text": "Link aggregation"
+      },
+      {
+        "letter": "C",
+        "text": "Most recently used"
+      },
+      {
+        "letter": "D",
+        "text": "Heartbeat"
+      }
+    ],
+    "correct_answers": [
+      "A"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 245,
+    "question": "A technician is creating a network share that will be used across both Unix and Windows clients at the same time. Users need read and write access to the files. Which of the following would be BEST for the technician to deploy?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "iSCSI"
+      },
+      {
+        "letter": "B",
+        "text": "CIFS"
+      },
+      {
+        "letter": "C",
+        "text": "HTTPS"
+      },
+      {
+        "letter": "D",
+        "text": "DAS"
+      }
+    ],
+    "correct_answers": [
+      "B"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 246,
+    "question": "A technician is able to copy a file to a temporary folder on another partition but is unable to copy it to a network share or a USB flash drive. Which of the following is MOST likely preventing the file from being copied to certain locations?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "An ACL"
+      },
+      {
+        "letter": "B",
+        "text": "Antivirus"
+      },
+      {
+        "letter": "C",
+        "text": "DLP"
+      },
+      {
+        "letter": "D",
+        "text": "A firewall"
+      }
+    ],
+    "correct_answers": [
+      "C"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 247,
+    "question": "An administrator is helping to replicate a large amount of data between two Windows servers. The administrator is unsure how much data has already been transferred. Which of the following will BEST ensure all the data is copied consistently?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "rsync"
+      },
+      {
+        "letter": "B",
+        "text": "copy"
+      },
+      {
+        "letter": "C",
+        "text": "scp"
+      },
+      {
+        "letter": "D",
+        "text": "robocopy"
+      }
+    ],
+    "correct_answers": [
+      "D"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 248,
+    "question": "An administrator notices high traffic on a certain subnet and would like to identify the source of the traffic. Which of the following tools should the administrator utilize?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Anti-malware"
+      },
+      {
+        "letter": "B",
+        "text": "Nbtstat"
+      },
+      {
+        "letter": "C",
+        "text": "Port scanner"
+      },
+      {
+        "letter": "D",
+        "text": "Sniffer"
+      }
+    ],
+    "correct_answers": [
+      "D"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 249,
+    "question": "Which of the following script types uses commands that start with Set-?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Batch"
+      },
+      {
+        "letter": "B",
+        "text": "Bash"
+      },
+      {
+        "letter": "C",
+        "text": "PowerShell"
+      },
+      {
+        "letter": "D",
+        "text": "JavaScript"
+      }
+    ],
+    "correct_answers": [
+      "C"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 250,
+    "question": "A change in policy requires a complete backup of the accounting server every seven days and a backup of modified data every day. Which of the following would be BEST to restore a full backup as quickly as possible in the event of a complete loss of server data?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "A full, weekly backup with daily open-file backups"
+      },
+      {
+        "letter": "B",
+        "text": "A full, weekly backup with daily archive backups"
+      },
+      {
+        "letter": "C",
+        "text": "A full, weekly backup with daily incremental backups"
+      },
+      {
+        "letter": "D",
+        "text": "A full, weekly backup with daily differential backups"
+      }
+    ],
+    "correct_answers": [
+      "D"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 251,
+    "question": "An administrator has been asked to increase the storage capacity of a stand-alone file server, but no further expansion slots are available. Which of the following would be the FASTEST solution to implement with no downtime?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Configure a RAID array."
+      },
+      {
+        "letter": "B",
+        "text": "Replace the current drives with higher-capacity disks."
+      },
+      {
+        "letter": "C",
+        "text": "Implement FCoE for more storage capacity."
+      },
+      {
+        "letter": "D",
+        "text": "Connect the server to a SAN."
+      }
+    ],
+    "correct_answers": [
+      "D"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 252,
+    "question": "A Linux server was recently updated. Now, the server stops during the boot process with a blank screen and an fs> prompt. Which of the following is the MOST likely cause of this issue?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "The system is booting to a USB flash drive."
+      },
+      {
+        "letter": "B",
+        "text": "The UEFI boot was interrupted by a missing Linux boot file."
+      },
+      {
+        "letter": "C",
+        "text": "The BIOS could not find a bootable hard disk."
+      },
+      {
+        "letter": "D",
+        "text": "The BIOS firmware needs to be upgraded."
+      }
+    ],
+    "correct_answers": [
+      "B"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 253,
+    "question": "A server technician arrives at a data center to troubleshoot a physical server that is not responding to remote management software. The technician discovers the servers in the data center are not connected to a KVM switch, and their out-of-band management cards have not been configured. Which of the following should the technician do to access the server for troubleshooting purposes?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Connect the diagnostic card to the PCIe connector."
+      },
+      {
+        "letter": "B",
+        "text": "Connect a console cable to the server NIC."
+      },
+      {
+        "letter": "C",
+        "text": "Connect to the server from a crash cart."
+      },
+      {
+        "letter": "D",
+        "text": "Connect the virtual administration console."
+      }
+    ],
+    "correct_answers": [
+      "C"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 254,
+    "question": "Which of the following describes a configuration in which both nodes of a redundant system respond to service requests whenever possible?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Active-passive"
+      },
+      {
+        "letter": "B",
+        "text": "Failover"
+      },
+      {
+        "letter": "C",
+        "text": "Active-active"
+      },
+      {
+        "letter": "D",
+        "text": "Failback"
+      }
+    ],
+    "correct_answers": [
+      "C"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 255,
+    "question": "Users have noticed a server is performing below baseline expectations. While diagnosing the server, an administrator discovers disk drive performance has degraded. The administrator checks the diagnostics on the RAID controller and sees the battery on the controller has gone bad. Which of the following is causing the poor performance on the RAID array?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "The controller has disabled the write cache."
+      },
+      {
+        "letter": "B",
+        "text": "The controller cannot use all the available channels."
+      },
+      {
+        "letter": "C",
+        "text": "The drive array is corrupt."
+      },
+      {
+        "letter": "D",
+        "text": "The controller has lost its configuration."
+      }
+    ],
+    "correct_answers": [
+      "A"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 256,
+    "question": "Which of the following licensing concepts is based on the number of logical processors a server has?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Per core"
+      },
+      {
+        "letter": "B",
+        "text": "Per socket"
+      },
+      {
+        "letter": "C",
+        "text": "Per instance"
+      },
+      {
+        "letter": "D",
+        "text": "Per server"
+      }
+    ],
+    "correct_answers": [
+      "A"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 257,
+    "question": "A technician has received tickets reporting a server is responding slowly during business hours. Which of the following should the technician implement so the team will be informed of this behavior in real time?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Log rotation"
+      },
+      {
+        "letter": "B",
+        "text": "Alerts"
+      },
+      {
+        "letter": "C",
+        "text": "Reports"
+      },
+      {
+        "letter": "D",
+        "text": "Log shipping"
+      }
+    ],
+    "correct_answers": [
+      "B"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 258,
+    "question": "A technician has moved a data drive from a new Windows server to an older Windows server. The hardware recognizes the drive, but the data is not visible to the OS. Which of the following is the MOST likely cause of the issue?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "The disk uses GPT."
+      },
+      {
+        "letter": "B",
+        "text": "The partition is formatted with ext4."
+      },
+      {
+        "letter": "C",
+        "text": "The partition is formatted with FAT32."
+      },
+      {
+        "letter": "D",
+        "text": "The disk uses MBR."
+      }
+    ],
+    "correct_answers": [
+      "A"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 259,
+    "question": "A server administrator is installing a new server in a data center. The administrator connects the server to a midplane but does not connect any cables. Which of the following types of servers is the administrator MOST likely installing?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Rack"
+      },
+      {
+        "letter": "B",
+        "text": "Virtual"
+      },
+      {
+        "letter": "C",
+        "text": "Tower"
+      },
+      {
+        "letter": "D",
+        "text": "Blade"
+      }
+    ],
+    "correct_answers": [
+      "D"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 260,
+    "question": "Which of the following licensing models was created by software companies in response to the increasing density of processors?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Per-instance"
+      },
+      {
+        "letter": "B",
+        "text": "Per-server"
+      },
+      {
+        "letter": "C",
+        "text": "Per-user"
+      },
+      {
+        "letter": "D",
+        "text": "Per-core"
+      }
+    ],
+    "correct_answers": [
+      "D"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 262,
+    "question": "The management team has mandated the use of data-at-rest encryption on all corporate servers. Using this encryption paradigm will ensure:",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "website traffic is protected while traversing the internet."
+      },
+      {
+        "letter": "B",
+        "text": "files stored on the server are protected against physical theft."
+      },
+      {
+        "letter": "C",
+        "text": "attachments that are emailed from this server cannot be intercepted."
+      },
+      {
+        "letter": "D",
+        "text": "databases in use are protected from remote hackers."
+      }
+    ],
+    "correct_answers": [
+      "B"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 263,
+    "question": "Two developers are working together on a project, and they have built out a set of shared servers that both developers can access over the internet. Which of the following cloud models is this an example of?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Hybrid"
+      },
+      {
+        "letter": "B",
+        "text": "Public"
+      },
+      {
+        "letter": "C",
+        "text": "Private"
+      },
+      {
+        "letter": "D",
+        "text": "Community"
+      }
+    ],
+    "correct_answers": [
+      "B"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 264,
+    "question": "A server administrator has received calls regarding latency and performance issues with a file server. After reviewing all logs and server features, the administrator discovers the server came with four Ethernet ports, but only one port is currently in use. Which of the following features will enable the use of all available ports using a single IP address?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Network address translation"
+      },
+      {
+        "letter": "B",
+        "text": "In-band management"
+      },
+      {
+        "letter": "C",
+        "text": "Round robin"
+      },
+      {
+        "letter": "D",
+        "text": "NIC teaming"
+      }
+    ],
+    "correct_answers": [
+      "D"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 265,
+    "question": "Joe, a user in the IT department, cannot save changes to a sensitive file on a Linux server. An is -la shows the following listing: -rw-r--r 1 Ann IT 6780 12 June 2019 filename Which of the following commands would BEST enable the server technician to allow Joe to have access without granting excessive access to others?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "chmod 777 filename"
+      },
+      {
+        "letter": "B",
+        "text": "chown Joe filename"
+      },
+      {
+        "letter": "C",
+        "text": "chmod g+w filename"
+      },
+      {
+        "letter": "D",
+        "text": "chgrp IT filename"
+      }
+    ],
+    "correct_answers": [
+      "C"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 266,
+    "question": "Which of the following is used for fail over, providing access to all the services currently in use by an organization without having to physically move any servers or employees?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "The cloud"
+      },
+      {
+        "letter": "B",
+        "text": "A cold site"
+      },
+      {
+        "letter": "C",
+        "text": "A warm site"
+      },
+      {
+        "letter": "D",
+        "text": "An emergency operations center"
+      }
+    ],
+    "correct_answers": [
+      "A"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 267,
+    "question": "Which of the following BEST measures how much downtime an organization can tolerate during an unplanned outage?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "SLA"
+      },
+      {
+        "letter": "B",
+        "text": "BIA"
+      },
+      {
+        "letter": "C",
+        "text": "RTO"
+      },
+      {
+        "letter": "D",
+        "text": "MTTR"
+      }
+    ],
+    "correct_answers": [
+      "C"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 268,
+    "question": "The management team at a healthcare organization is concerned about being able to access the daily vital records if there is an IT disaster that causes both servers and the network to be offline. Which of the following backup types can the organization use to mitigate this risk?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Tape"
+      },
+      {
+        "letter": "B",
+        "text": "Cloud"
+      },
+      {
+        "letter": "C",
+        "text": "Disk"
+      },
+      {
+        "letter": "D",
+        "text": "Print"
+      }
+    ],
+    "correct_answers": [
+      "D"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 269,
+    "question": "A server administrator notices the /var/log/audit/audit.log file on a Linux server is rotating too frequently. The administrator would like to decrease the number of times the log rotates without losing any of the information in the logs. Which of the following should the administrator configure?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Increase the audit.log file size in the appropriate configuration file."
+      },
+      {
+        "letter": "B",
+        "text": "Decrease the duration of the log rotate cycle for the audit.log file."
+      },
+      {
+        "letter": "C",
+        "text": "Remove the log rotate directive from the audit.log file configuration."
+      },
+      {
+        "letter": "D",
+        "text": "Move the audit.log files to a remote syslog server."
+      }
+    ],
+    "correct_answers": [
+      "B"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 270,
+    "question": "Which of the following backup types copies changed data from a server and then combines the backups on the backup target?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Differential"
+      },
+      {
+        "letter": "B",
+        "text": "Incremental"
+      },
+      {
+        "letter": "C",
+        "text": "Synthetic full"
+      },
+      {
+        "letter": "D",
+        "text": "Snapshot"
+      }
+    ],
+    "correct_answers": [
+      "C"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 271,
+    "question": "A server administrator is taking advantage of all the available bandwidth of the four NICs on the server. Which of the following NIC-teaming technologies should the server administrator utilize?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Fail over"
+      },
+      {
+        "letter": "B",
+        "text": "Fault tolerance"
+      },
+      {
+        "letter": "C",
+        "text": "Load balancing"
+      },
+      {
+        "letter": "D",
+        "text": "Link aggregation"
+      }
+    ],
+    "correct_answers": [
+      "D"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 272,
+    "question": "A technician is working on a Linux server and is trying to access another server over the network. The technician gets server not found messages when trying to execute ping servername but no error messages when using ping servername.domain.com. Which of the following should the technician do to resolve the error?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Configure the domain search variable."
+      },
+      {
+        "letter": "B",
+        "text": "Change the permissions on resolv.conf."
+      },
+      {
+        "letter": "C",
+        "text": "Configure the DNS address."
+      },
+      {
+        "letter": "D",
+        "text": "Modify nsswitch.conf."
+      }
+    ],
+    "correct_answers": [
+      "A"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 273,
+    "question": "Which of the following licensing models is MOST appropriate for a data center that has a variable daily equipment count?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Per site"
+      },
+      {
+        "letter": "B",
+        "text": "Per server"
+      },
+      {
+        "letter": "C",
+        "text": "Per user"
+      },
+      {
+        "letter": "D",
+        "text": "Per core"
+      }
+    ],
+    "correct_answers": [
+      "D"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 274,
+    "question": "While running a local network security scan, an administrator discovers communication between clients and one of the web servers is happening in cleartext. Company policy requires all communication to be encrypted. Which of the following ports should be closed to stop the cleartext communication?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "21"
+      },
+      {
+        "letter": "B",
+        "text": "22"
+      },
+      {
+        "letter": "C",
+        "text": "443"
+      },
+      {
+        "letter": "D",
+        "text": "3389"
+      }
+    ],
+    "correct_answers": [
+      "A"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 275,
+    "question": "An application server's power cord was accidentally unplugged. After plugging the cord back in, the server administrator notices some transactions were not written to the disk array. Which of the following is the MOST likely cause of this issue?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Backplane failure"
+      },
+      {
+        "letter": "B",
+        "text": "CMOS failure"
+      },
+      {
+        "letter": "C",
+        "text": "Misconfigured RAID"
+      },
+      {
+        "letter": "D",
+        "text": "Cache battery failure"
+      }
+    ],
+    "correct_answers": [
+      "D"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 276,
+    "question": "A server in a remote data center is no longer responsive. Which of the following is the BEST solution to investigate this failure?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Remote desktop"
+      },
+      {
+        "letter": "B",
+        "text": "Access via a crash cart"
+      },
+      {
+        "letter": "C",
+        "text": "Out-of-band management"
+      },
+      {
+        "letter": "D",
+        "text": "A Secure Shell connection"
+      }
+    ],
+    "correct_answers": [
+      "C"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 277,
+    "question": "A systems administrator is attempting to install a package on a server. After downloading the package from the internet and trying to launch it, the installation is blocked by the antivirus on the server. Which of the following must be completed before launching the installation package again?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Creating an exclusion to the antivirus for the application"
+      },
+      {
+        "letter": "B",
+        "text": "Disabling real-time scanning by the antivirus"
+      },
+      {
+        "letter": "C",
+        "text": "Validating the checksum for the downloaded installation package"
+      },
+      {
+        "letter": "D",
+        "text": "Checking for corruption of the downloaded installation package"
+      }
+    ],
+    "correct_answers": [
+      "A"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 278,
+    "question": "An administrator needs to increase the size of an existing RAID 6 array that is running out of available space. Which of the following is the BEST way the administrator can perform this task?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Replace all the array drives at once and then expand the array."
+      },
+      {
+        "letter": "B",
+        "text": "Expand the array by changing the RAID level to 6."
+      },
+      {
+        "letter": "C",
+        "text": "Expand the array by changing the RAID level to 10."
+      },
+      {
+        "letter": "D",
+        "text": "Replace the array drives one at a time and then expand the array."
+      }
+    ],
+    "correct_answers": [
+      "D"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 279,
+    "question": "A systems administrator recently upgraded the memory in a server, and now the server does not turn on, and nothing is displayed on the screen. Which of the following is the NEXT step the administrator should take to diagnose the error without opening the machine?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Perform a cold reboot."
+      },
+      {
+        "letter": "B",
+        "text": "Listen for POST code beeps."
+      },
+      {
+        "letter": "C",
+        "text": "Call technical support."
+      },
+      {
+        "letter": "D",
+        "text": "Check the monitor connection."
+      }
+    ],
+    "correct_answers": [
+      "B"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 280,
+    "question": "A data center technician is assigned the daily task of walking through the data center to perform a health check on all the systems. Which of the following issues can the technician detect without logging on to any of the systems? (Choose two.)",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "VLAN mismatch"
+      },
+      {
+        "letter": "B",
+        "text": "UPS battery fault"
+      },
+      {
+        "letter": "C",
+        "text": "Overheating"
+      },
+      {
+        "letter": "D",
+        "text": "Memory exhaustion"
+      },
+      {
+        "letter": "E",
+        "text": "IP conflict"
+      },
+      {
+        "letter": "F",
+        "text": "OS failure"
+      }
+    ],
+    "correct_answers": [
+      "B",
+      "C"
+    ],
+    "is_multi": true
+  },
+  {
+    "number": 281,
+    "question": "An administrator has been asked to deploy a database server that provides the highest performance with fault tolerance. Which of the following RAID levels will fulfill this request?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "RAID 0"
+      },
+      {
+        "letter": "B",
+        "text": "RAID 1"
+      },
+      {
+        "letter": "C",
+        "text": "RAID 5"
+      },
+      {
+        "letter": "D",
+        "text": "RAID 6"
+      },
+      {
+        "letter": "E",
+        "text": "RAID 10"
+      }
+    ],
+    "correct_answers": [
+      "E"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 282,
+    "question": "A data center has 4U rack servers that need to be replaced using VMs but without losing any data. Which of the following methods will MOST likely be used to replace these servers?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "VMFS"
+      },
+      {
+        "letter": "B",
+        "text": "Unattended scripted OS installation"
+      },
+      {
+        "letter": "C",
+        "text": "P2V"
+      },
+      {
+        "letter": "D",
+        "text": "VM cloning"
+      }
+    ],
+    "correct_answers": [
+      "C"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 283,
+    "question": "An administrator is troubleshooting an application performance issue on a virtual server with two vCPUs. The application performance logs indicate CPU contention. The administrator adds more vCPU cores to the VM, yet the issue persists. Which of the following is the MOST likely reason for this issue?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "The server has high page utilization."
+      },
+      {
+        "letter": "B",
+        "text": "The server has high disk latency."
+      },
+      {
+        "letter": "C",
+        "text": "The application is single-threaded."
+      },
+      {
+        "letter": "D",
+        "text": "The application cannot be virtualized."
+      }
+    ],
+    "correct_answers": [
+      "C"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 284,
+    "question": "An administrator is alerted to an issue with server hardware deployed as a virtualization host. The alert indicates a predictive failure in a DIMM module. Which of the following is the BEST action for the administrator to take?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Replace the failed module during the next scheduled downtime."
+      },
+      {
+        "letter": "B",
+        "text": "Hot swap the failed module immediately."
+      },
+      {
+        "letter": "C",
+        "text": "Schedule an outage to replace the failed module immediately."
+      },
+      {
+        "letter": "D",
+        "text": "Hot swap the failed module during the next scheduled downtime."
+      }
+    ],
+    "correct_answers": [
+      "A"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 285,
+    "question": "A technician is troubleshooting a server issue. The technician has determined several possible causes of the issue and has identified various solutions. Which of the following should the technician do NEXT?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Consult internet forums to determine which is the most common cause and deploy only that solution."
+      },
+      {
+        "letter": "B",
+        "text": "Test each solution individually to determine the root cause, rolling back the changes in between each test."
+      },
+      {
+        "letter": "C",
+        "text": "Implement the shortest solution first to identify the issue and minimize downtime."
+      },
+      {
+        "letter": "D",
+        "text": "Test each solution in succession and restore the server from the latest snapshot."
+      }
+    ],
+    "correct_answers": [
+      "B"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 286,
+    "question": "Following a recent power outage, a server in the data center has been constantly going offline and losing its configuration. Users have been experiencing access issues while using the application on the server. The server technician notices the date and time are incorrect when the server is online. All other servers are working. Which of the following would MOST likely cause this issue? (Choose two.)",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "The server has a faulty power supply."
+      },
+      {
+        "letter": "B",
+        "text": "The server has a CMOS battery failure."
+      },
+      {
+        "letter": "C",
+        "text": "The server requires OS updates."
+      },
+      {
+        "letter": "D",
+        "text": "The server has a malfunctioning LED panel."
+      },
+      {
+        "letter": "E",
+        "text": "The servers have NTP configured."
+      },
+      {
+        "letter": "F",
+        "text": "CPU frequency scaling is set too high."
+      }
+    ],
+    "correct_answers": [
+      "A",
+      "B"
+    ],
+    "is_multi": true
+  },
+  {
+    "number": 287,
+    "question": "Which of the following asset management documents is used to identify the location of a server within a data center?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Infrastructure diagram"
+      },
+      {
+        "letter": "B",
+        "text": "Workflow diagram"
+      },
+      {
+        "letter": "C",
+        "text": "Rack layout"
+      },
+      {
+        "letter": "D",
+        "text": "Service manual"
+      }
+    ],
+    "correct_answers": [
+      "C"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 288,
+    "question": "Users at a company are licensed to use an application that is restricted by the number of active sessions. Which of the following best describes this licensing model?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Per-server"
+      },
+      {
+        "letter": "B",
+        "text": "Per-seat"
+      },
+      {
+        "letter": "C",
+        "text": "Per-concurrent user"
+      },
+      {
+        "letter": "D",
+        "text": "Per-core"
+      }
+    ],
+    "correct_answers": [
+      "C"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 289,
+    "question": "A technician is tasked with upgrading 24 hosts simultaneously with a Type 1 hypervisor. Which of the following protocols should the technician use for this upgrade?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "VPN"
+      },
+      {
+        "letter": "B",
+        "text": "TFTP"
+      },
+      {
+        "letter": "C",
+        "text": "SSH"
+      },
+      {
+        "letter": "D",
+        "text": "HTTP"
+      }
+    ],
+    "correct_answers": [
+      "B"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 290,
+    "question": "A company is implementing a check-in desk to heighten physical security. Which of the following access controls would be the most appropriate to facilitate this implementation?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Security guards"
+      },
+      {
+        "letter": "B",
+        "text": "Security cameras"
+      },
+      {
+        "letter": "C",
+        "text": "Bollards"
+      },
+      {
+        "letter": "D",
+        "text": "An access control vestibule"
+      }
+    ],
+    "correct_answers": [
+      "A"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 291,
+    "question": "A systems administrator is setting up a server farm for a new company. The company has a public range of IP addresses and uses the addresses internally. Which of the following IP addresses best fits this scenario?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "10.3.7.27"
+      },
+      {
+        "letter": "B",
+        "text": "127.0.0.1"
+      },
+      {
+        "letter": "C",
+        "text": "192.168.7.1"
+      },
+      {
+        "letter": "D",
+        "text": "216.176.128.10"
+      }
+    ],
+    "correct_answers": [
+      "D"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 292,
+    "question": "A server administrator is installing a new server on a manufacturing floor. Because the server is publicly accessible, security requires the server to undergo hardware hardening. Which of the following actions should the administrator take?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Close unneeded ports."
+      },
+      {
+        "letter": "B",
+        "text": "Disable unused services."
+      },
+      {
+        "letter": "C",
+        "text": "Set a BIOS password."
+      },
+      {
+        "letter": "D",
+        "text": "Apply driver updates."
+      }
+    ],
+    "correct_answers": [
+      "C"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 293,
+    "question": "A human resources analyst is attempting to email the records for new employees to an outside payroll company. Each time the analyst sends an email containing employee records, the email is rejected with an error message. Other emails outside the company are sent correctly. Which of the following is most likely generating the error?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "DHCP configuration"
+      },
+      {
+        "letter": "B",
+        "text": "Firewall rules"
+      },
+      {
+        "letter": "C",
+        "text": "DLP software"
+      },
+      {
+        "letter": "D",
+        "text": "Intrusion detection system"
+      }
+    ],
+    "correct_answers": [
+      "C"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 294,
+    "question": "After installing a new file server, a technician notices the read times for accessing the same file are slower than the read times for other file servers. Which of the following is the first step the technician should take?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Add more memory."
+      },
+      {
+        "letter": "B",
+        "text": "Check if the cache is turned on."
+      },
+      {
+        "letter": "C",
+        "text": "Install faster hard drives."
+      },
+      {
+        "letter": "D",
+        "text": "Enable link aggregation."
+      }
+    ],
+    "correct_answers": [
+      "B"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 295,
+    "question": "A company wants to find an affordable way to simulate a fail over of a critical application. The company does not currently have a solution for it. The application consists of 15 servers, and the company would like to simulate on production configurations and IP address schemes. Which of the following would be the most cost-effective solution?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Build a warm site and perform a fail over of the application."
+      },
+      {
+        "letter": "B",
+        "text": "Build a cloud IaaS and perform a fail over of the application."
+      },
+      {
+        "letter": "C",
+        "text": "Build a hot site and perform a fail over of the application."
+      },
+      {
+        "letter": "D",
+        "text": "Build a cold site and perform a fail over of the application."
+      },
+      {
+        "letter": "E",
+        "text": "Perform a tabletop fail over of the application."
+      }
+    ],
+    "correct_answers": [
+      "E"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 296,
+    "question": "The management team has mandated the encryption of all server administration traffic. Which of the following should most likely be implemented?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "SSH"
+      },
+      {
+        "letter": "B",
+        "text": "VPN"
+      },
+      {
+        "letter": "C",
+        "text": "SELinux"
+      },
+      {
+        "letter": "D",
+        "text": "FTPS"
+      }
+    ],
+    "correct_answers": [
+      "A"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 297,
+    "question": "An administrator receives an alert that one of the virtual servers has suddenly crashed. The administrator confirms the data center does not have any power failures and then connects to the remote console of the crashed server. After connecting to the server console, which of the following should the administrator complete first?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Use the keyboard command Alt+F12 to switch to the kernel log screen."
+      },
+      {
+        "letter": "B",
+        "text": "Perform a hard reboot on the server and monitor the server startup."
+      },
+      {
+        "letter": "C",
+        "text": "Collect a screenshot of the PSOD and note the details after the line detailing the OS version."
+      },
+      {
+        "letter": "D",
+        "text": "Collect a core dump from the server and store locally before rebooting the hardware."
+      }
+    ],
+    "correct_answers": [
+      "C"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 298,
+    "question": "A server administrator just installed a new physical server and needs to harden the OS. Which of the following best describes the OS hardening method?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Apply security updates."
+      },
+      {
+        "letter": "B",
+        "text": "Disable unneeded hardware."
+      },
+      {
+        "letter": "C",
+        "text": "Set a BIOS password."
+      },
+      {
+        "letter": "D",
+        "text": "Configure the boot order."
+      }
+    ],
+    "correct_answers": [
+      "A"
+    ],
+    "is_multi": false
+  },
+  {
+    "number": 299,
+    "question": "A technician ordered two additional hard drives to expand an existing RAID 6 configuration. The technician added the new disks and then rebooted. After rebooting, the technician did not see the additional space in the existing disk, and the OS detected two new disks that needed signatures. Which of the following should the technician complete next to expand the existing RAID configuration?",
+    "choices": [
+      {
+        "letter": "A",
+        "text": "Modify the existing disk to a dynamic disk and add the two new raw disks to the existing array."
+      },
+      {
+        "letter": "B",
+        "text": "Allow the OS to write GPT signatures to the disks and add them as dynamic disks to the existing disk."
+      },
+      {
+        "letter": "C",
+        "text": "Reboot the server, start the RAID utility from the BIOS, and expand the RAID 6 with the two new disks."
+      },
+      {
+        "letter": "D",
+        "text": "Use the software RAID in the OS to create a RAID 0 with the existing array and the two new disks."
+      }
+    ],
+    "correct_answers": [
+      "C"
+    ],
+    "is_multi": false
+  }
+]

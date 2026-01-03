@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Quiz History</title>
+<link rel="stylesheet" href="/style.css">
+
+<style>
+.history-container {
+    max-width: 900px;
+    margin: auto;
+}
+
+/* -------------------------
+   MODE BANNER / TITLE BAR
+------------------------- */
+.mode-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 10px;
+}
+
+.mode-center {
+    text-align: center;
+}
+
+.mode-badge {
+    height: 84px;
+    max-width: 125px;
+    opacity: .98;
+    filter: drop-shadow(0 0 10px rgba(0,0,0,.9));
+    transition: transform .2s ease, opacity .2s ease;
+}
+
+.mode-banner:hover .mode-badge {
+    transform: scale(1.06);
+    opacity: 1;
+}
+
+/* Nice readable banner title */
+.hero-title {
+    text-align: center;
+    margin-top: 10px;
+    margin-bottom: 15px;
+    font-size: 34px;
+    letter-spacing: 1px;
+    font-weight: 800;
+    color: #ffffff;
+    background: rgba(0,0,0,0.75);
+    padding: 14px 26px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.22);
+    box-shadow: 0 0 25px rgba(0,0,0,.9);
+}
+
+/* -------------------------
+      HISTORY CARDS
+------------------------- */
+.quiz-group {
+    margin-top: 25px;
+    padding: 16px;
+    border-radius: 10px;
+    background: rgba(0,0,0,0.70);
+    border: 1px solid rgba(255,255,255,0.25);
+    box-shadow: 0 0 30px rgba(0,0,0,0.9);
+    backdrop-filter: blur(6px);
+}
+
+.quiz-title {
+    font-size: 22px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #fff;
+}
+
+.history-card {
+    background: rgba(0,0,0,.85);
+    padding: 14px;
+    margin: 10px 0;
+    border-radius: 8px;
+    border-left: 8px solid;
+    color: white;
+    box-shadow: 0 0 15px rgba(0,0,0,.8);
+    scroll-margin-top: 140px;
+}
+
+.history-card.good { border-color: #00ff80; }
+.history-card.warn { border-color: #ffe066; }
+.history-card.bad  { border-color: #ff4d4d; }
+
+.highlighted {
+    outline: 3px solid #00ffaa;
+    animation: pulse 1.5s infinite alternate;
+}
+
+@keyframes pulse {
+  from { box-shadow: 0 0 10px #00ffaa; }
+  to { box-shadow: 0 0 25px #00ffaa; }
+}
+
+small { color: #bbb; }
+
+button {
+    margin-top: 15px;
+}
+</style>
+</head>
+
+
+<body>
+<div class="container history-container">
+
+    <!-- =========================
+          TITLE BANNER WITH USER LOGO
+    ========================== -->
+    <div class="mode-banner">
+
+        <img id="leftLogo" class="mode-badge" style="visibility:hidden">
+
+        <div class="mode-center">
+            <h1 class="hero-title">📜 Exam & Quiz History</h1>
+        </div>
+
+        <img id="rightLogo" class="mode-badge" style="visibility:hidden">
+    </div>
+
+    <div id="historyOutput"></div>
+
+    <button onclick="clearHistory()">🗑 Clear All History</button>
+    <br><br>
+    <button onclick="location.href='/'">⬅ Back to Portal</button>
+
+</div>
+
+
+<script>
+const HISTORY_KEY = "serverplus_history_v2";
+
+function loadHistoryStore() {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY) || "{}");
+}
+
+function renderHistory() {
+    const historyDiv = document.getElementById("historyOutput");
+    historyDiv.innerHTML = "";
+
+    const history = loadHistoryStore();
+    const quizKeys = Object.keys(history);
+
+    if (!quizKeys.length) {
+        historyDiv.innerHTML = "<p>No history yet. Take some exams 😊</p>";
+        return;
+    }
+
+    quizKeys.forEach(key => {
+        const records = history[key];
+        const groupDiv = document.createElement("div");
+        groupDiv.className = "quiz-group";
+
+        groupDiv.innerHTML += `
+            <div class="quiz-title">
+                📘 ${key.replace("/data/","")}
+                <small>(${records.length} attempts)</small>
+            </div>
+        `;
+
+        records.forEach(rec => {
+            let cls =
+                rec.percent >= 80 ? "good" :
+                rec.percent >= 60 ? "warn" :
+                "bad";
+
+            let minsUsed = rec.timeRemaining
+                ? Math.floor((90*60 - rec.timeRemaining) / 60)
+                : "--";
+
+            let missedBlock = "<i>None 🎉</i>";
+
+            if (rec.missedDetails && rec.missedDetails.length) {
+                missedBlock = rec.missedDetails.map(m => `
+                    <div style="margin-top:6px; padding:8px; background:rgba(0,0,0,.6); border-radius:6px;">
+                        <b>Question ${m.number}</b><br>
+                        ${m.question}<br>
+                        <span style="color:#00ff80">
+                            ✓ Correct Answer: (${m.correctLetter}) ${m.correctText}
+                        </span>
+                    </div>
+                `).join("");
+            } else if (rec.missed && rec.missed.length) {
+                missedBlock = rec.missed.join(", ");
+            }
+
+            const card = document.createElement("div");
+            card.className = "history-card " + cls;
+            card.setAttribute("data-attempt", rec.attemptId || "");
+
+            card.innerHTML = `
+                <div><b>${rec.date}</b></div>
+                <div>Mode: ${rec.mode}</div>
+                <div>Score: ${rec.score} / ${rec.total} (${rec.percent}%)</div>
+                <div>Time Used: ${minsUsed} min</div>
+                <div>❌ Missed Questions:</div>
+                <div>${missedBlock}</div>
+            `;
+
+            groupDiv.appendChild(card);
+        });
+
+        historyDiv.appendChild(groupDiv);
+    });
+
+    highlightTargetAttempt();
+}
+
+/* =========================
+   CLEAR HISTORY
+========================= */
+function clearHistory() {
+    if (!confirm("Delete ALL quiz history?")) return;
+    localStorage.removeItem(HISTORY_KEY);
+    renderHistory();
+}
+
+/* ===============================
+   LOAD USER LOGO FROM QUIZ REGISTRY
+=============================== */
+function loadLogo() {
+    fetch('/config/quizzes.json')
+        .then(r => r.json())
+        .then(reg => {
+            if (!reg.length) return;
+
+            const latest = reg[reg.length - 1];
+            if (!latest.logo) return;
+
+            document.getElementById("leftLogo").src = "/static/logos/" + latest.logo;
+            document.getElementById("rightLogo").src = "/static/logos/" + latest.logo;
+            document.getElementById("leftLogo").style.visibility = "visible";
+            document.getElementById("rightLogo").style.visibility = "visible";
+        })
+        .catch(()=>{});
+}
+
+/* =========================
+   HIGHLIGHT JUST THIS ATTEMPT
+========================= */
+function highlightTargetAttempt() {
+    const params = new URLSearchParams(window.location.search);
+    const target = params.get("attempt");
+    if (!target) return;
+
+    const el = document.querySelector(`[data-attempt="${target}"]`);
+    if (!el) return;
+
+    el.classList.add("highlighted");
+    el.scrollIntoView({ behavior:"smooth", block:"center" });
+}
+
+/* =========================
+   RUN
+========================= */
+loadLogo();
+renderHistory();
+</script>
+
+</body>
+</html>

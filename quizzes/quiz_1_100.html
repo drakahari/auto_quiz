@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Server+ Quiz 1 - 100</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+
+<!-- 🔹 Overlay shown when exam is paused -->
+<div id="pauseOverlay" class="pause-overlay">
+    <div class="pause-overlay-content">
+        <h2>Exam Paused</h2>
+        <p>Your time is frozen. Click Resume to continue.</p>
+        <button onclick="resumeExam()">Resume</button>
+    </div>
+</div>
+
+<!-- 🔹 Everything that should blur goes inside this wrapper -->
+<div id="quizWrapper" class="blur-wrapper">
+    <div class="container">
+
+        <!-- Readable Centered Banner -->
+        <h1 class="hero-title">
+            Server+ Quiz 1 – 100
+        </h1>
+
+        <div id="modeSelect" class="card">
+            <div class="mode-banner">
+
+                <img src="/static/comptia_server+.png" class="mode-badge">
+
+                <div class="mode-center">
+                    <h2>Select Mode</h2>
+                    <button onclick="startQuiz(false)">Study Mode</button>
+                    <button onclick="startQuiz(true)">Exam Mode</button>
+                </div>
+
+                <img src="/static/comptia_server+.png" class="mode-badge">
+            </div>
+        </div>
+
+        <div id="quiz" class="hidden">
+
+            <!-- Progress Bar -->
+            <div id="progressBarOuter">
+                <div id="progressBarInner"></div>
+            </div>
+
+            <button onclick="document.body.classList.toggle('high-contrast')">
+                🌓 Toggle High Contrast
+            </button>
+
+            <!-- Exam Timer -->
+            <div id="timer" class="hidden timerBox">
+                <b>Time Remaining:</b>
+                <span id="timeDisplay">--:--</span>
+
+                <button id="pauseBtn" onclick="pauseExam()">Pause</button>
+                <button id="resumeBtn" class="hidden" onclick="resumeExam()">Resume</button>
+            </div>
+
+            <div id="qHeader"></div>
+            <div id="qText"></div>
+            <div id="choices"></div>
+
+            <div class="controls">
+                <button onclick="prev()">Prev</button>
+                <button onclick="next()">Next</button>
+                <button onclick="submitQuiz()">Submit</button>
+            </div>
+
+        </div>
+
+        <div id="result" class="hidden"></div>
+
+        <br>
+        <button onclick="location.href='/'">⬅ Back to Quiz Portal</button>
+    </div>
+</div>
+
+<script>
+  /* This tells script.js which JSON file to load for this quiz */
+  const QUIZ_FILE = "/data/quiz_1_100.json";
+</script>
+
+<script src="/script.js"></script>
+</body>
+</html>
