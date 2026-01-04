@@ -591,6 +591,11 @@ def preview_paste():
             <p style="opacity:.7">
                 If this looks correct, continue. Otherwise, go back and adjust rules.
             </p>
+            <form action="/download_cleaned" method="POST" style="display:inline;">
+    <textarea name="clean_text" style="display:none;">{{cleaned}}</textarea>
+    <button type="submit">📥 Download Cleaned Text</button>
+</form>
+              
 
             <!-- IMPORTANT:
                  Now we send the CLEANED text forward
@@ -617,6 +622,29 @@ def preview_paste():
     conf_summary=conf_summary,
     conf_details=conf_details
     )
+
+
+from flask import send_file
+from io import BytesIO
+
+@app.route("/download_cleaned", methods=["GET","POST"])
+def download_cleaned():
+    cleaned = request.form.get("clean_text", "").strip()
+
+    if not cleaned:
+        return "No cleaned text available.", 400
+
+    buf = BytesIO()
+    buf.write(cleaned.encode("utf-8"))
+    buf.seek(0)
+
+    return send_file(
+        buf,
+        mimetype="text/plain",
+        as_attachment=True,
+        download_name="cleaned_quiz_text.txt"
+    )
+
 
 
 
