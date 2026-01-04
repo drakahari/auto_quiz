@@ -341,7 +341,7 @@ body.home .quiz-card img {
 
 /* =======================
    HIGH CONTRAST MODE
-   ======================= */
+   ======================= 
 
 body.high-contrast {
     background: #000 !important;
@@ -391,7 +391,7 @@ body.high-contrast #progressBarInner {
 
 body.high-contrast #timer {
     color: white !important;
-}
+}*/
 
 /* ===== Pause Blur Wrapper ===== */
 .blur-wrapper {

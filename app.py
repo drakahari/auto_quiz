@@ -910,9 +910,7 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
                 <div id="progressBarInner"></div>
             </div>
 
-            <button onclick="document.body.classList.toggle('high-contrast')">
-                🌓 Toggle High Contrast
-            </button>
+            
 
             <!-- Exam Timer -->
             <div id="timer" class="hidden timerBox">
