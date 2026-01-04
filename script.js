@@ -71,9 +71,10 @@ function renderQuestion() {
     choicesEl.innerHTML = html;
 
     // Study mode: immediately show correct/incorrect colors
-    if (!examMode && selected.length > 0) {
-        applyStudyFeedback(selected[0]);
-    }
+   if (!examMode && selected.length > 0) {
+    applyStudyFeedback();
+}
+
 
     updateProgressBar();
 }
@@ -84,17 +85,51 @@ function renderQuestion() {
 function selectChoice(i) {
     if (!quiz.length) return;
 
+    const q = quiz[index];
     const key = `q${index}`;
-    userAnswers[key] = [i];
 
-    // Study mode: show correct/incorrect right away
+    const isMulti = Array.isArray(q.correct) && q.correct.length > 1;
+    let arr = userAnswers[key] || [];
+
+    // --- STUDY MODE ---
     if (!examMode) {
-        applyStudyFeedback(i);
+
+        if (!isMulti) {
+            // single-answer question → normal behavior
+            arr = [i];
+        } else {
+            // MULTI-ANSWER STUDY MODE → toggle selections
+            if (arr.includes(i)) {
+                arr = arr.filter(v => v !== i);
+            } else {
+                arr.push(i);
+                arr.sort();
+            }
+        }
+
+        userAnswers[key] = arr;
+        applyStudyFeedback();
+        renderQuestion();
+        return;
     }
 
-    // Re-render so "selected" class is applied in both modes
+    // --- EXAM MODE ---
+    if (!isMulti) {
+        arr = [i];
+    } else {
+        if (arr.includes(i)) {
+            arr = arr.filter(v => v !== i);
+        } else {
+            arr.push(i);
+            arr.sort();
+        }
+    }
+
+    userAnswers[key] = arr;
     renderQuestion();
 }
+
+
 
 /* =====================================================
    NAVIGATION
@@ -118,37 +153,39 @@ function prev() {
 /* =====================================================
    STUDY-MODE FEEDBACK
 ===================================================== */
-function applyStudyFeedback(selectedIndex) {
+function applyStudyFeedback() {
     if (!quiz.length) return;
 
     const q = quiz[index];
-
     if (!q.correct || !Array.isArray(q.correct)) return;
 
-    // Convert ["A"] -> [0], ["B"] -> [1], etc.
+    const key = `q${index}`;
+    const selected = userAnswers[key] || [];
+
+    // Convert letters → indexes
     const correctIndexes = q.correct.map(letter =>
         String(letter).toUpperCase().charCodeAt(0) - 65
     );
 
     const buttons = document.querySelectorAll("#choices .choice");
 
-    // Clear previous state
+    // Clear previous
     buttons.forEach(btn => {
         btn.classList.remove("correct-choice", "wrong-choice");
     });
 
-    // Mark all correct answers in green
-    correctIndexes.forEach(idx => {
-        if (buttons[idx]) {
+    // Only color what the user clicked
+    selected.forEach(idx => {
+        if (!buttons[idx]) return;
+
+        if (correctIndexes.includes(idx)) {
             buttons[idx].classList.add("correct-choice");
+        } else {
+            buttons[idx].classList.add("wrong-choice");
         }
     });
-
-    // If user chose a wrong one, mark it red
-    if (!correctIndexes.includes(selectedIndex) && buttons[selectedIndex]) {
-        buttons[selectedIndex].classList.add("wrong-choice");
-    }
 }
+
 
 /* =====================================================
    PROGRESS BAR

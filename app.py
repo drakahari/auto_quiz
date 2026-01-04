@@ -434,7 +434,6 @@ def parse_questions(filepath):
             continue
 
         lines = [l.strip() for l in block.split("\n") if l.strip()]
-
         if len(lines) < 3:
             continue
 
@@ -445,7 +444,8 @@ def parse_questions(filepath):
 
         for line in lines:
 
-            mchoice = re.match(r"([A-D])[\.\)]\s*(.+)", line, flags=re.IGNORECASE)
+            # Allow A–Z answer choices (not only A–D)
+            mchoice = re.match(r"([A-Z])[\.\)]\s*(.+)", line, flags=re.IGNORECASE)
             if mchoice:
                 choices_started = True
                 choices.append(mchoice.group(2).strip())
@@ -453,15 +453,27 @@ def parse_questions(filepath):
 
             lower = line.lower()
 
+            # Handle Suggested Answer / Correct Answer
             if lower.startswith("correct answer") or lower.startswith("suggested answer"):
-                m = re.search(r"[:\-]\s*[\(\[]?([A-D])[\)\]]?", line, re.IGNORECASE)
+                # Grab everything after ":" or "-"
+                m = re.search(r"[:\-]\s*(.+)", line, re.IGNORECASE)
                 if m:
-                    correct = m.group(1).upper()
+                    ans = m.group(1)
+
+                    # Normalize → remove junk, keep letters only
+                    ans = re.sub(r'[^A-Za-z]', '', ans).upper()
+
+                    # Convert AE -> ["A","E"]
+                    if ans:
+                        # unique while preserving order
+                        correct = list(dict.fromkeys(list(ans)))
+
                 continue
 
             if not choices_started:
                 q_lines.append(line)
 
+        # Must have answers + correct key
         if not correct or len(choices) < 2:
             continue
 
@@ -471,12 +483,13 @@ def parse_questions(filepath):
             "number": number,
             "question": question_text,
             "choices": choices,
-            "correct": [correct]
+            "correct": correct
         })
 
         number += 1
 
     return questions
+
 
 
 # =========================
