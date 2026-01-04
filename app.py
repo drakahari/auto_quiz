@@ -45,14 +45,7 @@ def save_portal_title(title):
 # =========================
 # QUIZ REGISTRY
 # =========================
-def load_registry():
-    if not os.path.exists(QUIZ_REGISTRY):
-        return []
-    try:
-        with open(QUI_REGISTRY, "r") as f:
-            return json.load(f)
-    except:
-        return []
+
 
 
 def load_registry():
@@ -152,8 +145,9 @@ def delete_quiz(html_name):
 # =========================
 # SAVE ORDER (DRAG + DROP)
 # =========================
-@app.post("/save_order")
+@app.route("/save_order", methods=["POST"])
 def save_order():
+
     data = request.get_json()
     order = data.get("order", [])
 
@@ -416,7 +410,7 @@ def paste_page():
 
         <div class="card">
 
-            <form action="/process_paste" method="POST">
+            <form action="/process_paste" method="POST" enctype="multipart/form-data">
 
                 <h3>Quiz Display Title</h3>
                 <input type="text" name="quiz_title"
@@ -441,6 +435,12 @@ def paste_page():
 
                 <br><br>
 
+                <h3>Upload Logo (Optional)</h3>
+                <input type="file" name="quiz_logo" accept="image/*">
+                <p style="opacity:0.7; font-size:12px">
+                    Supported: PNG / JPG / GIF / WEBP
+                </p>
+
                 <button type="submit">Convert & Build Quiz</button>
             </form>
 
@@ -454,6 +454,7 @@ def paste_page():
     </body>
     </html>
     """, portal_title=portal_title)
+
 
 
 # =========================
@@ -472,16 +473,72 @@ def process_paste():
     with open(path, "w", encoding="utf-8") as f:
         f.write(quiz_text)
 
+    # This will also reset + populate PARSE_LOG because of parse_questions()
     quiz_data = parse_questions(path)
 
     if not quiz_data:
-        return "Could not parse any questions. Check formatting.", 400
+        # Even in failure cases, PARSE_LOG is useful
+        ts_fail = int(time.time())
+        log_filename = f"parse_log_{ts_fail}.txt"
+        with open(os.path.join(DATA_FOLDER, log_filename), "w", encoding="utf-8") as f:
+            f.write("\n".join(PARSE_LOG))
 
+        return render_template_string("""
+        <html>
+        <head>
+            <title>Parse Failed</title>
+            <link rel="stylesheet" href="/style.css">
+        </head>
+        <body>
+        <div class="container">
+            <h1 class="hero-title">⚠️ Could Not Parse Any Questions</h1>
+            <div class="card">
+                <p>No valid questions were parsed. Please check the formatting.</p>
+                <p>You can download the parser log for troubleshooting:</p>
+
+                <button onclick="location.href='/data/{{log_filename}}'">
+                    📥 Download Parse Log
+                </button>
+
+                <br><br>
+                <button onclick="location.href='/paste'">⬅ Back To Paste Page</button>
+                <button onclick="location.href='/'">🏠 Return To Portal</button>
+            </div>
+        </div>
+        </body>
+        </html>
+        """, log_filename=log_filename), 400
+
+    # Common timestamp for files
     ts = int(time.time())
+
+    # =========================
+    # SAVE PARSE LOG 🎯
+    # =========================
+    
+    log_filename = f"parse_log_{ts}.txt"
+    with open(os.path.join(DATA_FOLDER, log_filename), "w", encoding="utf-8") as f:
+        f.write("\n".join(PARSE_LOG))
+
+    # =========================
+    # HANDLE LOGO (OPTIONAL)
+    # =========================
+    logo_file = request.files.get("quiz_logo")
+    logo_filename = None
+
+    if logo_file and logo_file.filename:
+        ext = os.path.splitext(logo_file.filename)[1].lower()
+        if ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
+            logo_filename = f"logo_{ts}{ext}"
+            logo_file.save(os.path.join(LOGO_FOLDER, logo_filename))
+
+    # =========================
+    # SAVE JSON + BUILD QUIZ
+    # =========================
     json_name = f"quiz_{ts}.json"
     html_name = f"quiz_{ts}.html"
 
-    with open(os.path.join(DATA_FOLDER, json_name), "w") as f:
+    with open(os.path.join(DATA_FOLDER, json_name), "w", encoding="utf-8") as f:
         json.dump(quiz_data, f, indent=4)
 
     build_quiz_html(
@@ -490,12 +547,57 @@ def process_paste():
         os.path.join(QUIZ_FOLDER, html_name),
         get_portal_title(),
         quiz_title,
-        None   # no logo from paste mode
+        logo_filename
     )
 
-    add_quiz_to_registry(html_name, quiz_title, None)
+    add_quiz_to_registry(html_name, quiz_title, logo_filename)
 
-    return redirect("/library")
+    # =========================
+    # SUCCESS PAGE 🎉
+    # =========================
+    portal_title = get_portal_title()
+
+    return render_template_string("""
+    <html>
+    <head>
+        <title>Quiz Built</title>
+        <link rel="stylesheet" href="/style.css">
+    </head>
+
+    <body>
+    <div class="container">
+
+        <h1 class="hero-title">
+            ✅ Quiz Successfully Built
+        </h1>
+
+        <div class="card">
+            <p><b>{{quiz_title}}</b> has been created in your library.</p>
+
+            <button onclick="location.href='/quizzes/{{html_name}}'">
+                ▶ Open Quiz
+            </button>
+
+            <button onclick="location.href='/library'">
+                📚 Return To Quiz Library
+            </button>
+
+            <button onclick="location.href='/data/{{log_filename}}'">
+                📥 Download Parse Log
+            </button>
+
+            <br><br>
+            <button onclick="location.href='/'">
+                🏠 Return To Portal
+            </button>
+        </div>
+
+    </div>
+    </body>
+    </html>
+    """, quiz_title=quiz_title, html_name=html_name, log_filename=log_filename)
+
+
 
 
 
@@ -609,31 +711,67 @@ def save_settings():
 
 
 # =========================
-# ROBUST PARSER
+# ROBUST PARSER + LOGGING
 # =========================
+DEBUG_PARSE = True     # Turn ON console debugging
+PARSE_LOG = []         # Stores debug log for download
+
+
+def dbg(*msg):
+    """
+    Debug helper. Prints to console (if DEBUG_PARSE)
+    AND stores a full debug transcript in PARSE_LOG.
+    """
+    text = " ".join(str(m) for m in msg)
+
+    # Console logging (optional)
+    if DEBUG_PARSE:
+        print("[PARSE]", text)
+
+    # Always capture log in memory
+    PARSE_LOG.append(text)
+
+
 def parse_questions(filepath):
+    import re
+
+    # =========================
+    # RESET LOG PER SESSION 🚀
+    # =========================
+    global PARSE_LOG
+    PARSE_LOG.clear()
+    dbg("=== NEW PARSE SESSION STARTED ===")
+
     with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
         raw = f.read()
 
     text = raw.replace("\r\n", "\n").replace("\r", "\n")
 
     blocks = re.split(
-        r"(?=(?:Question\s*#\d+)|(?:^\d+\.) )",
+        r"(?=^\s*(?:Question\s*#?\s*\d+|\d+\s*[.) ]))",
         text,
         flags=re.IGNORECASE | re.MULTILINE
     )
+
+    dbg("Total detected blocks:", len(blocks))
 
     questions = []
     number = 1
 
     for block in blocks:
+        original_block = block
         block = block.strip()
         if not block:
+            dbg("Skipped: empty block")
             continue
 
         lines = [l.strip() for l in block.split("\n") if l.strip()]
-        if len(lines) < 3:
+        if len(lines) < 2:
+            dbg("Skipped: too few lines:", repr(lines))
             continue
+
+        dbg(f"\n--- Parsing Question Candidate #{number} ---")
+        dbg(lines[0][:120] + ("..." if len(lines[0]) > 120 else ""))
 
         q_lines = []
         choices = []
@@ -641,41 +779,55 @@ def parse_questions(filepath):
         choices_started = False
 
         for line in lines:
+            lower = line.lower().replace(" ", "")
 
-            # Allow A–Z answer choices (not only A–D)
-            mchoice = re.match(r"([A-Z])[\.\)]\s*(.+)", line, flags=re.IGNORECASE)
+            # ===== ANSWER CHOICES =====
+            mchoice = re.match(r"^\s*([A-Za-z])[\.\)]?\s+(.*)", line, re.IGNORECASE)
             if mchoice:
+                label = mchoice.group(1).upper()
+                text_choice = mchoice.group(2).strip()
+                dbg(f"Choice detected: {label} → {text_choice}")
                 choices_started = True
-                choices.append(mchoice.group(2).strip())
+                choices.append(text_choice)
                 continue
 
-            lower = line.lower()
+            # ===== CORRECT / SUGGESTED =====
+            if lower.startswith("suggestedanswer") or lower.startswith("correctanswer"):
+                dbg("Found answer line:", line)
 
-            # Handle Suggested Answer / Correct Answer
-            if lower.startswith("correct answer") or lower.startswith("suggested answer"):
-                # Grab everything after ":" or "-"
-                m = re.search(r"[:\-]\s*(.+)", line, re.IGNORECASE)
+                m = re.search(r"[:\-]\s*([A-Za-z]+)", line)
+                if not m:
+                    m = re.search(r"\s+([A-Za-z]+)\s*$", line)
+
                 if m:
                     ans = m.group(1)
-
-                    # Normalize → remove junk, keep letters only
-                    ans = re.sub(r'[^A-Za-z]', '', ans).upper()
-
-                    # Convert AE -> ["A","E"]
-                    if ans:
-                        # unique while preserving order
-                        correct = list(dict.fromkeys(list(ans)))
+                    parsed = re.sub(r'[^A-Za-z]', '', ans).upper()
+                    if parsed:
+                        correct = list(dict.fromkeys(list(parsed)))
+                        dbg("Parsed answer letters:", correct)
+                    else:
+                        dbg("!! Could not extract letters from:", ans)
+                else:
+                    dbg("!! No recognizable answer format found")
 
                 continue
 
+            # Part of question text
             if not choices_started:
                 q_lines.append(line)
 
-        # Must have answers + correct key
-        if not correct or len(choices) < 2:
+        # ===== FINAL VALIDATION =====
+        if not correct:
+            dbg("!! Skipped: NO correct answer found")
+            dbg(original_block[:200])
+            continue
+
+        if len(choices) < 2:
+            dbg("!! Skipped: Not enough choices:", choices)
             continue
 
         question_text = " ".join(q_lines)
+        dbg("Final Question Built:", question_text[:120])
 
         questions.append({
             "number": number,
@@ -684,9 +836,17 @@ def parse_questions(filepath):
             "correct": correct
         })
 
+        dbg("✓ Question Accepted\n")
         number += 1
 
+    dbg("\n==== PARSE COMPLETE ====")
+    dbg("Total questions parsed:", len(questions))
+
     return questions
+
+
+
+
 
 
 
