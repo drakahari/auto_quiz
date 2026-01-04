@@ -45,9 +45,6 @@ def save_portal_title(title):
 # =========================
 # QUIZ REGISTRY
 # =========================
-
-
-
 def load_registry():
     if not os.path.exists(QUIZ_REGISTRY):
         return []
@@ -336,8 +333,7 @@ def upload_page():
                 Use this if you already have a .txt question file.
             </p>
 
-            <form action="/preview_paste" method="POST" enctype="multipart/form-data">
-
+            <form action="/process" method="POST" enctype="multipart/form-data">
 
                 <h3>Quiz Display Title</h3>
                 <input type="text" name="quiz_title"
@@ -486,9 +482,10 @@ def preview_paste():
     if not quiz_text:
         return "No text provided.", 400
 
+    # Start with raw text
     clean_text = quiz_text
 
-    # Normalize ALL newline styles (Windows, Linux, Literal \n)
+    # Normalize ALL newline styles (Windows, Linux, literal \n)
     clean_text = (
         clean_text
         .replace("\\r\\n", "\n")
@@ -496,7 +493,6 @@ def preview_paste():
         .replace("\r\n", "\n")
         .replace("\r", "\n")
     )
-
 
     # -------- APPLY STRIP RULES --------
     strip_rules = []
@@ -516,6 +512,9 @@ def preview_paste():
                 cleaned_lines.append(line)
 
         clean_text = "\n".join(cleaned_lines)
+
+    # -------- CONFIDENCE ANALYSIS (NEW) --------
+    conf_summary, conf_details = analyze_confidence(clean_text)
 
     # ---------- RENDER PREVIEW ----------
     return render_template_string("""
@@ -540,6 +539,26 @@ def preview_paste():
             <h2>Text To Be Parsed</h2>
             <pre style="background:#102020;padding:10px;border-radius:8px;white-space:pre-wrap;">{{cleaned}}</pre>
 
+            {% if conf_details %}
+            <h2>🧠 Confidence Analysis</h2>
+            <p>
+                <b>Total blocks:</b> {{conf_summary.total}}<br>
+                ✅ High: {{conf_summary.high}} &nbsp;
+                ⚠ Medium: {{conf_summary.medium}} &nbsp;
+                ❌ Low: {{conf_summary.low}}
+            </p>
+
+            <ul>
+                {% for item in conf_details %}
+                <li style="margin-bottom:8px;">
+                    <b>Block {{item.index}} ({{item.confidence|capitalize}})</b><br>
+                    <span style="opacity:.85">{{item.title}}</span><br>
+                    <span style="opacity:.6; font-size:12px;">{{item.reason}}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+
             <p style="opacity:.7">
                 If this looks correct, continue. Otherwise, go back and adjust rules.
             </p>
@@ -552,7 +571,6 @@ def preview_paste():
                 <input type="hidden" name="quiz_title" value="{{quiz_title}}">
                 <textarea name="quiz_text" style="display:none;">{{cleaned}}</textarea>
 
-
                 <button type="submit">✅ Yes, Build My Quiz</button>
             </form>
 
@@ -563,8 +581,13 @@ def preview_paste():
     </div>
     </body>
     </html>
-    """, quiz_title=quiz_title, original=quiz_text, cleaned=clean_text)
-
+    """,
+    quiz_title=quiz_title,
+    original=quiz_text,
+    cleaned=clean_text,
+    conf_summary=conf_summary,
+    conf_details=conf_details
+    )
 
 
 
@@ -576,10 +599,10 @@ def process_paste():
     quiz_text = request.form.get("quiz_text", "").strip()
     quiz_title = request.form.get("quiz_title", "Generated Quiz From Paste")
 
-    # Checkbox flag (Auto Junk Cleanup)
+    # Checkbox flag (Auto Junk Cleanup) – currently unused unless you add a checkbox
     auto_cleanup = request.form.get("auto_cleanup") == "1"
 
-    # Custom strip rules textarea
+    # Custom strip rules textarea (not used here anymore – handled in preview)
     strip_rules_raw = request.form.get("strip_text", "").strip()
 
     if not quiz_text:
@@ -596,10 +619,7 @@ def process_paste():
         .replace("\r", "\n")
     )
 
-
-    # =========================
-    # AUTO CLEANUP MODE 🧹
-    # =========================
+    # AUTO CLEANUP still present but will only run if you wire a checkbox
     if auto_cleanup:
         cleaned_lines = []
         junk_patterns = [
@@ -629,39 +649,12 @@ def process_paste():
 
         clean_text = "\n".join(cleaned_lines)
 
-    # =========================
-    # APPLY USER STRIP RULES ✂️
-    # =========================
-    strip_rules = []
-    if strip_rules_raw:
-        strip_rules = [r.strip() for r in strip_rules_raw.splitlines() if r.strip()]
-
-    if strip_rules:
-        cleaned_lines = []
-        for line in clean_text.splitlines():
-            line_low = line.lower()
-            remove_line = False
-
-            for rule in strip_rules:
-                if rule.lower() in line_low:
-                    remove_line = True
-                    break
-
-            if not remove_line:
-                cleaned_lines.append(line)
-
-        clean_text = "\n".join(cleaned_lines)
-
-    # =========================
     # SAVE CLEANED TEXT
-    # =========================
     path = os.path.join(UPLOAD_FOLDER, "pasted.txt")
     with open(path, "w", encoding="utf-8") as f:
         f.write(clean_text)
 
-    # =========================
     # PARSE QUIZ
-    # =========================
     quiz_data = parse_questions(path)
 
     if not quiz_data:
@@ -696,9 +689,7 @@ def process_paste():
         </html>
         """, log_filename=log_filename), 400
 
-    # =========================
     # SAVE OUTPUTS
-    # =========================
     ts = int(time.time())
 
     # Save parse debug log
@@ -706,7 +697,7 @@ def process_paste():
     with open(os.path.join(DATA_FOLDER, log_filename), "w", encoding="utf-8") as f:
         f.write("\n".join(PARSE_LOG))
 
-    # Optional logo
+    # Optional logo (note: logo from paste step is not preserved across preview)
     logo_file = request.files.get("quiz_logo")
     logo_filename = None
 
@@ -765,8 +756,7 @@ def process_paste():
 
             <br><br>
             <button onclick="location.href='/'">
-                🏠 Return To Portal
-            </button>
+                🏠 Return To Portal</button>
         </div>
 
     </div>
@@ -817,7 +807,7 @@ def process_file():
     json_name = f"quiz_{ts}.json"
     html_name = f"quiz_{ts}.html"
 
-    with open(os.path.join(DATA_FOLDER, json_name), "w") as f:
+    with open(os.path.join(DATA_FOLDER, json_name), "w", encoding="utf-8") as f:
         json.dump(quiz_data, f, indent=4)
 
     build_quiz_html(
@@ -886,6 +876,80 @@ def save_settings():
     title = request.form.get("portal_title", "Training & Practice Center")
     save_portal_title(title)
     return redirect("/")
+
+# =========================
+# CONFIDENCE ANALYSIS ENGINE
+# =========================
+def analyze_confidence(text):
+    import re
+
+    blocks = re.split(
+        r"(?=^\s*(?:Question\s*#?\s*\d+|\d+\s*[.) ]))",
+        text,
+        flags=re.IGNORECASE | re.MULTILINE
+    )
+
+    details = []
+    total = len(blocks)
+    high = medium = low = 0
+
+    for block in blocks:
+        b = block.strip()
+        if not b:
+            continue
+
+        score = 0
+        reasons = []
+
+        # --- Choices Check ---
+        choices = re.findall(r"^[A-F][\.\)]", b, flags=re.MULTILINE)
+        if len(choices) >= 2:
+            score += 40
+            reasons.append("Detected multiple answer choices")
+        else:
+            reasons.append("Missing or too few answer choices")
+
+        # --- Has Correct Answer ---
+        if re.search(r"correct answer|suggested answer", b, re.IGNORECASE):
+            score += 40
+            reasons.append("Detected an answer key line")
+        else:
+            reasons.append("No clear answer key line found")
+
+        # --- Length / Structure ---
+        if len(b) > 120:
+            score += 20
+            reasons.append("Looks like full valid question text")
+        else:
+            reasons.append("Question block looks short/incomplete")
+
+        # ---------- Confidence Bucket ----------
+        if score >= 80:
+            level = "HIGH"
+            high += 1
+        elif score >= 40:
+            level = "MEDIUM"
+            medium += 1
+        else:
+            level = "LOW"
+            low += 1
+
+        details.append({
+            "confidence": level,
+            "score": score,
+            "preview": b[:400],
+            "reasons": reasons
+        })
+
+    summary = {
+        "total": total,
+        "high": high,
+        "medium": medium,
+        "low": low
+    }
+
+    return summary, details
+
 
 
 
@@ -1019,12 +1083,93 @@ def parse_questions(filepath):
     return questions
 
 
+# =========================
+# CONFIDENCE ANALYZER (for preview only)
+# =========================
+def analyze_confidence(clean_text):
+    """
+    Heuristic pre-check of the raw text BEFORE parsing.
+    Used only for preview so the user can see if their input
+    looks parse-friendly.
+    """
+    import re
 
+    blocks = re.split(
+        r"(?=^\s*(?:Question\s*#?\s*\d+|\d+\s*[.) ]))",
+        clean_text,
+        flags=re.IGNORECASE | re.MULTILINE
+    )
 
+    details = []
+    high = med = low = 0
+    idx = 0
 
+    for raw in blocks:
+        block = raw.strip()
+        if not block:
+            continue
 
+        idx += 1
+        lines = [l.strip() for l in block.split("\n") if l.strip()]
+        txt = " ".join(lines)
 
+        # Basic signals
+        has_choice = any(re.match(r"^[A-Da-d][\.\)]\s+", l) for l in lines)
+        has_answer_line = any(
+            ("correct answer" in l.lower()) or ("suggested answer" in l.lower())
+            for l in lines
+        )
+        num_choices = sum(
+            1 for l in lines if re.match(r"^[A-Da-d][\.\)]\s+", l)
+        )
 
+        score = 0
+        reason = []
+
+        if has_choice:
+            score += 1
+            reason.append("Found A–D answer choices")
+        else:
+            reason.append("No A–D answer choices found")
+
+        if has_answer_line:
+            score += 1
+            reason.append("Found 'Correct/Suggested Answer' line")
+        else:
+            reason.append("No explicit correct-answer line found")
+
+        if 2 <= num_choices <= 6:
+            score += 1
+            reason.append(f"{num_choices} choices detected")
+        else:
+            reason.append(f"{num_choices} choices detected (unusual count)")
+
+        if score == 3:
+            conf = "high"
+            high += 1
+        elif score == 2:
+            conf = "medium"
+            med += 1
+        else:
+            conf = "low"
+            low += 1
+
+        title = lines[0][:80] if lines else "[empty]"
+
+        details.append({
+            "index": idx,
+            "title": title,
+            "confidence": conf,
+            "reason": "; ".join(reason),
+        })
+
+    summary = {
+        "high": high,
+        "medium": med,
+        "low": low,
+        "total": len(details),
+    }
+    return summary, details
 
 
 # =========================
@@ -1086,8 +1231,6 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
             <div id="progressBarOuter">
                 <div id="progressBarInner"></div>
             </div>
-
-            
 
             <!-- Exam Timer -->
             <div id="timer" class="hidden timerBox">
