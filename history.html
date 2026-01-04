@@ -224,35 +224,43 @@ function renderHistory() {
 
             } else if (rec.missed && rec.missed.length) {
 
-                // Handle legacy missed arrays
-                missedBlock = rec.missed.map(m => {
+    missedBlock = rec.missed.map(m => {
 
-                    // If older format stored ONLY number
-                    if (typeof m === "number") {
-                        return `<div>Question ${m}</div>`;
-                    }
+        // Legacy: stored only question number
+        if (typeof m === "number") {
+            return `<div>Question ${m}</div>`;
+        }
 
-                    // If object like { number: X, question:"", correct:["A"] }
-                    if (typeof m === "object") {
-                        let correctLetter = Array.isArray(m.correct)
-                            ? m.correct[0]
-                            : m.correct;
+        // Legacy-ish: correct just letters
+        if (!m.correctText && m.correct) {
+            m.correctText = Array.isArray(m.correct)
+                ? m.correct.map(l => l)
+                : [m.correct];
+        }
 
-                        return `
-                            <div style="margin-top:6px; padding:8px; background:rgba(0,0,0,.6); border-radius:6px;">
-                                <b>Question ${m.number}</b><br>
-                                ${m.question || ""}
-                                <br>
-                                <span style="color:#00ff80">
-                                    ✓ Correct Answer: ${correctLetter || ""}
-                                </span>
-                            </div>
-                        `;
-                    }
+        const correctSection = (m.correctText && m.correctText.length)
+            ? `
+                <ul>
+                    ${m.correctText.map(c => `<li>${c}</li>`).join("")}
+                </ul>
+              `
+            : `<span style="color:#00ff80">
+                    ✓ Correct Answer: ${(m.correctLetters || []).join(", ")}
+               </span>`;
 
-                    return m;
-                }).join("");
-            }
+        return `
+            <div style="margin-top:6px; padding:8px; background:rgba(0,0,0,.6); border-radius:6px;">
+                <b>Question ${m.number}</b><br>
+                ${m.question || ""}<br>
+                <div style="margin-top:6px; color:#00ff80">
+                    <b>Correct Answer(s):</b>
+                    ${correctSection}
+                </div>
+            </div>
+        `;
+    }).join("");
+}
+
 
             const card = document.createElement("div");
             card.className = "history-card " + cls;
