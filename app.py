@@ -281,6 +281,8 @@ def quiz_library():
 
             <br>
             <button onclick="location.href='/upload'">📤 Upload New Quiz</button>
+            <button onclick="location.href='/paste'">📋 Paste Questions Instead</button>
+                      
             <button onclick="location.href='/'">⬅ Back To Portal</button>
 
         </div>
@@ -369,6 +371,112 @@ def upload_page():
     </body>
     </html>
     """)
+
+
+# =========================
+# PASTE QUIZ PAGE
+# =========================
+@app.route("/paste")
+def paste_page():
+    portal_title = get_portal_title()
+
+    return render_template_string("""
+    <html>
+    <head>
+        <title>Paste Quiz Questions</title>
+        <link rel="stylesheet" href="/style.css">
+    </head>
+
+    <body>
+    <div class="container">
+
+        <h1 class="hero-title">
+            📋 Create Quiz From Pasted Text
+        </h1>
+
+        <div class="card">
+
+            <form action="/process_paste" method="POST">
+
+                <h3>Quiz Display Title</h3>
+                <input type="text" name="quiz_title"
+                       placeholder="Example: Linux+ Practice Set"
+                       required style="width:100%; padding:6px">
+
+                <br><br>
+
+                <h3>Paste Questions + Answers</h3>
+                <p style="opacity:.8; font-size:12px">
+                    Supports formats like:<br>
+                    1. Question text<br>
+                    A. Answer<br>
+                    B. Answer<br>
+                    C. Answer<br>
+                    Suggested Answer: B
+                </p>
+
+                <textarea name="quiz_text"
+                          required
+                          style="width:100%; height:400px; padding:10px; font-size:14px;"></textarea>
+
+                <br><br>
+
+                <button type="submit">Convert & Build Quiz</button>
+            </form>
+
+            <br>
+            <button onclick="location.href='/upload'">📤 Upload File Instead</button>
+            <button onclick="location.href='/'">⬅ Back To Portal</button>
+
+        </div>
+
+    </div>
+    </body>
+    </html>
+    """, portal_title=portal_title)
+
+
+# =========================
+# PROCESS PASTED QUIZ
+# =========================
+@app.route("/process_paste", methods=["POST"])
+def process_paste():
+    quiz_text = request.form.get("quiz_text", "").strip()
+    quiz_title = request.form.get("quiz_title", "Generated Quiz From Paste")
+
+    if not quiz_text:
+        return "No text provided.", 400
+
+    # Save pasted text to temp file so parser can reuse logic
+    path = os.path.join(UPLOAD_FOLDER, "pasted.txt")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(quiz_text)
+
+    quiz_data = parse_questions(path)
+
+    if not quiz_data:
+        return "Could not parse any questions. Check formatting.", 400
+
+    ts = int(time.time())
+    json_name = f"quiz_{ts}.json"
+    html_name = f"quiz_{ts}.html"
+
+    with open(os.path.join(DATA_FOLDER, json_name), "w") as f:
+        json.dump(quiz_data, f, indent=4)
+
+    build_quiz_html(
+        html_name,
+        json_name,
+        os.path.join(QUIZ_FOLDER, html_name),
+        get_portal_title(),
+        quiz_title,
+        None   # no logo from paste mode
+    )
+
+    add_quiz_to_registry(html_name, quiz_title, None)
+
+    return redirect("/library")
+
 
 
 # =========================
@@ -477,6 +585,7 @@ def save_settings():
     title = request.form.get("portal_title", "Training & Practice Center")
     save_portal_title(title)
     return redirect("/")
+
 
 
 # =========================
