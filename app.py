@@ -336,7 +336,8 @@ def upload_page():
                 Use this if you already have a .txt question file.
             </p>
 
-            <form action="/process" method="POST" enctype="multipart/form-data">
+            <form action="/preview_paste" method="POST" enctype="multipart/form-data">
+
 
                 <h3>Quiz Display Title</h3>
                 <input type="text" name="quiz_title"
@@ -410,7 +411,8 @@ def paste_page():
 
         <div class="card">
 
-            <form action="/process_paste" method="POST" enctype="multipart/form-data">
+            <!-- IMPORTANT: This must go to PREVIEW -->
+            <form action="/preview_paste" method="POST" enctype="multipart/form-data">
 
                 <h3>Quiz Display Title</h3>
                 <input type="text" name="quiz_title"
@@ -441,9 +443,14 @@ def paste_page():
                     (One per line, case insensitive)
                 </p>
 
-                <textarea name="strip_text"
-                          placeholder="Example:\nTopic\nExam Version\nPractice Only"
-                          style="width:100%; height:140px; padding:10px; font-size:14px;"></textarea>
+            <textarea name="strip_text"
+                      placeholder="Example:
+            Topic
+            Exam Version
+            Practice Only"
+                      style="width:100%; height:140px; padding:10px; font-size:14px;"></textarea>
+
+
 
                 <br><br>
 
@@ -453,7 +460,8 @@ def paste_page():
                     Supported: PNG / JPG / GIF / WEBP
                 </p>
 
-                <button type="submit">Convert & Build Quiz</button>
+                <!-- FIXED: This is NOT build. This goes to preview -->
+                <button type="submit">👀 Preview & Continue</button>
             </form>
 
             <br>
@@ -466,6 +474,98 @@ def paste_page():
     </body>
     </html>
     """, portal_title=portal_title)
+
+
+# =========================
+# PREVIEW CLEAN TEXT BEFORE PARSE
+# =========================
+@app.route("/preview_paste", methods=["POST"])
+def preview_paste():
+    quiz_text = request.form.get("quiz_text", "").strip()
+    quiz_title = request.form.get("quiz_title", "Generated Quiz From Paste")
+    strip_rules_raw = request.form.get("strip_text", "").strip()
+
+    if not quiz_text:
+        return "No text provided.", 400
+
+    clean_text = quiz_text
+
+    # Normalize ALL newline styles (Windows, Linux, Literal \n)
+    clean_text = (
+        clean_text
+        .replace("\\r\\n", "\n")
+        .replace("\\n", "\n")
+        .replace("\r\n", "\n")
+        .replace("\r", "\n")
+    )
+
+
+    # -------- APPLY STRIP RULES --------
+    strip_rules = []
+    if strip_rules_raw:
+        strip_rules = [r.strip() for r in strip_rules_raw.splitlines() if r.strip()]
+
+    if strip_rules:
+        cleaned_lines = []
+        for line in clean_text.splitlines():
+            low = line.lower()
+            remove = False
+            for rule in strip_rules:
+                if rule.lower() in low:
+                    remove = True
+                    break
+            if not remove:
+                cleaned_lines.append(line)
+
+        clean_text = "\n".join(cleaned_lines)
+
+    # ---------- RENDER PREVIEW ----------
+    return render_template_string("""
+    <html>
+    <head>
+        <title>Preview Before Parsing</title>
+        <link rel="stylesheet" href="/style.css">
+    </head>
+
+    <body>
+    <div class="container">
+        
+        <h1 class="hero-title">👀 Preview Quiz Before Building</h1>
+
+        <div class="card">
+            <h2>Quiz Title:</h2>
+            <p><b>{{quiz_title}}</b></p>
+
+            <h2>Original Text</h2>
+            <pre style="background:black;padding:10px;border-radius:8px;white-space:pre-wrap;">{{original}}</pre>
+
+            <h2>Text To Be Parsed</h2>
+            <pre style="background:#102020;padding:10px;border-radius:8px;white-space:pre-wrap;">{{cleaned}}</pre>
+
+            <p style="opacity:.7">
+                If this looks correct, continue. Otherwise, go back and adjust rules.
+            </p>
+
+            <!-- IMPORTANT:
+                 Now we send the CLEANED text forward
+                 to actual build handler -->
+            <form action="/process_paste" method="POST">
+
+                <input type="hidden" name="quiz_title" value="{{quiz_title}}">
+                <textarea name="quiz_text" style="display:none;">{{cleaned}}</textarea>
+
+
+                <button type="submit">✅ Yes, Build My Quiz</button>
+            </form>
+
+            <br>
+            <button onclick="history.back()">⬅ Go Back & Edit</button>
+            <button onclick="location.href='/'">🏠 Return To Portal</button>
+        </div>
+    </div>
+    </body>
+    </html>
+    """, quiz_title=quiz_title, original=quiz_text, cleaned=clean_text)
 
 
 
@@ -488,6 +588,16 @@ def process_paste():
         return "No text provided.", 400
 
     clean_text = quiz_text
+
+    # Normalize ALL newline styles (Windows, Linux, Literal \n)
+    clean_text = (
+        clean_text
+        .replace("\\r\\n", "\n")
+        .replace("\\n", "\n")
+        .replace("\r\n", "\n")
+        .replace("\r", "\n")
+    )
+
 
     # =========================
     # AUTO CLEANUP MODE 🧹
