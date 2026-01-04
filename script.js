@@ -171,6 +171,10 @@ function startQuiz(isExam) {
 
     console.log("START QUIZ. examMode =", examMode);
 
+    // Show Submit ONLY in Exam Mode
+    const submitBtn = document.querySelector("button[onclick='submitQuiz()']");
+    if (submitBtn) submitBtn.style.display = examMode ? "inline-block" : "none";
+
     const modeSelect = document.getElementById("modeSelect");
     const quizDiv = document.getElementById("quiz");
     const resultDiv = document.getElementById("result");
@@ -202,6 +206,7 @@ function startQuiz(isExam) {
 
     renderQuestion();
 }
+
 
 /* =====================================================
    EXAM TIMER + PAUSE / RESUME
