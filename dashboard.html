@@ -81,34 +81,58 @@
 <script>
 const HISTORY_KEY = "serverplus_history_v2";
 
-/*
-========================================
-  OPTION A — SMART HISTORY LOADER
-  (Matches History Page Logic)
-========================================
-*/
-function loadHistory() {
+/* ---------------------------------------------
+   QUIZ NAME REGISTRY (from quizzes.json)
+--------------------------------------------- */
+let QUIZ_NAME_MAP = {};
 
-    // Try new structured storage
+// Load quiz registry FIRST
+fetch('/config/quizzes.json')
+    .then(r => r.json())
+    .then(list => {
+        list.forEach(q => {
+    if (!q.title || !q.html) return;
+
+    // Example: quiz_1767557688.html
+    const htmlName = q.html;
+    const baseName = htmlName.replace(".html","");     // quiz_1767557688
+    const jsonName = baseName + ".json";               // quiz_1767557688.json
+
+    // Support ALL possible history keys
+    QUIZ_NAME_MAP[htmlName]          = q.title;
+    QUIZ_NAME_MAP["/data/" + htmlName] = q.title;
+
+    QUIZ_NAME_MAP[jsonName]          = q.title;
+    QUIZ_NAME_MAP["/data/" + jsonName] = q.title;
+});
+
+        buildDashboard();
+    })
+    .catch(() => {
+        console.warn("Could not load quizzes.json — fallback names only");
+        buildDashboard();
+    });
+
+
+/* ---------------------------------------------
+   SMART HISTORY LOADER (supports legacy)
+--------------------------------------------- */
+function loadHistory() {
     let v2 = JSON.parse(localStorage.getItem(HISTORY_KEY) || "{}");
 
-    // If structured keys exist, use them
-    if (Object.keys(v2).length) return v2;
+    if (Object.keys(v2).length)
+        return v2;
 
-    // Otherwise support legacy flat history
     let legacy = JSON.parse(localStorage.getItem("history") || "[]");
 
     if (legacy.length) {
         let grouped = {};
-
         legacy.forEach(entry => {
             const key = entry.quiz || "Unknown Quiz";
-
             if (!grouped[key]) grouped[key] = [];
             grouped[key].push(entry);
         });
 
-        // Save upgraded format
         localStorage.setItem(HISTORY_KEY, JSON.stringify(grouped));
         return grouped;
     }
@@ -117,11 +141,9 @@ function loadHistory() {
 }
 
 
-/*
-========================================
-  DASHBOARD BUILDER
-========================================
-*/
+/* ---------------------------------------------
+   DASHBOARD BUILDER
+--------------------------------------------- */
 function buildDashboard() {
     const div = document.getElementById("analytics");
     const store = loadHistory();
@@ -180,7 +202,14 @@ function buildDashboard() {
 
         html += `
         <div class="section">
-            <h2>📘 ${key.replace("/data/","")}</h2>
+
+            <!-- Show friendly quiz name when possible -->
+            <h2>📘 ${
+                (attempts[0]?.quizName ||     // if future stored name
+                 attempts[0]?.quiz ||         // if stored quiz label
+                 QUIZ_NAME_MAP[key] ||        // from quizzes.json (NOW WORKING 🎉)
+                 key.replace("/data/",""))     // fallback filename
+            }</h2>
 
             <div class="stat-grid">
                 <div class="stat-card">
@@ -221,8 +250,6 @@ function buildDashboard() {
 
     div.innerHTML = html;
 }
-
-buildDashboard();
 </script>
 
 </body>

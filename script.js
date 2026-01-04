@@ -462,8 +462,29 @@ function saveHistory(percent, correct, total, missed, attemptId) {
         store = {};
     }
 
-    // Use quiz file path as key so each quiz tracks its own attempts
-    const quizKey = (typeof QUIZ_FILE !== "undefined") ? QUIZ_FILE : "quiz.json";
+    /* --------------------------------------------
+       Determine Quiz KEY for grouping history
+       Priority:
+       1️⃣ User-supplied quiz name (from your portal)
+       2️⃣ Existing QUIZ_FILE fallback (old behavior)
+    -------------------------------------------- */
+    let quizKey = "Unnamed Quiz";
+
+    // If you already store quiz title globally, catch it
+    if (window.quiz_title && window.quiz_title.trim()) {
+        quizKey = window.quiz_title.trim();
+    }
+
+    // If you capture quiz name from an input box
+    else if (document.getElementById("quiz_title")) {
+        const val = document.getElementById("quiz_title").value.trim();
+        if (val) quizKey = val;
+    }
+
+    // FINAL fallback to filename (keeps compatibility)
+    else if (typeof QUIZ_FILE !== "undefined") {
+        quizKey = QUIZ_FILE;
+    }
 
     if (!store[quizKey]) {
         store[quizKey] = [];
@@ -472,15 +493,16 @@ function saveHistory(percent, correct, total, missed, attemptId) {
     store[quizKey].push({
         id: attemptId,
         date: new Date().toLocaleString(),
-        score: correct,      // number of correct answers
-        total: total,        // total questions
-        percent: percent,    // percentage
+        score: correct,      
+        total: total,        
+        percent: percent,    
         timeRemaining: timeRemaining,
         mode: "Exam",
-        missed: missed       // array of {number, question, correct}
+        missed: missed       
     });
 
     localStorage.setItem(HISTORY_KEY, JSON.stringify(store));
     console.log("History saved for quizKey:", quizKey, "Attempt:", attemptId);
 }
+
 

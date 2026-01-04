@@ -21,9 +21,7 @@
     padding: 6px 10px;
 }
 
-.mode-center {
-    text-align: center;
-}
+.mode-center { text-align: center; }
 
 .mode-badge {
     height: 84px;
@@ -101,27 +99,18 @@
 
 small { color: #bbb; }
 
-button {
-    margin-top: 15px;
-}
+button { margin-top: 15px; }
 </style>
 </head>
-
 
 <body>
 <div class="container history-container">
 
-    <!-- =========================
-          TITLE BANNER WITH USER LOGO
-    ========================== -->
     <div class="mode-banner">
-
         <img id="leftLogo" class="mode-badge" style="visibility:hidden">
-
         <div class="mode-center">
             <h1 class="hero-title">📜 Exam & Quiz History</h1>
         </div>
-
         <img id="rightLogo" class="mode-badge" style="visibility:hidden">
     </div>
 
@@ -133,30 +122,56 @@ button {
 
 </div>
 
-
 <script>
 const HISTORY_KEY = "serverplus_history_v2";
+
+/* ---------------------------------------------------
+   QUIZ NAME REGISTRY MAP (like dashboard)
+--------------------------------------------------- */
+let QUIZ_NAME_MAP = {};
+
+// Load registry FIRST, THEN render history
+fetch('/config/quizzes.json')
+    .then(r => r.json())
+    .then(list => {
+        list.forEach(q => {
+            if (!q.title || !q.html) return;
+
+            const html = q.html;
+            const base = html.replace(".html","");
+            const json = base + ".json";
+
+            // Support ALL forms history might use
+            QUIZ_NAME_MAP[html] = q.title;
+            QUIZ_NAME_MAP["/data/" + html] = q.title;
+            QUIZ_NAME_MAP[json] = q.title;
+            QUIZ_NAME_MAP["/data/" + json] = q.title;
+        });
+
+        loadLogo();
+        renderHistory();
+    })
+    .catch(() => {
+        console.warn("Could not load quizzes.json — titles fallback to filenames");
+        loadLogo();
+        renderHistory();
+    });
+
 
 /* =========================
    LOAD HISTORY
 ========================= */
 function loadHistoryStore() {
 
-    // New Format
     let v2 = JSON.parse(localStorage.getItem(HISTORY_KEY) || "{}");
-
-    // If we already have structured history, use it
     if (Object.keys(v2).length) return v2;
 
-    // Legacy format fallback (flat array)
     let legacy = JSON.parse(localStorage.getItem("history") || "[]");
 
     if (legacy.length) {
         let grouped = {};
-
         legacy.forEach(entry => {
             const key = entry.quiz || "Unknown Quiz";
-
             if (!grouped[key]) grouped[key] = [];
             grouped[key].push(entry);
         });
@@ -189,9 +204,16 @@ function renderHistory() {
         const groupDiv = document.createElement("div");
         groupDiv.className = "quiz-group";
 
+        // 🔥 FRIENDLY QUIZ NAME LOGIC
+        const friendlyName =
+            records[0]?.quizName ||     // future saved name
+            records[0]?.quiz     ||     // if saved
+            QUIZ_NAME_MAP[key]   ||     // lookup match
+            key.replace("/data/","");   // final fallback
+
         groupDiv.innerHTML += `
             <div class="quiz-title">
-                📘 ${key.replace("/data/","")}
+                📘 ${friendlyName}
                 <small>(${records.length} attempts)</small>
             </div>
         `;
@@ -210,8 +232,6 @@ function renderHistory() {
 
             /* ---- FORMAT MISSED QUESTIONS ---- */
             if (rec.missedDetails && rec.missedDetails.length) {
-
-                // New-style detailed missed list
                 missedBlock = rec.missedDetails.map(m => `
                     <div style="margin-top:6px; padding:8px; background:rgba(0,0,0,.6); border-radius:6px;">
                         <b>Question ${m.number}</b><br>
@@ -223,51 +243,41 @@ function renderHistory() {
                 `).join("");
 
             } else if (rec.missed && rec.missed.length) {
+                missedBlock = rec.missed.map(m => {
+                    if (typeof m === "number") {
+                        return `<div>Question ${m}</div>`;
+                    }
 
-    missedBlock = rec.missed.map(m => {
+                    if (!m.correctText && m.correct) {
+                        m.correctText = Array.isArray(m.correct)
+                            ? m.correct.map(l => l)
+                            : [m.correct];
+                    }
 
-        // Legacy: stored only question number
-        if (typeof m === "number") {
-            return `<div>Question ${m}</div>`;
-        }
+                    const correctSection = (m.correctText && m.correctText.length)
+                        ? `<ul>${m.correctText.map(c => `<li>${c}</li>`).join("")}</ul>`
+                        : `<span style="color:#00ff80">
+                                ✓ Correct Answer: ${(m.correctLetters || []).join(", ")}
+                           </span>`;
 
-        // Legacy-ish: correct just letters
-        if (!m.correctText && m.correct) {
-            m.correctText = Array.isArray(m.correct)
-                ? m.correct.map(l => l)
-                : [m.correct];
-        }
-
-        const correctSection = (m.correctText && m.correctText.length)
-            ? `
-                <ul>
-                    ${m.correctText.map(c => `<li>${c}</li>`).join("")}
-                </ul>
-              `
-            : `<span style="color:#00ff80">
-                    ✓ Correct Answer: ${(m.correctLetters || []).join(", ")}
-               </span>`;
-
-        return `
-            <div style="margin-top:6px; padding:8px; background:rgba(0,0,0,.6); border-radius:6px;">
-                <b>Question ${m.number}</b><br>
-                ${m.question || ""}<br>
-                <div style="margin-top:6px; color:#00ff80">
-                    <b>Correct Answer(s):</b>
-                    ${correctSection}
-                </div>
-            </div>
-        `;
-    }).join("");
-}
-
+                    return `
+                        <div style="margin-top:6px; padding:8px; background:rgba(0,0,0,.6); border-radius:6px;">
+                            <b>Question ${m.number}</b><br>
+                            ${m.question || ""}<br>
+                            <div style="margin-top:6px; color:#00ff80">
+                                <b>Correct Answer(s):</b>
+                                ${correctSection}
+                            </div>
+                        </div>
+                    `;
+                }).join("");
+            }
 
             const card = document.createElement("div");
             card.className = "history-card " + cls;
             card.setAttribute("data-attempt",
-    rec.attemptId || rec.id || rec.uuid || ""
-);
-
+                rec.attemptId || rec.id || rec.uuid || ""
+            );
 
             card.innerHTML = `
                 <div><b>${rec.date}</b></div>
@@ -293,24 +303,20 @@ function renderHistory() {
 ========================= */
 function clearHistory() {
     if (!confirm("Delete ALL quiz history?")) return;
-
     localStorage.removeItem(HISTORY_KEY);
-    localStorage.removeItem("history");   // legacy storage
-
+    localStorage.removeItem("history");
     renderHistory();
 }
 
 
-
 /* ===============================
-   LOAD USER LOGO
+   LOAD LOGO
 =============================== */
 function loadLogo() {
     fetch('/config/quizzes.json')
         .then(r => r.json())
         .then(reg => {
             if (!reg.length) return;
-
             const latest = reg[reg.length - 1];
             if (!latest.logo) return;
 
@@ -324,7 +330,7 @@ function loadLogo() {
 
 
 /* =========================
-   HIGHLIGHT JUST THIS ATTEMPT
+   HIGHLIGHT ATTEMPT
 ========================= */
 function highlightTargetAttempt() {
     const params = new URLSearchParams(window.location.search);
@@ -339,35 +345,18 @@ function highlightTargetAttempt() {
         if (val && val === target) match = card;
     });
 
-    // If no matching attempt → DO NOTHING
-    if (!match) {
-        console.warn("Attempt not found — leaving full history visible");
-        return;
-    }
+    if (!match) return;
 
-    // Hide everything except this one
     cards.forEach(c => {
         if (c === match) {
             c.style.display = "block";
             c.classList.add("highlighted");
-        } else {
-            c.style.display = "none";
-        }
+        } else c.style.display = "none";
     });
 
     match.scrollIntoView({ behavior:"smooth", block:"center" });
 }
-
-
-
-
-/* =========================
-   RUN
-========================= */
-loadLogo();
-renderHistory();
 </script>
-
 
 </body>
 </html>
