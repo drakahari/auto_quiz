@@ -504,6 +504,18 @@ def preview_paste():
     quiz_title = request.form.get("quiz_title", "Generated Quiz From Paste")
     strip_rules_raw = request.form.get("strip_text", "").strip()
 
+    # =========================
+    # TEMPORARY LOGO HANDLING
+    # =========================
+    logo_file = request.files.get("quiz_logo")
+    temp_logo_name = None
+
+    if logo_file and logo_file.filename:
+        ext = os.path.splitext(logo_file.filename)[1].lower()
+        if ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
+            temp_logo_name = f"temp_{int(time.time())}{ext}"
+            logo_file.save(os.path.join(LOGO_FOLDER, temp_logo_name))
+
     if not quiz_text:
         return "No text provided.", 400
 
@@ -518,6 +530,7 @@ def preview_paste():
         .replace("\r\n", "\n")
         .replace("\r", "\n")
     )
+
 
     # -------- APPLY STRIP RULES --------
     strip_rules = []
@@ -602,11 +615,16 @@ def preview_paste():
                  to actual build handler -->
             <form action="/process_paste" method="POST">
 
-                <input type="hidden" name="quiz_title" value="{{quiz_title}}">
-                <textarea name="quiz_text" style="display:none;">{{cleaned}}</textarea>
+    <input type="hidden" name="quiz_title" value="{{quiz_title}}">
+    <textarea name="quiz_text" style="display:none;">{{cleaned}}</textarea>
 
-                <button type="submit">✅ Yes, Build My Quiz</button>
-            </form>
+    {% if temp_logo_name %}
+        <input type="hidden" name="temp_logo_name" value="{{temp_logo_name}}">
+    {% endif %}
+
+    <button type="submit">✅ Yes, Build My Quiz</button>
+</form>
+
 
             <br>
             <button onclick="history.back()">⬅ Go Back & Edit</button>
@@ -615,13 +633,16 @@ def preview_paste():
     </div>
     </body>
     </html>
-    """,
+        """,
     quiz_title=quiz_title,
     original=quiz_text,
     cleaned=clean_text,
     conf_summary=conf_summary,
-    conf_details=conf_details
-    )
+    conf_details=conf_details,
+    temp_logo_name=temp_logo_name
+)
+
+
 
 
 from flask import send_file
@@ -754,17 +775,33 @@ def process_paste():
     with open(os.path.join(DATA_FOLDER, log_filename), "w", encoding="utf-8") as f:
         f.write("\n".join(PARSE_LOG))
 
-    # Optional logo (note: logo from paste step is not preserved across preview)
-    logo_file = request.files.get("quiz_logo")
+        # =========================
+    # HANDLE LOGO (Supports preview temp logo)
+    # =========================
     logo_filename = None
 
+    # 1️⃣ If a logo was uploaded here directly (upload flow)
+    logo_file = request.files.get("quiz_logo")
     if logo_file and logo_file.filename:
         ext = os.path.splitext(logo_file.filename)[1].lower()
         if ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
             logo_filename = f"logo_{ts}{ext}"
             logo_file.save(os.path.join(LOGO_FOLDER, logo_filename))
 
-    # Save JSON + HTML quiz
+    # 2️⃣ If coming from PREVIEW and a temp logo exists
+    else:
+        temp_logo_name = request.form.get("temp_logo_name")
+        if temp_logo_name:
+            old_path = os.path.join(LOGO_FOLDER, temp_logo_name)
+            if os.path.exists(old_path):
+                ext = os.path.splitext(temp_logo_name)[1].lower()
+                logo_filename = f"logo_{ts}{ext}"
+                new_path = os.path.join(LOGO_FOLDER, logo_filename)
+                os.rename(old_path, new_path)
+
+    # =========================
+    # SAVE JSON + HTML quiz
+    # =========================
     json_name = f"quiz_{ts}.json"
     html_name = f"quiz_{ts}.html"
 
@@ -779,6 +816,7 @@ def process_paste():
         quiz_title,
         logo_filename
     )
+
 
     add_quiz_to_registry(html_name, quiz_title, logo_filename)
 
