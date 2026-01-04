@@ -411,7 +411,7 @@ def paste_page():
 
         <div class="card">
 
-            <!-- IMPORTANT: This must go to PREVIEW -->
+            <!-- IMPORTANT: Goes to PREVIEW first -->
             <form action="/preview_paste" method="POST" enctype="multipart/form-data">
 
                 <h3>Quiz Display Title</h3>
@@ -443,14 +443,12 @@ def paste_page():
                     (One per line, case insensitive)
                 </p>
 
-            <textarea name="strip_text"
-                      placeholder="Example:
-            Topic
-            Exam Version
-            Practice Only"
-                      style="width:100%; height:140px; padding:10px; font-size:14px;"></textarea>
-
-
+                <textarea name="strip_text"
+                          placeholder="Example:
+Topic
+Exam Version
+Practice Only"
+                          style="width:100%; height:140px; padding:10px; font-size:14px;"></textarea>
 
                 <br><br>
 
@@ -460,7 +458,6 @@ def paste_page():
                     Supported: PNG / JPG / GIF / WEBP
                 </p>
 
-                <!-- FIXED: This is NOT build. This goes to preview -->
                 <button type="submit">👀 Preview & Continue</button>
             </form>
 
@@ -474,6 +471,7 @@ def paste_page():
     </body>
     </html>
     """, portal_title=portal_title)
+
 
 
 # =========================
