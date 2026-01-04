@@ -179,12 +179,22 @@ function buildDashboard() {
 
         // ---- Most Missed Questions ----
         let missedMap = {};
-        attempts.forEach(a=>{
-            if (!a.missed) return;
-            a.missed.forEach(m=>{
-                missedMap[m] = (missedMap[m]||0)+1;
-            });
-        });
+
+attempts.forEach(a => {
+    if (!a.missed) return;
+
+    a.missed.forEach(m => {
+
+        // Support multiple formats safely
+        const key =
+            (typeof m === "number")
+                ? m
+                : (m.number || m.id || m.question || "Unknown");
+
+        missedMap[key] = (missedMap[key] || 0) + 1;
+    });
+});
+
 
         let missedHtml = "<p>No problem questions yet 🎉</p>";
         const missedKeys = Object.keys(missedMap);
@@ -196,7 +206,10 @@ function buildDashboard() {
                 <div class="barRow">
                     <div class="barFill" style="width:${Math.min(missedMap[q]*20,100)}%"></div>
                 </div>
-                <div class="barLabel">Question ${q} — ${missedMap[q]} misses</div>
+                <div class="barLabel">
+    Question ${q} — ${missedMap[q]} misses
+</div>
+
                 `).join("");
         }
 
