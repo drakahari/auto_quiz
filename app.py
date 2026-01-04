@@ -324,18 +324,23 @@ def upload_page():
     return render_template_string(f"""
     <html>
     <head>
-    <title>Upload Quiz File</title>
-    <link rel="stylesheet" href="/style.css">
+        <title>Upload Quiz File</title>
+        <link rel="stylesheet" href="/style.css">
     </head>
 
     <body>
     <div class="container">
 
         <h1 class="hero-title">
-            📤 Upload Quiz
+            📤 Create a New Quiz
         </h1>
 
         <div class="card">
+
+            <h2>Option 1 — Upload a Text File</h2>
+            <p style="opacity:.8">
+                Use this if you already have a .txt question file.
+            </p>
 
             <form action="/process" method="POST" enctype="multipart/form-data">
 
@@ -361,16 +366,31 @@ def upload_page():
                     Supported: PNG / JPG / GIF
                 </p>
 
-                <button type="submit">Upload & Build Quiz</button>
+                <button type="submit">📤 Upload & Build Quiz</button>
             </form>
 
-            <br>
+
+            <hr style="margin:25px 0; opacity:.5">
+
+
+            <h2>Option 2 — Paste Questions Instead</h2>
+            <p style="opacity:.8">
+                Use this if you do NOT have a .txt file. Just paste your questions.
+            </p>
+
+            <button onclick="location.href='/paste'">
+                📋 Paste Questions to Build Quiz
+            </button>
+
+            <br><br>
             <button onclick="location.href='/'">⬅ Back To Portal</button>
+
         </div>
     </div>
     </body>
     </html>
     """)
+
 
 
 # =========================
