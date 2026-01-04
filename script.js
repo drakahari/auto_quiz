@@ -274,13 +274,20 @@ function stopExamTimer() {
 /* =====================================================
    SUBMIT — EXAM ONLY
 ===================================================== */
+/* =====================================================
+   SUBMIT — EXAM ONLY
+===================================================== */
 function submitQuiz() {
     // Do nothing in Study Mode
-    if (!examMode) return;
+    if (!examMode) {
+        console.log("submitQuiz called but examMode = false; ignoring.");
+        return;
+    }
 
     console.log("SUBMIT EXAM");
 
-    if (!quiz || !Array.isArray(quiz) || !quiz.length) {
+    if (!quiz || !Array.isArray(quiz) || quiz.length === 0) {
+        console.error("Quiz is empty or not loaded.");
         alert("Quiz failed to load.");
         return;
     }
@@ -290,45 +297,61 @@ function submitQuiz() {
 
     console.log("QUESTIONS:", quiz.length);
 
-    for (let i = 0; i < quiz.length; i++) {
-        const q = quiz[i];
-        if (!q || !q.correct) continue;
+    try {
+        for (let i = 0; i < quiz.length; i++) {
+            const q = quiz[i];
 
-        const key = `q${i}`;
-        let ans = userAnswers[key];
+            if (!q || !q.correct) {
+                console.warn("Question missing 'correct' field:", q);
+                continue;
+            }
 
-        if (!Array.isArray(ans)) {
-            ans = (ans === undefined || ans === null) ? [] : [ans];
+            const key = `q${i}`;
+            let ans = userAnswers[key];
+
+            // Normalize answer to an array of indexes
+            if (!Array.isArray(ans)) {
+                ans = (ans === undefined || ans === null) ? [] : [ans];
+            }
+
+            // Convert ["A"] -> [0], ["D"] -> [3], etc.
+            const correctIndexes = q.correct.map(
+                l => String(l).toUpperCase().charCodeAt(0) - 65
+            );
+
+            // Compare arrays safely
+            const isCorrect =
+                ans.length === correctIndexes.length &&
+                ans.every((v, idx) => v === correctIndexes[idx]);
+
+            if (isCorrect) {
+                correct++;
+            } else {
+                missed.push({
+                    number: q.number || (i + 1),
+                    question: q.question,
+                    correct: q.correct
+                });
+            }
         }
-
-        // Convert ["A"] -> [0], ["D"] -> [3], etc.
-        const correctIndexes = q.correct.map(
-            l => String(l).toUpperCase().charCodeAt(0) - 65
-        );
-
-        const isCorrect =
-            ans.length === correctIndexes.length &&
-            ans.every((v, idx) => v === correctIndexes[idx]);
-
-        if (isCorrect) {
-            correct++;
-        } else {
-            missed.push({
-                number: q.number || (i + 1),
-                question: q.question,
-                correct: q.correct
-            });
-        }
+    } catch (e) {
+        console.error("ERROR DURING SCORING:", e);
+        alert("Something went wrong while scoring the exam.");
+        return;
     }
+
+    console.log("SCORING COMPLETE. Correct:", correct);
 
     const total = quiz.length;
     const percent = Math.round((correct / total) * 100);
 
     stopExamTimer();
 
-    const attemptId = crypto.randomUUID();
+    const attemptId = (window.crypto && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : String(Date.now());
 
-    // Save history in the structure that history.html expects
+    // Save history for dashboard/history.html
     saveHistory(percent, correct, total, missed, attemptId);
 
     const quizDiv = document.getElementById("quiz");
@@ -339,6 +362,7 @@ function submitQuiz() {
     if (resultDiv) {
         resultDiv.classList.remove("hidden");
         resultDiv.style.display = "block";
+
         resultDiv.innerHTML = `
             <h2>Exam Results</h2>
             <p><b>Score:</b> ${correct} / ${total} (${percent}%)</p>
@@ -360,8 +384,14 @@ function submitQuiz() {
             </button>
         `;
     }
+
+    console.log("RESULT UI RENDERED. Attempt ID:", attemptId);
 }
 
+
+/* =====================================================
+   SAVE HISTORY (localStorage, per-quiz)
+===================================================== */
 /* =====================================================
    SAVE HISTORY (localStorage, per-quiz)
 ===================================================== */
@@ -372,9 +402,11 @@ function saveHistory(percent, correct, total, missed, attemptId) {
     try {
         store = JSON.parse(localStorage.getItem(HISTORY_KEY) || "{}");
     } catch (e) {
+        console.warn("Failed to parse history store, resetting.", e);
         store = {};
     }
 
+    // Use quiz file path as key so each quiz tracks its own attempts
     const quizKey = (typeof QUIZ_FILE !== "undefined") ? QUIZ_FILE : "quiz.json";
 
     if (!store[quizKey]) {
@@ -389,8 +421,10 @@ function saveHistory(percent, correct, total, missed, attemptId) {
         percent: percent,    // percentage
         timeRemaining: timeRemaining,
         mode: "Exam",
-        missed: missed
+        missed: missed       // array of {number, question, correct}
     });
 
     localStorage.setItem(HISTORY_KEY, JSON.stringify(store));
+    console.log("History saved for quizKey:", quizKey, "Attempt:", attemptId);
 }
+
