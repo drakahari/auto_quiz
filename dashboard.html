@@ -81,14 +81,47 @@
 <script>
 const HISTORY_KEY = "serverplus_history_v2";
 
+/*
+========================================
+  OPTION A — SMART HISTORY LOADER
+  (Matches History Page Logic)
+========================================
+*/
 function loadHistory() {
-    try {
-        return JSON.parse(localStorage.getItem(HISTORY_KEY) || "{}");
-    } catch {
-        return {};
+
+    // Try new structured storage
+    let v2 = JSON.parse(localStorage.getItem(HISTORY_KEY) || "{}");
+
+    // If structured keys exist, use them
+    if (Object.keys(v2).length) return v2;
+
+    // Otherwise support legacy flat history
+    let legacy = JSON.parse(localStorage.getItem("history") || "[]");
+
+    if (legacy.length) {
+        let grouped = {};
+
+        legacy.forEach(entry => {
+            const key = entry.quiz || "Unknown Quiz";
+
+            if (!grouped[key]) grouped[key] = [];
+            grouped[key].push(entry);
+        });
+
+        // Save upgraded format
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(grouped));
+        return grouped;
     }
+
+    return {};
 }
 
+
+/*
+========================================
+  DASHBOARD BUILDER
+========================================
+*/
 function buildDashboard() {
     const div = document.getElementById("analytics");
     const store = loadHistory();
@@ -99,86 +132,94 @@ function buildDashboard() {
         return;
     }
 
-    let attempts = [];
-    quizKeys.forEach(k => attempts.push(...store[k]));
+    let html = "";
 
-    if (!attempts.length) {
-        div.innerHTML = "<p>No attempts recorded yet.</p>";
-        return;
-    }
+    quizKeys.forEach(key => {
+        const attempts = store[key];
+        if (!attempts || !attempts.length) return;
 
-    const scores = attempts.map(a => a.percent);
-    const avg = Math.round(scores.reduce((a,b)=>a+b,0) / scores.length);
-    const best = Math.max(...scores);
-    const passes = attempts.filter(a=>a.percent>=75).length;
-    const passRate = Math.round((passes / attempts.length) * 100);
+        const scores = attempts.map(a => a.percent);
+        const avg = Math.round(scores.reduce((a,b)=>a+b,0) / scores.length);
+        const best = Math.max(...scores);
+        const passes = attempts.filter(a=>a.percent>=75).length;
+        const passRate = Math.round((passes / attempts.length) * 100);
 
-    let trendMsg = "Keep going!";
-    let trendClass = "";
-    if (attempts.length >= 2) {
-        const last = attempts[attempts.length-1].percent;
-        const prev = attempts[attempts.length-2].percent;
-        if (last > prev) { trendMsg = "📈 Improving — Great work!"; trendClass="good"; }
-        else if (last < prev) { trendMsg = "📉 Slight drop — Review missed topics"; trendClass="bad"; }
-        else { trendMsg = "➡️ Holding steady"; trendClass="warn"; }
-    }
+        // ---- Performance Trend ----
+        let trendMsg = "Keep going!";
+        let trendClass = "";
+        if (attempts.length >= 2) {
+            const last = attempts[attempts.length-1].percent;
+            const prev = attempts[attempts.length-2].percent;
+            if (last > prev) { trendMsg = "📈 Improving — Great work!"; trendClass="good"; }
+            else if (last < prev) { trendMsg = "📉 Slight drop — Review missed topics"; trendClass="bad"; }
+            else { trendMsg = "➡️ Holding steady"; trendClass="warn"; }
+        }
 
-    let missedMap = {};
-    attempts.forEach(a=>{
-        if (!a.missed) return;
-        a.missed.forEach(m=>{
-            missedMap[m] = (missedMap[m]||0)+1;
+        // ---- Most Missed Questions ----
+        let missedMap = {};
+        attempts.forEach(a=>{
+            if (!a.missed) return;
+            a.missed.forEach(m=>{
+                missedMap[m] = (missedMap[m]||0)+1;
+            });
         });
+
+        let missedHtml = "<p>No problem questions yet 🎉</p>";
+        const missedKeys = Object.keys(missedMap);
+
+        if (missedKeys.length) {
+            missedHtml = missedKeys
+                .sort((a,b)=>missedMap[b]-missedMap[a])
+                .map(q=>`
+                <div class="barRow">
+                    <div class="barFill" style="width:${Math.min(missedMap[q]*20,100)}%"></div>
+                </div>
+                <div class="barLabel">Question ${q} — ${missedMap[q]} misses</div>
+                `).join("");
+        }
+
+        html += `
+        <div class="section">
+            <h2>📘 ${key.replace("/data/","")}</h2>
+
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <div>Total Attempts</div>
+                    <div class="big">${attempts.length}</div>
+                </div>
+
+                <div class="stat-card">
+                    <div>Average Score</div>
+                    <div class="big">${avg}%</div>
+                </div>
+
+                <div class="stat-card">
+                    <div>Best Score</div>
+                    <div class="big good">${best}%</div>
+                </div>
+
+                <div class="stat-card">
+                    <div>Pass Rate</div>
+                    <div class="big ${passRate>=75?'good':passRate>=50?'warn':'bad'}">
+                        ${passRate}%
+                    </div>
+                </div>
+            </div>
+
+            <div class="section ${trendClass}">
+                <h3>📈 Performance Trend</h3>
+                <p>${trendMsg}</p>
+            </div>
+
+            <div class="section">
+                <h3>🔥 Most Missed Questions</h3>
+                ${missedHtml}
+            </div>
+        </div>
+        `;
     });
 
-    let missedHtml = "<p>No common misses yet 🎉</p>";
-    const missedKeys = Object.keys(missedMap);
-    if (missedKeys.length) {
-        missedHtml = missedKeys
-            .sort((a,b)=>missedMap[b]-missedMap[a])
-            .map(q=>`
-            <div class="barRow">
-                <div class="barFill" style="width:${Math.min(missedMap[q]*20,100)}%"></div>
-            </div>
-            <div class="barLabel">Question ${q} — ${missedMap[q]} misses</div>
-        `).join("");
-    }
-
-    div.innerHTML = `
-    <div class="stat-grid">
-        <div class="stat-card">
-            <div>Total Attempts</div>
-            <div class="big">${attempts.length}</div>
-        </div>
-
-        <div class="stat-card">
-            <div>Average Score</div>
-            <div class="big">${avg}%</div>
-        </div>
-
-        <div class="stat-card">
-            <div>Best Score</div>
-            <div class="big good">${best}%</div>
-        </div>
-
-        <div class="stat-card">
-            <div>Pass Rate</div>
-            <div class="big ${passRate>=75?'good':passRate>=50?'warn':'bad'}">
-                ${passRate}%
-            </div>
-        </div>
-    </div>
-
-    <div class="section ${trendClass}">
-        <h2>📈 Performance Trend</h2>
-        <p>${trendMsg}</p>
-    </div>
-
-    <div class="section">
-        <h2>🔥 Most Missed Questions</h2>
-        ${missedHtml}
-    </div>
-    `;
+    div.innerHTML = html;
 }
 
 buildDashboard();
