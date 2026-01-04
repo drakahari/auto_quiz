@@ -25,21 +25,46 @@ QUIZ_REGISTRY = os.path.join(CONFIG_FOLDER, "quizzes.json")
 
 
 # =========================
-# PORTAL TITLE
+# PORTAL CONFIG MANAGEMENT
 # =========================
-def get_portal_title():
-    if os.path.exists(PORTAL_CONFIG):
-        try:
-            with open(PORTAL_CONFIG, "r") as f:
-                return json.load(f).get("title", "Training & Practice Center")
-        except:
-            pass
-    return "Training & Practice Center"
+def load_portal_config():
+    """Always returns a valid config"""
+    default = {
+        "title": "Training & Practice Center",
+        "show_confidence": True
+    }
+
+    if not os.path.exists(PORTAL_CONFIG):
+        return default
+
+    try:
+        with open(PORTAL_CONFIG, "r") as f:
+            data = json.load(f)
+            return {
+                "title": data.get("title", default["title"]),
+                "show_confidence": data.get("show_confidence", True)
+            }
+    except:
+        return default
 
 
-def save_portal_title(title):
+def save_portal_config(title, show_confidence=True):
+    cfg = {
+        "title": title,
+        "show_confidence": show_confidence
+    }
+
     with open(PORTAL_CONFIG, "w") as f:
-        json.dump({"title": title}, f, indent=4)
+        json.dump(cfg, f, indent=4)
+
+
+def get_portal_title():
+    return load_portal_config().get("title", "Training & Practice Center")
+
+
+def get_confidence_setting():
+    return load_portal_config().get("show_confidence", True)
+
 
 
 # =========================
@@ -514,7 +539,11 @@ def preview_paste():
         clean_text = "\n".join(cleaned_lines)
 
     # -------- CONFIDENCE ANALYSIS (NEW) --------
-    conf_summary, conf_details = analyze_confidence(clean_text)
+    conf_summary = conf_details = None
+
+    if get_confidence_setting():
+        conf_summary, conf_details = analyze_confidence(clean_text)
+
 
     # ---------- RENDER PREVIEW ----------
     return render_template_string("""
@@ -829,7 +858,7 @@ def process_file():
 # =========================
 @app.route("/settings")
 def settings_page():
-    portal_title = get_portal_title()
+    cfg = load_portal_config()
 
     return render_template_string("""
     <html>
@@ -852,8 +881,20 @@ def settings_page():
                 <h3>Training Portal Title</h3>
                 <input type="text"
                        name="portal_title"
-                       value="{{portal_title}}"
+                       value="{{cfg.title}}"
                        required style="width:100%; padding:6px">
+
+                <br><br>
+
+                <h3>Confidence Analysis</h3>
+                <p style="opacity:.7">Controls whether the 🧠 Confidence Analysis panel appears on quiz preview.</p>
+
+                <label style="display:flex; gap:10px; align-items:center;">
+                    <input type="checkbox" name="show_confidence"
+                           value="1"
+                           {% if cfg.show_confidence %}checked{% endif %}>
+                    Enable Confidence Analysis on Preview
+                </label>
 
                 <br><br>
 
@@ -868,14 +909,20 @@ def settings_page():
     </div>
     </body>
     </html>
-    """, portal_title=portal_title)
-
+    """, cfg=cfg)
 
 @app.route("/save_settings", methods=["POST"])
 def save_settings():
     title = request.form.get("portal_title", "Training & Practice Center")
-    save_portal_title(title)
-    return redirect("/")
+
+    # Checkbox returns "1" when checked, None when not
+    show_conf = request.form.get("show_confidence") == "1"
+
+    save_portal_config(title, show_conf)
+
+    return redirect("/settings")
+
+
 
 # =========================
 # CONFIDENCE ANALYSIS ENGINE
