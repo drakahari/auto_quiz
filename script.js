@@ -54,9 +54,12 @@ function renderQuestion() {
     q.choices.forEach((choiceText, i) => {
         const label = String.fromCharCode(65 + i);
         let cls = "choice";
-        if (selected.includes(i)) {
-            cls += " selected";
-        }
+
+// Only visually “select” answers in EXAM MODE
+if (examMode && selected.includes(i)) {
+    cls += " selected";
+}
+
 
         html += `
             <div 
@@ -162,29 +165,30 @@ function applyStudyFeedback() {
     const key = `q${index}`;
     const selected = userAnswers[key] || [];
 
-    // Convert letters → indexes
     const correctIndexes = q.correct.map(letter =>
         String(letter).toUpperCase().charCodeAt(0) - 65
     );
 
     const buttons = document.querySelectorAll("#choices .choice");
 
-    // Clear previous
+    // Clear previous feedback
     buttons.forEach(btn => {
         btn.classList.remove("correct-choice", "wrong-choice");
     });
 
-    // Only color what the user clicked
+    // Mark ONLY what the user picked
     selected.forEach(idx => {
         if (!buttons[idx]) return;
 
         if (correctIndexes.includes(idx)) {
-            buttons[idx].classList.add("correct-choice");
+            buttons[idx].classList.add("correct-choice");   // green
         } else {
-            buttons[idx].classList.add("wrong-choice");
+            buttons[idx].classList.add("wrong-choice");     // red
         }
     });
 }
+
+
 
 
 /* =====================================================
