@@ -256,7 +256,10 @@ function renderHistory() {
 
             const card = document.createElement("div");
             card.className = "history-card " + cls;
-            card.setAttribute("data-attempt", rec.attemptId || "");
+            card.setAttribute("data-attempt",
+    rec.attemptId || rec.id || rec.uuid || ""
+);
+
 
             card.innerHTML = `
                 <div><b>${rec.date}</b></div>
@@ -282,9 +285,13 @@ function renderHistory() {
 ========================= */
 function clearHistory() {
     if (!confirm("Delete ALL quiz history?")) return;
+
     localStorage.removeItem(HISTORY_KEY);
+    localStorage.removeItem("history");   // legacy storage
+
     renderHistory();
 }
+
 
 
 /* ===============================
@@ -316,12 +323,34 @@ function highlightTargetAttempt() {
     const target = params.get("attempt");
     if (!target) return;
 
-    const el = document.querySelector(`[data-attempt="${target}"]`);
-    if (!el) return;
+    const cards = document.querySelectorAll("[data-attempt]");
+    let match = null;
 
-    el.classList.add("highlighted");
-    el.scrollIntoView({ behavior:"smooth", block:"center" });
+    cards.forEach(card => {
+        const val = card.getAttribute("data-attempt");
+        if (val && val === target) match = card;
+    });
+
+    // If no matching attempt → DO NOTHING
+    if (!match) {
+        console.warn("Attempt not found — leaving full history visible");
+        return;
+    }
+
+    // Hide everything except this one
+    cards.forEach(c => {
+        if (c === match) {
+            c.style.display = "block";
+            c.classList.add("highlighted");
+        } else {
+            c.style.display = "none";
+        }
+    });
+
+    match.scrollIntoView({ behavior:"smooth", block:"center" });
 }
+
+
 
 
 /* =========================
