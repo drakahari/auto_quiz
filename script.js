@@ -328,10 +328,20 @@ function submitQuiz() {
                 correct++;
             } else {
                 missed.push({
-                    number: q.number || (i + 1),
-                    question: q.question,
-                    correct: q.correct
-                });
+    number: q.number || (i + 1),
+    question: q.question,
+
+    // Letters like ["A","C"]
+    correctLetters: q.correct,
+
+    // Convert to readable text like:
+    // "A — Encryption prevents access"
+    correctText: q.correct.map(letter => {
+        const idx = letter.toUpperCase().charCodeAt(0) - 65;
+        return `${letter} — ${q.choices[idx]}`;
+    })
+});
+
             }
         }
     } catch (e) {

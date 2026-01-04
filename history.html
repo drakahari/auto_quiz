@@ -137,10 +137,41 @@ button {
 <script>
 const HISTORY_KEY = "serverplus_history_v2";
 
+/* =========================
+   LOAD HISTORY
+========================= */
 function loadHistoryStore() {
-    return JSON.parse(localStorage.getItem(HISTORY_KEY) || "{}");
+
+    // New Format
+    let v2 = JSON.parse(localStorage.getItem(HISTORY_KEY) || "{}");
+
+    // If we already have structured history, use it
+    if (Object.keys(v2).length) return v2;
+
+    // Legacy format fallback (flat array)
+    let legacy = JSON.parse(localStorage.getItem("history") || "[]");
+
+    if (legacy.length) {
+        let grouped = {};
+
+        legacy.forEach(entry => {
+            const key = entry.quiz || "Unknown Quiz";
+
+            if (!grouped[key]) grouped[key] = [];
+            grouped[key].push(entry);
+        });
+
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(grouped));
+        return grouped;
+    }
+
+    return {};
 }
 
+
+/* =========================
+   RENDER HISTORY
+========================= */
 function renderHistory() {
     const historyDiv = document.getElementById("historyOutput");
     historyDiv.innerHTML = "";
@@ -177,7 +208,10 @@ function renderHistory() {
 
             let missedBlock = "<i>None 🎉</i>";
 
+            /* ---- FORMAT MISSED QUESTIONS ---- */
             if (rec.missedDetails && rec.missedDetails.length) {
+
+                // New-style detailed missed list
                 missedBlock = rec.missedDetails.map(m => `
                     <div style="margin-top:6px; padding:8px; background:rgba(0,0,0,.6); border-radius:6px;">
                         <b>Question ${m.number}</b><br>
@@ -187,8 +221,37 @@ function renderHistory() {
                         </span>
                     </div>
                 `).join("");
+
             } else if (rec.missed && rec.missed.length) {
-                missedBlock = rec.missed.join(", ");
+
+                // Handle legacy missed arrays
+                missedBlock = rec.missed.map(m => {
+
+                    // If older format stored ONLY number
+                    if (typeof m === "number") {
+                        return `<div>Question ${m}</div>`;
+                    }
+
+                    // If object like { number: X, question:"", correct:["A"] }
+                    if (typeof m === "object") {
+                        let correctLetter = Array.isArray(m.correct)
+                            ? m.correct[0]
+                            : m.correct;
+
+                        return `
+                            <div style="margin-top:6px; padding:8px; background:rgba(0,0,0,.6); border-radius:6px;">
+                                <b>Question ${m.number}</b><br>
+                                ${m.question || ""}
+                                <br>
+                                <span style="color:#00ff80">
+                                    ✓ Correct Answer: ${correctLetter || ""}
+                                </span>
+                            </div>
+                        `;
+                    }
+
+                    return m;
+                }).join("");
             }
 
             const card = document.createElement("div");
@@ -213,6 +276,7 @@ function renderHistory() {
     highlightTargetAttempt();
 }
 
+
 /* =========================
    CLEAR HISTORY
 ========================= */
@@ -222,8 +286,9 @@ function clearHistory() {
     renderHistory();
 }
 
+
 /* ===============================
-   LOAD USER LOGO FROM QUIZ REGISTRY
+   LOAD USER LOGO
 =============================== */
 function loadLogo() {
     fetch('/config/quizzes.json')
@@ -242,6 +307,7 @@ function loadLogo() {
         .catch(()=>{});
 }
 
+
 /* =========================
    HIGHLIGHT JUST THIS ATTEMPT
 ========================= */
@@ -257,12 +323,14 @@ function highlightTargetAttempt() {
     el.scrollIntoView({ behavior:"smooth", block:"center" });
 }
 
+
 /* =========================
    RUN
 ========================= */
 loadLogo();
 renderHistory();
 </script>
+
 
 </body>
 </html>
