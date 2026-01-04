@@ -173,55 +173,69 @@ def quiz_library():
 
                 {% for q in quizzes %}
                 <div class="quiz-card"
-                     style="padding:12px; margin:10px; background:rgba(0,0,0,.6); border-radius:8px;">
+                     style="
+                        padding:14px;
+                        margin:10px;
+                        background:rgba(0,0,0,.6);
+                        border-radius:8px;
+                        display:flex;
+                        justify-content:space-between;
+                        gap:20px;
+                     ">
 
-                    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
-                        
-                        <div>
-                            <h3 style="margin:0;">
-                                {{q['title']}}
-                            </h3>
-                            <small>{{q['html']}}</small>
+                    <!-- LEFT SIDE -->
+                    <div style="flex:1;">
+                        <h3 style="
+                            margin-top:0;
+                            margin-bottom:6px;
+                            font-size:24px;
+                            font-weight:900;
+                            letter-spacing:.5px;">
+                            {{q['title']}}
+                        </h3>
+
+                        <div style="margin-top:10px;">
+                            <button onclick="location.href='/quizzes/{{q['html']}}'"
+                                    style="padding:8px 14px; border-radius:6px;">
+                                ▶ Open Quiz
+                            </button>
                         </div>
+                    </div>
+
+                    <!-- RIGHT SIDE (Logo + Delete pinned bottom) -->
+                    <div style="
+                        width:150px;
+                        display:flex;
+                        flex-direction:column;
+                        justify-content:space-between;
+                        align-items:center;
+                    ">
 
                         {% if q.get('logo') %}
                         <img src="/static/logos/{{q['logo']}}"
-                             style="max-height:70px; width:auto;">
+                             style="max-height:90px; width:auto;">
+                        {% else %}
+                        <div style="height:90px;"></div>
                         {% endif %}
-                    </div>
-
-                    <div style="margin-top:10px; display:flex; gap:10px;">
-
-                        <button
-                            onclick="location.href='/quizzes/{{q['html']}}'"
-                            style="
-                                background:#1e9bff;
-                                color:white;
-                                border:none;
-                                padding:6px 12px;
-                                border-radius:6px;
-                                cursor:pointer;
-                                font-size:14px;">
-                            ▶️ Open Quiz
-                        </button>
 
                         <form method="POST"
                               action="/delete_quiz/{{q['html']}}"
-                              onsubmit="return confirm('Delete this quiz permanently?');">
+                              onsubmit="return confirm('Delete this quiz permanently?');"
+                              style="margin-top:12px; width:100%; text-align:center;">
 
                             <button type="submit" style="
+                                width:100%;
                                 background:#7a0000;
                                 color:white;
                                 border:none;
-                                padding:4px 8px;
-                                font-size:12px;
+                                padding:7px 0;
+                                font-size:13px;
                                 border-radius:6px;
-                                opacity:.8;
                                 cursor:pointer;">
                                 🗑 Delete
                             </button>
-
                         </form>
+
                     </div>
 
                 </div>
@@ -241,6 +255,7 @@ def quiz_library():
     </body>
     </html>
     """, quizzes=quizzes, portal_title=portal_title)
+
 
 
 # =========================
