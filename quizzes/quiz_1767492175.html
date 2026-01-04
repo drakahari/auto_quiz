@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Server+ Quiz 200 - 299</title>
+<title>Server+ 300 - 399</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 
@@ -23,24 +23,24 @@
 
         <!-- Readable Centered Banner -->
         <h1 class="hero-title">
-            Server+ Quiz 200 – 299
+            Mike's Training & Practice Center<br>
+            <span style="font-size:20px;opacity:.85">Server+ 300 - 399</span>
         </h1>
 
+        <!-- Mode Select -->
         <div id="modeSelect" class="card">
             <div class="mode-banner">
-
-                <img src="/static/comptia_server+.png" class="mode-badge">
-
+                <img src="/static/logos/logo_1767492175.png" class="mode-badge">
                 <div class="mode-center">
                     <h2>Select Mode</h2>
                     <button onclick="startQuiz(false)">Study Mode</button>
                     <button onclick="startQuiz(true)">Exam Mode</button>
                 </div>
-
-                <img src="/static/comptia_server+.png" class="mode-badge">
+                <img src="/static/logos/logo_1767492175.png" class="mode-badge">
             </div>
         </div>
 
+        <!-- Quiz Area -->
         <div id="quiz" class="hidden">
 
             <!-- Progress Bar -->
@@ -48,9 +48,7 @@
                 <div id="progressBarInner"></div>
             </div>
 
-            <button onclick="document.body.classList.toggle('high-contrast')">
-                🌓 Toggle High Contrast
-            </button>
+            
 
             <!-- Exam Timer -->
             <div id="timer" class="hidden timerBox">
@@ -58,7 +56,7 @@
                 <span id="timeDisplay">--:--</span>
 
                 <button id="pauseBtn" onclick="pauseExam()">Pause</button>
-                <button id="resumeBtn" class="hidden" onclick="resumeExam()">Resume</button>
+                
             </div>
 
             <div id="qHeader"></div>
@@ -68,21 +66,22 @@
             <div class="controls">
                 <button onclick="prev()">Prev</button>
                 <button onclick="next()">Next</button>
-                <button onclick="submitQuiz()">Submit</button>
+                <button onclick="submitQuiz()">Submit Exam</button>
             </div>
-
         </div>
 
         <div id="result" class="hidden"></div>
 
         <br>
-        <button onclick="location.href='/'">⬅ Back to Quiz Portal</button>
+        <button onclick="location.href='/'">🏠 Return To Portal</button>
+        <button onclick="location.href='/library'">📚 Return To Quiz Library</button>
+
     </div>
 </div>
 
 <script>
   /* This tells script.js which JSON file to load for this quiz */
-  const QUIZ_FILE = "/data/quiz_200_299.json";
+  const QUIZ_FILE = "/data/quiz_1767492175.json";
 </script>
 
 <script src="/script.js"></script>
