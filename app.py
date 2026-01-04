@@ -477,28 +477,65 @@ def paste_page():
 def process_paste():
     quiz_text = request.form.get("quiz_text", "").strip()
     quiz_title = request.form.get("quiz_title", "Generated Quiz From Paste")
+
+    # Checkbox flag (Auto Junk Cleanup)
+    auto_cleanup = request.form.get("auto_cleanup") == "1"
+
+    # Custom strip rules textarea
     strip_rules_raw = request.form.get("strip_text", "").strip()
 
     if not quiz_text:
         return "No text provided.", 400
 
-    # =========================
-    # APPLY STRIP RULES ✂️
-    # =========================
     clean_text = quiz_text
-    strip_rules = []
 
+    # =========================
+    # AUTO CLEANUP MODE 🧹
+    # =========================
+    if auto_cleanup:
+        cleaned_lines = []
+        junk_patterns = [
+            "topic",
+            "chapter",
+            "exam version",
+            "objective",
+            "learning goal",
+            "case study",
+            "scenario",
+            "explanation",
+            "rationale",
+            "reference",
+            "page",
+        ]
+
+        for line in clean_text.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+
+            low = stripped.lower()
+            if any(p in low for p in junk_patterns):
+                continue
+
+            cleaned_lines.append(line)
+
+        clean_text = "\n".join(cleaned_lines)
+
+    # =========================
+    # APPLY USER STRIP RULES ✂️
+    # =========================
+    strip_rules = []
     if strip_rules_raw:
         strip_rules = [r.strip() for r in strip_rules_raw.splitlines() if r.strip()]
 
     if strip_rules:
         cleaned_lines = []
         for line in clean_text.splitlines():
-            line_lower = line.lower()
+            line_low = line.lower()
             remove_line = False
 
             for rule in strip_rules:
-                if rule.lower() in line_lower:
+                if rule.lower() in line_low:
                     remove_line = True
                     break
 
@@ -507,12 +544,16 @@ def process_paste():
 
         clean_text = "\n".join(cleaned_lines)
 
-    # Save cleaned text for parsing
+    # =========================
+    # SAVE CLEANED TEXT
+    # =========================
     path = os.path.join(UPLOAD_FOLDER, "pasted.txt")
     with open(path, "w", encoding="utf-8") as f:
         f.write(clean_text)
 
-    # Parse it (also fills PARSE_LOG)
+    # =========================
+    # PARSE QUIZ
+    # =========================
     quiz_data = parse_questions(path)
 
     if not quiz_data:
@@ -547,18 +588,17 @@ def process_paste():
         </html>
         """, log_filename=log_filename), 400
 
-    # Common timestamp
+    # =========================
+    # SAVE OUTPUTS
+    # =========================
     ts = int(time.time())
 
-    # Save parse log
-    
+    # Save parse debug log
     log_filename = f"parse_log_{ts}.txt"
     with open(os.path.join(DATA_FOLDER, log_filename), "w", encoding="utf-8") as f:
         f.write("\n".join(PARSE_LOG))
 
-    # =========================
-    # OPTIONAL LOGO
-    # =========================
+    # Optional logo
     logo_file = request.files.get("quiz_logo")
     logo_filename = None
 
@@ -568,7 +608,7 @@ def process_paste():
             logo_filename = f"logo_{ts}{ext}"
             logo_file.save(os.path.join(LOGO_FOLDER, logo_filename))
 
-    # Save JSON + Build quiz
+    # Save JSON + HTML quiz
     json_name = f"quiz_{ts}.json"
     html_name = f"quiz_{ts}.html"
 
@@ -625,6 +665,7 @@ def process_paste():
     </body>
     </html>
     """, quiz_title=quiz_title, html_name=html_name, log_filename=log_filename)
+
 
 
 
@@ -743,31 +784,20 @@ def save_settings():
 # =========================
 # ROBUST PARSER + LOGGING
 # =========================
-DEBUG_PARSE = True     # Turn ON console debugging
-PARSE_LOG = []         # Stores debug log for download
+DEBUG_PARSE = True
+PARSE_LOG = []
 
 
 def dbg(*msg):
-    """
-    Debug helper. Prints to console (if DEBUG_PARSE)
-    AND stores a full debug transcript in PARSE_LOG.
-    """
     text = " ".join(str(m) for m in msg)
-
-    # Console logging (optional)
     if DEBUG_PARSE:
         print("[PARSE]", text)
-
-    # Always capture log in memory
     PARSE_LOG.append(text)
 
 
 def parse_questions(filepath):
     import re
 
-    # =========================
-    # RESET LOG PER SESSION 🚀
-    # =========================
     global PARSE_LOG
     PARSE_LOG.clear()
     dbg("=== NEW PARSE SESSION STARTED ===")
@@ -775,8 +805,10 @@ def parse_questions(filepath):
     with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
         raw = f.read()
 
+    # Normalize newlines
     text = raw.replace("\r\n", "\n").replace("\r", "\n")
 
+    # Split into question blocks
     blocks = re.split(
         r"(?=^\s*(?:Question\s*#?\s*\d+|\d+\s*[.) ]))",
         text,
@@ -788,6 +820,9 @@ def parse_questions(filepath):
     questions = []
     number = 1
 
+    # ===================================
+    # MAIN PARSE LOOP
+    # ===================================
     for block in blocks:
         original_block = block
         block = block.strip()
@@ -801,18 +836,21 @@ def parse_questions(filepath):
             continue
 
         dbg(f"\n--- Parsing Question Candidate #{number} ---")
-        dbg(lines[0][:120] + ("..." if len(lines[0]) > 120 else ""))
+        dbg(lines[0])
 
         q_lines = []
         choices = []
         correct = None
         choices_started = False
 
+        # ================================
+        # PARSE EACH LINE
+        # ================================
         for line in lines:
-            lower = line.lower().replace(" ", "")
+            lower = line.lower()
 
-            # ===== ANSWER CHOICES =====
-            mchoice = re.match(r"^\s*([A-Za-z])[\.\)]?\s+(.*)", line, re.IGNORECASE)
+            # -------- Detect Choices --------
+            mchoice = re.match(r"^\s*([A-Da-d])[\.\)]\s+(.*)", line)
             if mchoice:
                 label = mchoice.group(1).upper()
                 text_choice = mchoice.group(2).strip()
@@ -821,32 +859,30 @@ def parse_questions(filepath):
                 choices.append(text_choice)
                 continue
 
-            # ===== CORRECT / SUGGESTED =====
-            if lower.startswith("suggestedanswer") or lower.startswith("correctanswer"):
+            # -------- Detect Correct Answer --------
+            if "correct answer" in lower or "suggested answer" in lower:
+
                 dbg("Found answer line:", line)
 
                 m = re.search(r"[:\-]\s*([A-Za-z]+)", line)
-                if not m:
-                    m = re.search(r"\s+([A-Za-z]+)\s*$", line)
-
                 if m:
-                    ans = m.group(1)
-                    parsed = re.sub(r'[^A-Za-z]', '', ans).upper()
-                    if parsed:
-                        correct = list(dict.fromkeys(list(parsed)))
-                        dbg("Parsed answer letters:", correct)
+                    ans = re.sub(r'[^A-Za-z]', '', m.group(1)).upper()
+                    if ans:
+                        correct = list(dict.fromkeys(list(ans)))
+                        dbg("Parsed correct letters:", correct)
                     else:
-                        dbg("!! Could not extract letters from:", ans)
+                        dbg("!! Failed to parse answer text")
                 else:
-                    dbg("!! No recognizable answer format found")
-
+                    dbg("!! Could not read answer format")
                 continue
 
-            # Part of question text
+            # -------- Question Text --------
             if not choices_started:
                 q_lines.append(line)
 
-        # ===== FINAL VALIDATION =====
+        # ================================
+        # VALIDATION
+        # ================================
         if not correct:
             dbg("!! Skipped: NO correct answer found")
             dbg(original_block[:200])
@@ -857,7 +893,7 @@ def parse_questions(filepath):
             continue
 
         question_text = " ".join(q_lines)
-        dbg("Final Question Built:", question_text[:120])
+        dbg("Final Question Built:", question_text[:150])
 
         questions.append({
             "number": number,
@@ -873,6 +909,9 @@ def parse_questions(filepath):
     dbg("Total questions parsed:", len(questions))
 
     return questions
+
+
+
 
 
 
