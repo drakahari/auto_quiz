@@ -49,6 +49,16 @@ def load_registry():
     if not os.path.exists(QUIZ_REGISTRY):
         return []
     try:
+        with open(QUI_REGISTRY, "r") as f:
+            return json.load(f)
+    except:
+        return []
+
+
+def load_registry():
+    if not os.path.exists(QUIZ_REGISTRY):
+        return []
+    try:
         with open(QUIZ_REGISTRY, "r") as f:
             return json.load(f)
     except:
@@ -75,9 +85,6 @@ def add_quiz_to_registry(html_name, quiz_title, logo_filename):
 # ROOT + STATIC (ORDER MATTERS)
 # =========================
 
-# =========================
-# HOME PAGE (DYNAMIC)
-# =========================
 @app.route("/")
 def home():
     portal_title = get_portal_title()
@@ -98,7 +105,6 @@ def serve_quiz(filename):
     return send_from_directory(QUIZ_FOLDER, filename)
 
 
-# Catch-all LAST
 @app.route("/<path:path>")
 def static_proxy(path):
     return send_from_directory(".", path)
@@ -144,11 +150,34 @@ def delete_quiz(html_name):
 
 
 # =========================
-# LIBRARY
+# SAVE ORDER (DRAG + DROP)
+# =========================
+@app.post("/save_order")
+def save_order():
+    data = request.get_json()
+    order = data.get("order", [])
+
+    registry = load_registry()
+
+    lookup = {q["html"]: q for q in registry}
+    new_list = []
+
+    for html in order:
+        if html in lookup:
+            new_list.append(lookup.pop(html))
+
+    new_list.extend(lookup.values())
+    save_registry(new_list)
+
+    return {"status": "ok"}
+
+
+# =========================
+# LIBRARY (WITH DRAG + DROP!)
 # =========================
 @app.route("/library")
 def quiz_library():
-    quizzes = sorted(load_registry(), key=lambda x: x["timestamp"], reverse=True)
+    quizzes = load_registry()
     portal_title = get_portal_title()
 
     return render_template_string("""
@@ -156,6 +185,9 @@ def quiz_library():
     <head>
         <title>Quiz Library</title>
         <link rel="stylesheet" href="/style.css">
+
+        <!-- Drag + Drop Library -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     </head>
 
     <body>
@@ -169,10 +201,13 @@ def quiz_library():
         <div class="card">
 
             {% if quizzes %}
-                <h2>Available Quizzes</h2>
+                <h2>Drag to Reorder</h2>
+
+                <div id="quizList">
 
                 {% for q in quizzes %}
                 <div class="quiz-card"
+                     data-id="{{q['html']}}"
                      style="
                         padding:14px;
                         margin:10px;
@@ -181,9 +216,9 @@ def quiz_library():
                         display:flex;
                         justify-content:space-between;
                         gap:20px;
+                        cursor:grab;
                      ">
 
-                    <!-- LEFT SIDE -->
                     <div style="flex:1;">
                         <h3 style="
                             margin-top:0;
@@ -202,7 +237,6 @@ def quiz_library():
                         </div>
                     </div>
 
-                    <!-- RIGHT SIDE (Logo + Delete pinned bottom) -->
                     <div style="
                         width:150px;
                         display:flex;
@@ -237,9 +271,9 @@ def quiz_library():
                         </form>
 
                     </div>
-
                 </div>
                 {% endfor %}
+                </div>
 
             {% else %}
                 <p>No quizzes created yet. Upload one 😊</p>
@@ -252,6 +286,26 @@ def quiz_library():
         </div>
 
     </div>
+
+<script>
+const list = document.getElementById("quizList");
+
+Sortable.create(list, {
+    animation: 150,
+    handle: ".quiz-card",
+    onEnd: () => {
+        const order = [...document.querySelectorAll(".quiz-card")]
+            .map(card => card.getAttribute("data-id"));
+
+        fetch("/save_order", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ order })
+        });
+    }
+});
+</script>
+
     </body>
     </html>
     """, quizzes=quizzes, portal_title=portal_title)
