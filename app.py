@@ -435,6 +435,18 @@ def paste_page():
 
                 <br><br>
 
+                <h3>Optional: Remove Unwanted Text Before Parsing</h3>
+                <p style="opacity:.8; font-size:12px">
+                    Any line containing these values will be automatically deleted.<br>
+                    (One per line, case insensitive)
+                </p>
+
+                <textarea name="strip_text"
+                          placeholder="Example:\nTopic\nExam Version\nPractice Only"
+                          style="width:100%; height:140px; padding:10px; font-size:14px;"></textarea>
+
+                <br><br>
+
                 <h3>Upload Logo (Optional)</h3>
                 <input type="file" name="quiz_logo" accept="image/*">
                 <p style="opacity:0.7; font-size:12px">
@@ -457,6 +469,7 @@ def paste_page():
 
 
 
+
 # =========================
 # PROCESS PASTED QUIZ
 # =========================
@@ -464,20 +477,45 @@ def paste_page():
 def process_paste():
     quiz_text = request.form.get("quiz_text", "").strip()
     quiz_title = request.form.get("quiz_title", "Generated Quiz From Paste")
+    strip_rules_raw = request.form.get("strip_text", "").strip()
 
     if not quiz_text:
         return "No text provided.", 400
 
-    # Save pasted text to temp file so parser can reuse logic
+    # =========================
+    # APPLY STRIP RULES ✂️
+    # =========================
+    clean_text = quiz_text
+    strip_rules = []
+
+    if strip_rules_raw:
+        strip_rules = [r.strip() for r in strip_rules_raw.splitlines() if r.strip()]
+
+    if strip_rules:
+        cleaned_lines = []
+        for line in clean_text.splitlines():
+            line_lower = line.lower()
+            remove_line = False
+
+            for rule in strip_rules:
+                if rule.lower() in line_lower:
+                    remove_line = True
+                    break
+
+            if not remove_line:
+                cleaned_lines.append(line)
+
+        clean_text = "\n".join(cleaned_lines)
+
+    # Save cleaned text for parsing
     path = os.path.join(UPLOAD_FOLDER, "pasted.txt")
     with open(path, "w", encoding="utf-8") as f:
-        f.write(quiz_text)
+        f.write(clean_text)
 
-    # This will also reset + populate PARSE_LOG because of parse_questions()
+    # Parse it (also fills PARSE_LOG)
     quiz_data = parse_questions(path)
 
     if not quiz_data:
-        # Even in failure cases, PARSE_LOG is useful
         ts_fail = int(time.time())
         log_filename = f"parse_log_{ts_fail}.txt"
         with open(os.path.join(DATA_FOLDER, log_filename), "w", encoding="utf-8") as f:
@@ -509,19 +547,17 @@ def process_paste():
         </html>
         """, log_filename=log_filename), 400
 
-    # Common timestamp for files
+    # Common timestamp
     ts = int(time.time())
 
-    # =========================
-    # SAVE PARSE LOG 🎯
-    # =========================
+    # Save parse log
     
     log_filename = f"parse_log_{ts}.txt"
     with open(os.path.join(DATA_FOLDER, log_filename), "w", encoding="utf-8") as f:
         f.write("\n".join(PARSE_LOG))
 
     # =========================
-    # HANDLE LOGO (OPTIONAL)
+    # OPTIONAL LOGO
     # =========================
     logo_file = request.files.get("quiz_logo")
     logo_filename = None
@@ -532,9 +568,7 @@ def process_paste():
             logo_filename = f"logo_{ts}{ext}"
             logo_file.save(os.path.join(LOGO_FOLDER, logo_filename))
 
-    # =========================
-    # SAVE JSON + BUILD QUIZ
-    # =========================
+    # Save JSON + Build quiz
     json_name = f"quiz_{ts}.json"
     html_name = f"quiz_{ts}.html"
 
@@ -551,11 +585,6 @@ def process_paste():
     )
 
     add_quiz_to_registry(html_name, quiz_title, logo_filename)
-
-    # =========================
-    # SUCCESS PAGE 🎉
-    # =========================
-    portal_title = get_portal_title()
 
     return render_template_string("""
     <html>
@@ -596,6 +625,7 @@ def process_paste():
     </body>
     </html>
     """, quiz_title=quiz_title, html_name=html_name, log_filename=log_filename)
+
 
 
 
