@@ -640,6 +640,54 @@ def build_smart_suggestions(original_text, cleaned_text):
 
     return suggestions
 
+# =============================
+# 12A – STRUCTURAL VALIDATION
+# =============================
+def quick_structural_scan(text):
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    
+    issues = []
+    question_blocks = 0
+    current_block_has_answer = False
+    current_block_has_correct = False
+
+    for line in lines:
+        
+        # Detect likely question
+        if re.match(r"^\d+[\).\-]?\s", line) or line.lower().startswith("question"):
+            question_blocks += 1
+
+            # if previous question existed but had no answer
+            if not current_block_has_answer and question_blocks > 1:
+                issues.append("A question appears without any A/B/C/D answer choices.")
+
+            current_block_has_answer = False
+            current_block_has_correct = False
+        
+        # Detect answer choices
+        if re.match(r"^[A-D][\).\-]?\s", line):
+            current_block_has_answer = True
+        
+        # Detect correct answer
+        if "correct answer" in line.lower():
+            current_block_has_correct = True
+
+    # Final block sanity check
+    if question_blocks == 0:
+        issues.append("No recognizable questions were detected.")
+
+    if question_blocks > 0 and not current_block_has_answer:
+        issues.append("Last detected question has no answer choices.")
+
+    if question_blocks > 0 and not current_block_has_correct:
+        issues.append("No 'Correct Answer' lines were found — quiz may fail to grade.")
+
+    return {
+        "question_blocks": question_blocks,
+        "issues": issues
+    }
+
+scan_result = quick_structural_scan(clean_text)
 
 
 
@@ -682,7 +730,7 @@ def preview_paste():
     )
 
     # =========================
-    # APPLY STRIP RULES (with optional regex mode)
+    # APPLY STRIP RULES (optional regex mode)
     # =========================
     strip_rules = []
     if strip_rules_raw:
@@ -707,10 +755,10 @@ def preview_paste():
                             remove = True
                             break
                     except re.error:
-                        # Bad regex shouldn't crash parsing — ignore invalid patterns
+                        # Ignore bad regex patterns
                         pass
 
-                # --- NORMAL MODE ---
+                # --- PLAIN TEXT MODE ---
                 else:
                     if rule.lower() in test.lower():
                         remove = True
@@ -724,16 +772,13 @@ def preview_paste():
     # =========================
     # REGEX REPLACE ENGINE
     # =========================
-    cfg = load_portal_config()
     regex_replace_enabled = cfg.get("enable_regex_replace", False)
 
-    # Manual user-entered rules from UI
     replace_rules_raw = request.form.get("replace_rules", "").strip()
-
     applied_rules = []
 
     # -------------------------
-    # MANUAL REGEX RULES
+    # MANUAL USER REGEX RULES
     # -------------------------
     if regex_replace_enabled and replace_rules_raw:
         for line in replace_rules_raw.splitlines():
@@ -764,16 +809,14 @@ def preview_paste():
             except re.error:
                 applied_rules.append(f"[INVALID REGEX] {pattern}")
 
-        # =========================================================
-    # REGEX PRESETS (Only if engine enabled)
     # =========================================================
+    # REGEX PRESETS (state preserved for the template)
+    # =========================================================
+    preset_number_prefix_checked = bool(request.form.get("preset_number_prefix"))
+    preset_pdf_spacing_checked = bool(request.form.get("preset_pdf_spacing"))
+    preset_headers_checked = bool(request.form.get("preset_headers"))
+
     if regex_replace_enabled:
-
-        # Preserve checkbox state
-        preset_number_prefix_checked = bool(request.form.get("preset_number_prefix"))
-        preset_pdf_spacing_checked = bool(request.form.get("preset_pdf_spacing"))
-        preset_headers_checked = bool(request.form.get("preset_headers"))
-
         preset_patterns = []
 
         # 1️⃣ Remove numbered prefixes "1. ", "22. "
@@ -781,7 +824,7 @@ def preview_paste():
             preset_patterns.append((
                 r"^\s*\d+\.\s*",
                 "",
-                "Removed numbered prefixes (1. 22. 5. …)"
+                "Removed numbered prefixes"
             ))
 
         # 2️⃣ Fix PDF / Microsoft wrapped lines + hyphenation
@@ -794,7 +837,7 @@ def preview_paste():
             preset_patterns.append((
                 r"(?<![.!?])\n(?!\n)",
                 " ",
-                "Joined broken wrapped lines"
+                "Joined wrapped lines"
             ))
 
         # 3️⃣ Remove likely header/footer lines
@@ -823,17 +866,13 @@ def preview_paste():
             except re.error:
                 applied_rules.append(f"[INVALID PRESET REGEX] {pattern}")
 
-
-    # =========================
+       # =========================
     # AUTO BOM / INVISIBLE CLEAN
     # =========================
-    cfg = load_portal_config()
     invis_cleanup_enabled = cfg.get("auto_bom_clean", False)
-
     removed_unicode = []
 
     if invis_cleanup_enabled:
-        # Common hidden troublemakers
         invisibles = [
             ("\uFEFF", "BOM"),
             ("\u200B", "Zero-Width Space"),
@@ -858,16 +897,70 @@ def preview_paste():
                 removed_unicode.append("BOM")
                 clean_text = clean_text.lstrip("\uFEFF")
 
-    # -------- CONFIDENCE ANALYSIS (NEW) --------
+    # -------- CONFIDENCE ANALYSIS --------
     conf_summary = conf_details = None
     if get_confidence_setting():
         conf_summary, conf_details = analyze_confidence(clean_text)
 
     # -------- SMART SUGGESTIONS --------
-    smart_suggestions = build_smart_suggestions(quiz_text, clean_text)
+    smart_suggestions = []
+
+    def add_suggestion(title, detail, recommend, rule=None):
+        smart_suggestions.append({
+            "title": title,
+            "detail": detail,
+            "recommend": recommend,
+            "suggest_rule": rule
+        })
+
+    text = clean_text
+
+    # 1️⃣ Detect wrapped PDF text
+    if re.search(r"(?<![.!?])\n(?!\n)", text):
+        add_suggestion(
+            "Possible PDF Wrap Detected",
+            "Lines appear split where they should be continuous sentences.",
+            "Enable PDF Line Wrapping Fix preset.",
+            "Enable preset: PDF Wrapping"
+        )
+
+    # 2️⃣ Detect numbered prefixes like 1. Question
+    if re.search(r"^\s*\d+\.\s+", text, re.MULTILINE):
+        add_suggestion(
+            "Numbered Question Prefixes Found",
+            "Detected numbering like '1.' or '22.' before questions.",
+            "Enable Number Prefix Removal preset.",
+            r"^\s*\d+\.\s* => "
+        )
+
+    # 3️⃣ Detect repeated header/footer patterns
+    if re.search(r"Page\s+\d+", text) or re.search(r"Copyright", text, re.I):
+        add_suggestion(
+            "Likely Headers/Footers Detected",
+            "Repeated structural text such as page numbers or copyright text found.",
+            "Enable Header/Footer Cleanup preset.",
+            "Enable preset: Headers"
+        )
+
+    # 4️⃣ Detect if nothing changed
+    if quiz_text == clean_text:
+        add_suggestion(
+            "No Formatting Changes Applied",
+            "None of your strip or regex rules changed the text.",
+            "Try enabling presets or adding regex rules."
+        )
+
+    # 5️⃣ If no warnings, say it’s clean
+    if len(smart_suggestions) == 0:
+        add_suggestion(
+            "Formatting Looks Excellent",
+            "No structural or formatting problems detected.",
+            "You can safely continue 👍"
+        )
 
     # ---------- RENDER PREVIEW ----------
     return render_template_string("""
+
 <html>
 <head>
     <title>Preview Before Parsing</title>
@@ -980,7 +1073,6 @@ def preview_paste():
 
             <!-- SMART SUGGESTIONS -->
             <h3>💡 Smart Suggestions</h3>
-
             {% if smart_suggestions and smart_suggestions|length > 0 %}
                 <ul>
                     {% for s in smart_suggestions %}
@@ -988,7 +1080,6 @@ def preview_paste():
                         <b>{{s.title}}</b><br>
                         <span style="opacity:.85">{{s.detail}}</span><br>
                         <span style="opacity:.7">Recommendation: {{s.recommend}}</span>
-
                         {% if s.suggest_rule %}
                         <br>
                         <code style="background:#222;padding:4px 6px;border-radius:6px;">
@@ -1003,7 +1094,6 @@ def preview_paste():
             {% endif %}
         </div>
         <!-- END SUMMARY -->
-
 
         <h2>Original Text</h2>
         <pre id="origBox" style="background:black;padding:10px;border-radius:8px;white-space:pre-wrap;">{{original}}</pre>
@@ -1161,27 +1251,24 @@ def preview_paste():
 </body>
 </html>
 """,
+        quiz_title=quiz_title,
+        original=quiz_text,
+        cleaned=clean_text,
+        conf_summary=conf_summary,
+        conf_details=conf_details,
+        temp_logo_name=temp_logo_name,
+        regex_mode=regex_mode,
+        strip_rules=strip_rules,
+        replace_rules=replace_rules_raw.splitlines() if replace_rules_raw else [],
+        applied_rules=applied_rules,
+        invis_cleanup_enabled=invis_cleanup_enabled,
+        removed_unicode=removed_unicode,
+        preset_number_prefix_checked=preset_number_prefix_checked,
+        preset_pdf_spacing_checked=preset_pdf_spacing_checked,
+        preset_headers_checked=preset_headers_checked,
+        smart_suggestions=smart_suggestions
+    )
 
-
-quiz_title=quiz_title,
-original=quiz_text,
-cleaned=clean_text,
-conf_summary=conf_summary,
-conf_details=conf_details,
-temp_logo_name=temp_logo_name,
-regex_mode=regex_mode,
-strip_rules=strip_rules,
-replace_rules=replace_rules_raw.splitlines() if replace_rules_raw else [],
-applied_rules=applied_rules,
-invis_cleanup_enabled=invis_cleanup_enabled,
-removed_unicode=removed_unicode,
-
-# NEW FOR STEP 11C
-preset_number_prefix_checked=bool(request.form.get("preset_number_prefix")),
-preset_pdf_spacing_checked=bool(request.form.get("preset_pdf_spacing")),
-preset_headers_checked=bool(request.form.get("preset_headers")),
-smart_suggestions=smart_suggestions
-)
 
 
 
