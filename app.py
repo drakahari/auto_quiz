@@ -701,9 +701,10 @@ def quick_structural_scan(text):
             current_block_has_answer = False
             current_block_has_correct = False
         
-        # Detect answer choices
-        if re.match(r"^[A-D][\).\-]?\s", line):
+        # Detect answer choices (A–Z supported)
+        if re.match(r"^[A-Za-z][\).\-]?\s", line):
             current_block_has_answer = True
+
         
         # Detect correct answer
         if "correct answer" in line.lower():
@@ -1493,15 +1494,20 @@ def process_paste():
     with open(path, "w", encoding="utf-8") as f:
         f.write(clean_text)
 
+    # =========================
     # PARSE QUIZ
+    # =========================
     quiz_data = parse_questions(path)
 
-    if not quiz_data:
-        ts_fail = int(time.time())
-        log_filename = f"parse_log_{ts_fail}.txt"
-        with open(os.path.join(DATA_FOLDER, log_filename), "w", encoding="utf-8") as f:
-            f.write("\n".join(PARSE_LOG))
+    # Always save a parse log so failures are debuggable
+    ts_fail = int(time.time())
+    log_filename = f"parse_log_{ts_fail}.txt"
 
+    with open(os.path.join(DATA_FOLDER, log_filename), "w", encoding="utf-8") as f:
+        f.write("\n".join(PARSE_LOG))
+
+    # If no questions parsed, show failure UI + log link
+    if not quiz_data:
         return render_template_string("""
         <html>
         <head>
@@ -1511,6 +1517,7 @@ def process_paste():
         <body>
         <div class="container">
             <h1 class="hero-title">⚠️ Could Not Parse Any Questions</h1>
+
             <div class="card">
                 <p>No valid questions were parsed. Please check the formatting.</p>
                 <p>You can download the parser log for troubleshooting:</p>
@@ -1520,13 +1527,24 @@ def process_paste():
                 </button>
 
                 <br><br>
-                <button onclick="location.href='/paste'">⬅ Back To Paste Page</button>
-                <button onclick="location.href='/'">🏠 Return To Portal</button>
+
+                <button onclick="location.href='/upload'">
+                    ⬅ Back To Upload Page
+                </button>
+
+                <button onclick="location.href='/paste'">
+                    📋 Try Paste Mode Instead
+                </button>
+
+                <button onclick="location.href='/'">
+                    🏠 Return To Portal
+                </button>
             </div>
         </div>
         </body>
         </html>
         """, log_filename=log_filename), 400
+
 
     # SAVE OUTPUTS
     ts = int(time.time())
@@ -1630,20 +1648,17 @@ def process_paste():
 def process_file():
     file = request.files["file"]
 
-    if not file.filename.lower().endswith(".txt"):
+    if not file or not file.filename.lower().endswith(".txt"):
         return "Only .txt files are supported.", 400
 
     quiz_title = request.form.get("quiz_title", "Generated Quiz")
 
-    if not file:
-        return "No file uploaded", 400
-
     path = os.path.join(UPLOAD_FOLDER, "latest.txt")
     file.save(path)
 
+    # Handle optional logo
     logo_file = request.files.get("quiz_logo")
     logo_filename = None
-
     if logo_file and logo_file.filename:
         ext = os.path.splitext(logo_file.filename)[1].lower()
         if ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
@@ -1651,10 +1666,58 @@ def process_file():
             logo_filename = f"logo_{ts}{ext}"
             logo_file.save(os.path.join(LOGO_FOLDER, logo_filename))
 
-    quiz_data = parse_questions(path)
+    # =========================
+    # READ FILE CONTENT
+    # =========================
+    with open(path, "r", encoding="utf-8", errors="ignore") as f:
+        text = f.read()
+
+    # =========================
+    # PARSE QUIZ (PASS TEXT!)
+    # =========================
+    quiz_data = parse_questions(text)
+
+    print("UPLOAD MODE FINAL PARSE COUNT:", 
+          0 if quiz_data is None else len(quiz_data))
+
+    # Always save parse log
+    ts_fail = int(time.time())
+    log_filename = f"parse_log_{ts_fail}.txt"
+    with open(os.path.join(DATA_FOLDER, log_filename), "w", encoding="utf-8") as f:
+        f.write("\n".join(PARSE_LOG))
 
     if not quiz_data:
-        return "Could not parse any questions. Check formatting.", 400
+        return render_template_string("""
+        <html>
+        <head>
+            <title>Parse Failed</title>
+            <link rel="stylesheet" href="/style.css">
+        </head>
+        <body>
+        <div class="container">
+            <h1 class="hero-title">⚠️ Could Not Parse Any Questions</h1>
+            <div class="card">
+                <p>No valid questions were parsed.</p>
+                <p>You can download the parser log:</p>
+
+                <button onclick="location.href='/data/{{log_filename}}'">
+                    📥 Download Parse Log
+                </button>
+
+                <br><br>
+                <button onclick="location.href='/upload'">
+                    ⬅ Back To Upload Page
+                </button>
+                <button onclick="location.href='/'">
+                    🏠 Return To Portal
+                </button>
+            </div>
+        </div>
+        </body>
+        </html>
+        """, log_filename=log_filename), 400
+
+
 
     ts = int(time.time())
     json_name = f"quiz_{ts}.json"
@@ -1874,7 +1937,7 @@ def analyze_confidence(text):
         reasons = []
 
         # --- Choices Check ---
-        choices = re.findall(r"^[A-F][\.\)]", b, flags=re.MULTILINE)
+        choices = re.findall(r"^[A-Z][\.\)]", b, flags=re.MULTILINE)
         if len(choices) >= 2:
             score += 40
             reasons.append("Detected multiple answer choices")
@@ -1939,18 +2002,28 @@ def dbg(*msg):
     PARSE_LOG.append(text)
 
 
-def parse_questions(filepath):
-    import re
+def parse_questions(source):
+    import re, os
 
     global PARSE_LOG
     PARSE_LOG.clear()
     dbg("=== NEW PARSE SESSION STARTED ===")
 
-    with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
-        raw = f.read()
+    # Allow BOTH: file paths OR already-loaded quiz text
+    if isinstance(source, str) and os.path.isfile(source):
+        dbg("Input detected as FILE path → reading file")
+        with open(source, "r", encoding="utf-8", errors="ignore") as f:
+            raw = f.read()
+    else:
+        dbg("Input detected as RAW TEXT → using directly")
+        raw = source
 
     # Normalize newlines
     text = raw.replace("\r\n", "\n").replace("\r", "\n")
+
+    # Remove UTF-8 BOM if present
+    text = text.lstrip("\ufeff")
+    dbg("BOM stripped (if present)")
 
     # Split into question blocks
     blocks = re.split(
@@ -1994,7 +2067,8 @@ def parse_questions(filepath):
             lower = line.lower()
 
             # -------- Detect Choices --------
-            mchoice = re.match(r"^\s*([A-Da-d])[\.\)]\s+(.*)", line)
+            mchoice = re.match(r"^\s*([A-Za-z])[\.\)]\s+(.*)", line)
+
             if mchoice:
                 label = mchoice.group(1).upper()
                 text_choice = mchoice.group(2).strip()
@@ -2036,7 +2110,17 @@ def parse_questions(filepath):
             dbg("!! Skipped: Not enough choices:", choices)
             continue
 
+        # Build full question text
         question_text = " ".join(q_lines)
+
+        # --- UX CLEANUP ---
+        question_text = re.sub(
+            r'^(?:Question\s*#?\s*\d+[\).\s-]*|\d+[\).\s-]*)\s*',
+            '',
+            question_text,
+            flags=re.IGNORECASE
+        )
+
         dbg("Final Question Built:", question_text[:150])
 
         questions.append({
@@ -2049,10 +2133,16 @@ def parse_questions(filepath):
         dbg("✓ Question Accepted\n")
         number += 1
 
+    # ================================
+    # END OF LOOP — FINALIZE
+    # ================================
     dbg("\n==== PARSE COMPLETE ====")
     dbg("Total questions parsed:", len(questions))
 
     return questions
+
+
+
 
 
 # =========================
@@ -2086,13 +2176,16 @@ def analyze_confidence(clean_text):
         txt = " ".join(lines)
 
         # Basic signals
-        has_choice = any(re.match(r"^[A-Da-d][\.\)]\s+", l) for l in lines)
+        # Detect ANY lettered choices A–Z
+        has_choice = any(re.match(r"^[A-Za-z][\.\)]\s+", l) for l in lines)
+
         has_answer_line = any(
             ("correct answer" in l.lower()) or ("suggested answer" in l.lower())
             for l in lines
         )
         num_choices = sum(
-            1 for l in lines if re.match(r"^[A-Da-d][\.\)]\s+", l)
+            1 for l in lines if re.match(r"^[A-Za-z][\.\)]\s+", l)
+
         )
 
         score = 0
@@ -2100,9 +2193,9 @@ def analyze_confidence(clean_text):
 
         if has_choice:
             score += 1
-            reason.append("Found A–D answer choices")
+            reason.append("Found A–Z answer choices")
         else:
-            reason.append("No A–D answer choices found")
+            reason.append("No A–Z answer choices found")
 
         if has_answer_line:
             score += 1
@@ -2110,7 +2203,8 @@ def analyze_confidence(clean_text):
         else:
             reason.append("No explicit correct-answer line found")
 
-        if 2 <= num_choices <= 6:
+        if num_choices >= 2:
+
             score += 1
             reason.append(f"{num_choices} choices detected")
         else:
