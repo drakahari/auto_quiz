@@ -56,7 +56,7 @@ def load_portal_config():
     default = {
         "title": "Training & Practice Center",
         "show_confidence": True,
-        "enable_regex_strip": False
+        "enable_regex_replace": False
     }
 
     if not os.path.exists(PORTAL_CONFIG):
@@ -65,18 +65,14 @@ def load_portal_config():
     try:
         with open(PORTAL_CONFIG, "r") as f:
             data = json.load(f)
-
-            if not isinstance(data, dict):
-                return default
-
             return {
                 "title": data.get("title", default["title"]),
-                "show_confidence": data.get("show_confidence", default["show_confidence"]),
-                "enable_regex_strip": data.get("enable_regex_strip", default["enable_regex_strip"]),
+                "show_confidence": data.get("show_confidence", True),
+                "enable_regex_replace": data.get("enable_regex_replace", False)
             }
-
-    except Exception:
+    except:
         return default
+
 
 
 
@@ -505,6 +501,28 @@ Exam Version
 Practice Only"
                           style="width:100%; height:140px; padding:10px; font-size:14px;"></textarea>
 
+
+                <br><br>
+
+                <!-- ========================= -->
+                <!--  REGEX REPLACE SECTION    -->
+                <!-- ========================= -->
+                <h3>Optional: Regex Replace Rules</h3>
+                <p style="opacity:.8; font-size:12px">
+                    Runs BEFORE parsing. Format:<br>
+                    REGEX => REPLACEMENT<br><br>
+
+                    Examples:<br>
+                    ^\\d+\\.\\s* =>   (removes leading "1. ")<br>
+                    Question\\s*#\\d+ =>   (removes Question # labels)<br>
+                    \\(Choose.*?\\) =>   (removes Choose statement)
+                </p>
+
+                <textarea name="replace_rules"
+                          placeholder="^\\d+\\.\\s* => 
+Question\\s*#\\d+ => "
+                          style="width:100%; height:140px; padding:10px; font-size:14px;"></textarea>
+
                 <br><br>
 
                 <h3>Upload Logo (Optional)</h3>
@@ -526,6 +544,7 @@ Practice Only"
     </body>
     </html>
     """, portal_title=portal_title)
+
 
 
 
@@ -607,6 +626,60 @@ def preview_paste():
 
         clean_text = "\n".join(cleaned_lines)
 
+    # =========================
+    # REGEX REPLACE ENGINE
+    # =========================
+    cfg = load_portal_config()
+    regex_replace_enabled = cfg.get("enable_regex_replace", False)
+
+    regex_rules_raw = request.form.get("regex_replace_rules", "").strip()
+
+    applied_rules = []
+
+    if regex_replace_enabled and regex_rules_raw:
+        for line in regex_rules_raw.splitlines():
+            line = line.strip()
+            if "=>" not in line:
+                continue
+            
+            pattern, replacement = line.split("=>", 1)
+            pattern = pattern.strip()
+            replacement = replacement.strip()
+
+            if not pattern:
+                continue
+
+            try:
+                new_text = re.sub(pattern, replacement, clean_text, flags=re.MULTILINE)
+                if new_text != clean_text:
+                    applied_rules.append(pattern)
+                clean_text = new_text
+            except re.error:
+                applied_rules.append(f"[INVALID REGEX] {pattern}")
+
+    # ===============================
+    # APPLY REGEX REPLACE RULES
+    # ===============================
+    replace_rules_raw = request.form.get("replace_rules", "").strip()
+
+    if replace_rules_raw:
+        for line in replace_rules_raw.splitlines():
+            line = line.strip()
+            if not line or "=>" not in line:
+                continue
+
+            pattern, replacement = line.split("=>", 1)
+            pattern = pattern.strip()
+            replacement = replacement.strip()
+
+            try:
+                clean_text = re.sub(pattern, replacement, clean_text, flags=re.IGNORECASE | re.MULTILINE)
+            except re.error:
+                # do NOT crash if user enters bad regex
+                pass
+
+        
+
     # -------- CONFIDENCE ANALYSIS (NEW) --------
     conf_summary = conf_details = None
     if get_confidence_setting():
@@ -614,83 +687,136 @@ def preview_paste():
 
     # ---------- RENDER PREVIEW ----------
     return render_template_string("""
-    <html>
-    <head>
-        <title>Preview Before Parsing</title>
-        <link rel="stylesheet" href="/style.css">
-    </head>
+<html>
+<head>
+    <title>Preview Before Parsing</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
 
-    <body>
-    <div class="container">
-        
-        <h1 class="hero-title">👀 Preview Quiz Before Building</h1>
+<body>
+<div class="container">
+    
+    <h1 class="hero-title">👀 Preview Quiz Before Building</h1>
 
-        <div class="card">
-            <h2>Quiz Title:</h2>
-            <p><b>{{quiz_title}}</b></p>
+    <div class="card">
+        <h2>Quiz Title:</h2>
+        <p><b>{{quiz_title}}</b></p>
 
-            <h2>Original Text</h2>
-            <pre style="background:black;padding:10px;border-radius:8px;white-space:pre-wrap;">{{original}}</pre>
+        <!-- STEP 7: PRE-PROCESS SUMMARY PANEL -->
+        <div style="background:#1a1a1a; padding:12px; border-radius:8px; margin-bottom:18px;">
+            <h2>🧪 Pre-Processing Summary</h2>
 
-            <h2>Text To Be Parsed</h2>
-            <pre style="background:#102020;padding:10px;border-radius:8px;white-space:pre-wrap;">{{cleaned}}</pre>
-
-            {% if conf_details %}
-            <h2>🧠 Confidence Analysis</h2>
-            <p>
-                <b>Total blocks:</b> {{conf_summary.total}}<br>
-                ✅ High: {{conf_summary.high}} &nbsp;
-                ⚠ Medium: {{conf_summary.medium}} &nbsp;
-                ❌ Low: {{conf_summary.low}}
+            <p><b>Regex Strip Mode:</b>
+                {% if regex_mode %}
+                    Enabled ✔
+                {% else %}
+                    Disabled ❌
+                {% endif %}
             </p>
 
+            {% if strip_rules %}
+            <h3>Lines Removed By Strip Rules</h3>
             <ul>
-                {% for item in conf_details %}
-                <li style="margin-bottom:8px;">
-                    <b>Block {{item.index}} ({{item.confidence|capitalize}})</b><br>
-                    <span style="opacity:.85">{{item.title}}</span><br>
-                    <span style="opacity:.6; font-size:12px;">{{item.reason}}</span>
-                </li>
+                {% for r in strip_rules %}
+                <li>{{r}}</li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p>No strip rules applied.</p>
+            {% endif %}
+
+            {% if replace_rules %}
+            <h3>Regex Replace Rules Provided</h3>
+            <ul>
+                {% for r in replace_rules %}
+                <li>{{r}}</li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p>No regex replace rules entered.</p>
+            {% endif %}
+
+            {% if applied_rules %}
+            <h3>Applied Successfully</h3>
+            <ul>
+                {% for r in applied_rules %}
+                <li>✔ {{r}}</li>
                 {% endfor %}
             </ul>
             {% endif %}
-
-            <p style="opacity:.7">
-                If this looks correct, continue. Otherwise, go back and adjust rules.
-            </p>
-
-            <form action="/download_cleaned" method="POST" style="display:inline;">
-                <textarea name="clean_text" style="display:none;">{{cleaned}}</textarea>
-                <button type="submit">📥 Download Cleaned Text</button>
-            </form>
-
-            <!-- IMPORTANT: Send CLEANED text forward -->
-            <form action="/process_paste" method="POST">
-                <input type="hidden" name="quiz_title" value="{{quiz_title}}">
-                <textarea name="quiz_text" style="display:none;">{{cleaned}}</textarea>
-
-                {% if temp_logo_name %}
-                    <input type="hidden" name="temp_logo_name" value="{{temp_logo_name}}">
-                {% endif %}
-
-                <button type="submit">✅ Yes, Build My Quiz</button>
-            </form>
-
-            <br>
-            <button onclick="history.back()">⬅ Go Back & Edit</button>
-            <button onclick="location.href='/'">🏠 Return To Portal</button>
         </div>
+        <!-- END STEP 7 -->
+
+
+        <h2>Original Text</h2>
+        <pre style="background:black;padding:10px;border-radius:8px;white-space:pre-wrap;">{{original}}</pre>
+
+        <h2>Text To Be Parsed</h2>
+        <pre style="background:#102020;padding:10px;border-radius:8px;white-space:pre-wrap;">{{cleaned}}</pre>
+
+        {% if conf_details %}
+        <h2>🧠 Confidence Analysis</h2>
+        <p>
+            <b>Total blocks:</b> {{conf_summary.total}}<br>
+            ✅ High: {{conf_summary.high}} &nbsp;
+            ⚠ Medium: {{conf_summary.medium}} &nbsp;
+            ❌ Low: {{conf_summary.low}}
+        </p>
+
+        <ul>
+            {% for item in conf_details %}
+            <li style="margin-bottom:8px;">
+                <b>Block {{item.index}} ({{item.confidence|capitalize}})</b><br>
+                <span style="opacity:.85">{{item.title}}</span><br>
+                <span style="opacity:.6; font-size:12px;">{{item.reason}}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        <p style="opacity:.7">
+            If this looks correct, continue. Otherwise, go back and adjust rules.
+        </p>
+
+        <form action="/download_cleaned" method="POST" style="display:inline;">
+            <textarea name="clean_text" style="display:none;">{{cleaned}}</textarea>
+            <button type="submit">📥 Download Cleaned Text</button>
+        </form>
+
+        <!-- IMPORTANT: Send CLEANED text forward -->
+        <form action="/process_paste" method="POST">
+            <input type="hidden" name="quiz_title" value="{{quiz_title}}">
+            <textarea name="quiz_text" style="display:none;">{{cleaned}}</textarea>
+
+            {% if temp_logo_name %}
+                <input type="hidden" name="temp_logo_name" value="{{temp_logo_name}}">
+            {% endif %}
+
+            <button type="submit">✅ Yes, Build My Quiz</button>
+        </form>
+
+        <br>
+        <button onclick="history.back()">⬅ Go Back & Edit</button>
+        <button onclick="location.href='/'">🏠 Return To Portal</button>
     </div>
-    </body>
-    </html>
-    """,
-    quiz_title=quiz_title,
-    original=quiz_text,
-    cleaned=clean_text,
-    conf_summary=conf_summary,
-    conf_details=conf_details,
-    temp_logo_name=temp_logo_name
-    )
+</div>
+</body>
+</html>
+""",
+quiz_title=quiz_title,
+original=quiz_text,
+cleaned=clean_text,
+conf_summary=conf_summary,
+conf_details=conf_details,
+temp_logo_name=temp_logo_name,
+regex_mode=regex_mode,
+strip_rules=strip_rules,
+replace_rules=regex_rules_raw.splitlines() if regex_rules_raw else [],
+applied_rules=applied_rules
+)
+
+
+
 
 
 
@@ -1026,10 +1152,10 @@ def settings_page():
 </p>
 
 <label style="display:flex; gap:10px; align-items:center;">
-    <input type="checkbox" name="enable_regex_strip"
+    <input type="checkbox" name="enable_regex_replace"
            value="1"
-           {% if cfg.enable_regex_strip %}checked{% endif %}>
-    Enable Regex Strip Rules
+           {% if cfg.enable_regex_replace %}checked{% endif %}>
+    Enable Regex Replace Engine
 </label>
 
               
@@ -1047,16 +1173,67 @@ def settings_page():
     </html>
     """, cfg=cfg)
 
+def load_portal_config():
+    default = {
+        "title": "Training & Practice Center",
+        "show_confidence": True,
+        "enable_regex_replace": False
+    }
+
+    if not os.path.exists(PORTAL_CONFIG):
+        return default
+
+    try:
+        with open(PORTAL_CONFIG, "r") as f:
+            data = json.load(f)
+            return {
+                "title": data.get("title", default["title"]),
+                "show_confidence": data.get("show_confidence", default["show_confidence"]),
+                "enable_regex_replace": data.get("enable_regex_replace", default["enable_regex_replace"])
+            }
+    except:
+        return default
+
+
+def load_portal_config():
+    default = {
+        "title": "Training & Practice Center",
+        "show_confidence": True,
+        "enable_regex_replace": False
+    }
+
+    if not os.path.exists(PORTAL_CONFIG):
+        return default
+
+    try:
+        with open(PORTAL_CONFIG, "r") as f:
+            data = json.load(f)
+            return {
+                "title": data.get("title", default["title"]),
+                "show_confidence": data.get("show_confidence", True),
+                "enable_regex_replace": data.get("enable_regex_replace", False)
+            }
+    except:
+        return default
+
+
 @app.route("/save_settings", methods=["POST"])
 def save_settings():
     title = request.form.get("portal_title", "Training & Practice Center")
-    show_conf = request.form.get("show_confidence") == "1"
-    enable_regex = request.form.get("enable_regex_strip") == "1"
 
-    save_portal_config(title, show_conf, enable_regex)
+    show_conf = request.form.get("show_confidence") == "1"
+    regex_enabled = request.form.get("enable_regex_replace") == "1"
+
+    cfg = {
+        "title": title,
+        "show_confidence": show_conf,
+        "enable_regex_replace": regex_enabled
+    }
+
+    with open(PORTAL_CONFIG, "w") as f:
+        json.dump(cfg, f, indent=4)
 
     return redirect("/settings")
-
 
 
 
