@@ -596,42 +596,43 @@ def build_smart_suggestions(original_text, cleaned_text):
 
 
     # ---------------------------------------
-    # PDF Wrapper Detection (FINAL FIX)
+    # PDF Wrapper Detection (FINAL — No False Positives)
     #
-    # 🎯 Only warn if CLEANED TEXT is STILL broken
+    # Only warn if CLEANED TEXT still contains TRUE mid-sentence breaks.
+    # Do NOT warn on real paragraph breaks.
     # ---------------------------------------
     pdf_wrap_detected = False
 
-    # Case 1: hyphen breaks still exist
+    # Case 1 — hyphen wrapped words still exist
     if re.search(r"-\s*\n\s*", c):
         pdf_wrap_detected = True
 
-    # Case 2: ANY single line break in the middle of a sentence
-    # Meaning: previous line does NOT end with . ! ? and next line is text
-    elif re.search(r"(?<![.!?])\s*\n\s*\S", c):
-        pdf_wrap_detected = True
+    else:
+        paragraphs = [p for p in c.split("\n\n") if p.strip()]
 
+        for p in paragraphs:
+            # Ignore paragraphs that only have 1 line
+            if "\n" not in p:
+                continue
 
-        # If we truly detected something → then warn
-        if pdf_wrap_detected:
-            suggestions.append({
-                "title": "Possible PDF Wrap Detected",
-                "detail": "Lines appear split where they should be continuous sentences.",
-                "recommend": "Enable PDF Line Wrapping Fix preset.",
-                "suggest_rule": "Enable preset: PDF Wrapping"
-            })
+            # TRUE PDF wrap:
+            # letter + newline + letter WITHIN SAME paragraph
+            if re.search(r"[A-Za-z0-9]\s*\n\s*[A-Za-z0-9]", p):
+                pdf_wrap_detected = True
+                break
 
-
-    # ---------------------------------------
-    # Detect Choose statements
-    # ---------------------------------------
-    if re.search(r"\(Choose.*?\)", o, re.IGNORECASE):
+    if pdf_wrap_detected:
         suggestions.append({
-            "title": "Test Hint Statements Detected",
-            "detail": "Found '(Choose two / Choose best)' style text.",
-            "recommend": "Consider removing choose instructions",
-            "suggest_rule": r"\(Choose.*?\) =>"
+            "title": "Possible PDF Wrap Detected",
+            "detail": "Lines appear split where they should be continuous sentences.",
+            "recommend": "Enable PDF Line Wrapping Fix preset.",
+            "suggest_rule": "Enable preset: PDF Wrapping"
         })
+
+
+
+
+
 
 
     # ---------------------------------------
