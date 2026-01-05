@@ -572,98 +572,110 @@ Question\\s*#\\d+ => "
 
 
 # =========================================================
-# SMART SUGGESTIONS ENGINE (Final Stable Version)
+# SMART SUGGESTIONS ENGINE — FINAL CONSOLIDATED
 # =========================================================
 def build_smart_suggestions(original_text, cleaned_text):
     suggestions = []
-
     import re
 
-    # Normalize clearly
+    # Normalize safely
     o = (original_text or "").strip()
     c = (cleaned_text or "").strip()
 
     # ---------------------------------------
-    # Detect numbered question prefixes
+    # 1️⃣ Detect numbered prefixes
     # ---------------------------------------
     if re.search(r"^\s*\d+\.\s+", o, re.MULTILINE):
         suggestions.append({
             "title": "Numbered Questions Detected",
             "detail": "Questions appear to start with numbers like '1. 2. 3.'.",
-            "recommend": "Enable Number Prefix Removal preset",
-            "suggest_rule": r"^\s*\d+\.\s* =>"
+            "recommend": "Enable Number Prefix Removal preset"
         })
 
-
     # ---------------------------------------
-    # PDF Wrapper Detection (FINAL — No False Positives)
-    #
-    # Only warn if CLEANED TEXT still contains TRUE mid-sentence breaks.
-    # Do NOT warn on real paragraph breaks.
+    # 2️⃣ PDF WRAP — warn ONLY if CLEANED TEXT still broken
     # ---------------------------------------
     pdf_wrap_detected = False
 
-    # Case 1 — hyphen wrapped words still exist
+    # hyphen wrap still present
     if re.search(r"-\s*\n\s*", c):
         pdf_wrap_detected = True
 
-    else:
-        paragraphs = [p for p in c.split("\n\n") if p.strip()]
-
-        for p in paragraphs:
-            # Ignore paragraphs that only have 1 line
-            if "\n" not in p:
-                continue
-
-            # TRUE PDF wrap:
-            # letter + newline + letter WITHIN SAME paragraph
-            if re.search(r"[A-Za-z0-9]\s*\n\s*[A-Za-z0-9]", p):
-                pdf_wrap_detected = True
-                break
+    # mid-sentence linebreak still present
+    elif re.search(r"(?<![.!?:])\s*\n\s*[A-Za-z]", c):
+        pdf_wrap_detected = True
 
     if pdf_wrap_detected:
         suggestions.append({
             "title": "Possible PDF Wrap Detected",
-            "detail": "Lines appear split where they should be continuous sentences.",
-            "recommend": "Enable PDF Line Wrapping Fix preset.",
-            "suggest_rule": "Enable preset: PDF Wrapping"
+            "detail": "Lines appear split mid-sentence.",
+            "recommend": "Enable PDF Line Wrapping Fix preset."
         })
 
-
-
-
-
-
-
     # ---------------------------------------
-    # Detect repeated headers / footers
+    # 3️⃣ HEADER / FOOTER repetition detector
     # ---------------------------------------
     lines = [l.strip() for l in o.splitlines() if l.strip()]
     repeats = [l for l in set(lines) if lines.count(l) >= 3]
 
     if repeats:
         suggestions.append({
-            "title": "Repeated Header/Footer Text Detected",
-            "detail": "Multiple lines repeat across document; likely page headers or footers.",
+            "title": "Repeated Header/Footer Detected",
+            "detail": "Document contains repeating page headers or footers.",
             "recommend": "Enable Header/Footer Cleanup preset"
         })
 
-    return suggestions
+    # ---------------------------------------
+    # 4️⃣ MULTIPLE QUESTION COLLAPSE DETECTOR
+    # ---------------------------------------
+    answer_markers_pattern = re.compile(
+        r"(Correct\s*Answer[s]?|Suggested\s*Answer[s]?)",
+        re.IGNORECASE
+    )
 
+    total_markers = (
+        len(answer_markers_pattern.findall(o)) +
+        len(answer_markers_pattern.findall(c))
+    )
 
+    if total_markers >= 2:
+        suggestions.append({
+            "title": "Multiple Questions Detected in a Single Block",
+            "detail": (
+                "Detected multiple answer markers inside one block. "
+                "This usually means more than one question exists but "
+                "isn't clearly separated. The parser may merge them."
+            ),
+            "recommend": (
+                "Insert a BLANK LINE between each question, "
+                "or number them 1., 2., 3."
+            )
+        })
 
     # ---------------------------------------
-    # Detect BOM / Unicode weirdness still present
+    # 5️⃣ BOM / Unicode trouble detector
     # ---------------------------------------
     trouble_chars = ["\uFEFF", "\u200B", "\u200C", "\u200D", "\u2060"]
+
     if any(t in o for t in trouble_chars):
         suggestions.append({
             "title": "Hidden Unicode Characters Present",
-            "detail": "Looks like BOM / zero-width characters exist in source text.",
-            "recommend": "Leave Invisible Cleanup Enabled"
+            "detail": "Detected BOM or zero-width Unicode in source text.",
+            "recommend": "Keep Invisible Character Cleanup Enabled"
+        })
+
+    # ---------------------------------------
+    # 6️⃣ EVERYTHING LOOKS GOOD fallback
+    # ---------------------------------------
+    if not suggestions:
+        suggestions.append({
+            "title": "Formatting Looks Excellent",
+            "detail": "No structural or formatting problems detected.",
+            "recommend": "You can safely continue 👍"
         })
 
     return suggestions
+
 
 # =============================
 # 12A – STRUCTURAL VALIDATION
@@ -860,18 +872,24 @@ def preview_paste():
             "Removed header/footer text"
         ))
 
-    # 3️⃣ FIX PDF WRAPS LAST
+    # 2️⃣ Fix PDF / Microsoft wrapped lines + hyphenation
     if preset_pdf_spacing_checked:
         preset_patterns.append((
             r"-\s*\n\s*",
             "",
             "Fixed PDF hyphen wraps"
         ))
+
+        # SUPER SAFE PDF WRAP JOIN
+        # Will NOT join across question boundaries
         preset_patterns.append((
-            r"(?<![.!?])\n(?!\n)",
+            r"(?<=[a-z,;])\n(?=\s*[a-z])",
             " ",
-            "Joined wrapped lines"
+            "Joined wrapped lines safely"
         ))
+
+
+
 
 
         # ---------- APPLY PRESETS ----------
@@ -892,7 +910,51 @@ def preview_paste():
             except re.error:
                 applied_rules.append(f"[INVALID PRESET REGEX] {pattern}")
 
-       # =========================
+    # =========================
+    # AUTO MULTI-QUESTION SPLIT FIX
+    # =========================
+    safe_split_pattern = re.compile(
+        r"(Correct\s*Answer[s]?:.*?\n)(?=\S)",
+        re.IGNORECASE
+    )
+
+    # Also support Suggested Answer
+    safe_split_pattern_2 = re.compile(
+        r"(Suggested\s*Answer[s]?:.*?\n)(?=\S)",
+        re.IGNORECASE
+    )
+
+    new_text = clean_text
+
+    new_text = safe_split_pattern.sub(r"\1\n", new_text)
+    new_text = safe_split_pattern_2.sub(r"\1\n", new_text)
+
+    if new_text != clean_text:
+        applied_rules.append("Auto Question Splitter")
+        clean_text = new_text
+
+    # =========================
+    # FORCE MCQ OPTIONS ON CLEAN LINES
+    # =========================
+    # 1️⃣ Ensure every choice letter starts a new line
+    choice_line_fix = re.compile(
+        r"\s+(?=([A-Z]\.\s))"
+    )
+
+    new_text = clean_text
+    new_text = choice_line_fix.sub(r"\n", new_text)
+
+    # 2️⃣ Remove accidental double newlines caused by above
+    new_text = re.sub(r"\n{3,}", "\n\n", new_text)
+
+    if new_text != clean_text:
+        applied_rules.append("Normalized MCQ Choices")
+        clean_text = new_text
+
+
+
+
+    # =========================
     # AUTO BOM / INVISIBLE CLEAN
     # =========================
     invis_cleanup_enabled = cfg.get("auto_bom_clean", False)
