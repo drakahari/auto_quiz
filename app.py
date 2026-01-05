@@ -501,7 +501,6 @@ Exam Version
 Practice Only"
                           style="width:100%; height:140px; padding:10px; font-size:14px;"></textarea>
 
-
                 <br><br>
 
                 <!-- ========================= -->
@@ -522,6 +521,32 @@ Practice Only"
                           placeholder="^\\d+\\.\\s* => 
 Question\\s*#\\d+ => "
                           style="width:100%; height:140px; padding:10px; font-size:14px;"></textarea>
+
+                <br><br>
+
+                <!-- ========================= -->
+                <!--  REGEX PRESET CHECKBOXES  -->
+                <!-- ========================= -->
+                <h3>✨ Regex Presets (Optional)</h3>
+                <p style="opacity:.8; font-size:12px">
+                    These presets automatically apply helpful cleanup rules.<br>
+                    They will stack with any manual regex rules above.
+                </p>
+
+                <label style="display:flex; gap:10px; align-items:center;">
+                    <input type="checkbox" name="preset_number_prefix" value="1">
+                    Remove numbered question prefixes (1., 22., 5. → removed)
+                </label>
+
+                <label style="display:flex; gap:10px; align-items:center;">
+                    <input type="checkbox" name="preset_pdf_spacing" value="1">
+                    Fix PDF / Microsoft broken line wrapping & hyphenation
+                </label>
+
+                <label style="display:flex; gap:10px; align-items:center;">
+                    <input type="checkbox" name="preset_headers" value="1">
+                    Try to remove page headers / footers
+                </label>
 
                 <br><br>
 
@@ -546,6 +571,76 @@ Question\\s*#\\d+ => "
     """, portal_title=portal_title)
 
 
+# =========================================================
+# SMART SUGGESTIONS ENGINE (Step 11A)
+# =========================================================
+def build_smart_suggestions(original_text, cleaned_text):
+    suggestions = []
+
+    # Normalize
+    o = original_text.strip()
+    c = cleaned_text.strip()
+
+    # ---------------------------------------
+    # Detect numbered question prefixes
+    # ---------------------------------------
+    import re
+    if re.search(r"^\s*\d+\.\s+", o, re.MULTILINE):
+        suggestions.append({
+            "title": "Numbered Questions Detected",
+            "detail": "Questions appear to start with numbers like '1. 2. 3.'.",
+            "recommend": "Enable Number Prefix Removal preset",
+            "suggest_rule": r"^\s*\d+\.\s* =>"
+        })
+
+    # ---------------------------------------
+    # Detect PDF wrapped lines / broken sentences
+    # ---------------------------------------
+    if re.search(r"[a-z]\n[a-z]", o):
+        suggestions.append({
+            "title": "Possible PDF Line Breaks",
+            "detail": "Detected mid-sentence line breaks that may be from PDF extraction.",
+            "recommend": "Enable PDF Wrapping Repair preset"
+        })
+
+    # ---------------------------------------
+    # Detect Choose statements
+    # ---------------------------------------
+    if re.search(r"\(Choose.*?\)", o, re.IGNORECASE):
+        suggestions.append({
+            "title": "Test Hint Statements Detected",
+            "detail": "Found '(Choose two / Choose best)' style text.",
+            "recommend": "Consider removing choose instructions",
+            "suggest_rule": r"\(Choose.*?\) =>"
+        })
+
+    # ---------------------------------------
+    # Detect repeated headers / footers
+    # ---------------------------------------
+    lines = [l.strip() for l in o.splitlines() if l.strip()]
+    repeats = [l for l in set(lines) if lines.count(l) >= 3]
+
+    if repeats:
+        suggestions.append({
+            "title": "Repeated Header/Footer Text Detected",
+            "detail": "Multiple lines repeat across document; likely page headers or footers.",
+            "recommend": "Enable Header/Footer Cleanup preset"
+        })
+
+    # ---------------------------------------
+    # Detect BOM / Unicode weirdness still present
+    # ---------------------------------------
+    trouble_chars = ["\uFEFF", "\u200B", "\u200C", "\u200D", "\u2060"]
+    if any(t in o for t in trouble_chars):
+        suggestions.append({
+            "title": "Hidden Unicode Characters Present",
+            "detail": "Looks like BOM / zero-width characters exist in source text.",
+            "recommend": "Leave Invisible Cleanup Enabled"
+        })
+
+    return suggestions
+
+
 
 
 # =========================
@@ -554,9 +649,8 @@ Question\\s*#\\d+ => "
 @app.route("/preview_paste", methods=["POST"])
 def preview_paste():
     cleanup_temp_logos()   # 🧹 auto-clean old temp logos
-    
-    quiz_text = request.form.get("quiz_text", "").strip()
 
+    quiz_text = request.form.get("quiz_text", "").strip()
     quiz_title = request.form.get("quiz_title", "Generated Quiz From Paste")
     strip_rules_raw = request.form.get("strip_text", "").strip()
 
@@ -587,8 +681,9 @@ def preview_paste():
         .replace("\r", "\n")
     )
 
-
-       # -------- APPLY STRIP RULES --------
+    # =========================
+    # APPLY STRIP RULES (with optional regex mode)
+    # =========================
     strip_rules = []
     if strip_rules_raw:
         strip_rules = [r.strip() for r in strip_rules_raw.splitlines() if r.strip()]
@@ -632,16 +727,20 @@ def preview_paste():
     cfg = load_portal_config()
     regex_replace_enabled = cfg.get("enable_regex_replace", False)
 
-    regex_rules_raw = request.form.get("regex_replace_rules", "").strip()
+    # Manual user-entered rules from UI
+    replace_rules_raw = request.form.get("replace_rules", "").strip()
 
     applied_rules = []
 
-    if regex_replace_enabled and regex_rules_raw:
-        for line in regex_rules_raw.splitlines():
+    # -------------------------
+    # MANUAL REGEX RULES
+    # -------------------------
+    if regex_replace_enabled and replace_rules_raw:
+        for line in replace_rules_raw.splitlines():
             line = line.strip()
             if "=>" not in line:
                 continue
-            
+
             pattern, replacement = line.split("=>", 1)
             pattern = pattern.strip()
             replacement = replacement.strip()
@@ -650,40 +749,122 @@ def preview_paste():
                 continue
 
             try:
-                new_text = re.sub(pattern, replacement, clean_text, flags=re.MULTILINE)
+                new_text = re.sub(
+                    pattern,
+                    replacement,
+                    clean_text,
+                    flags=re.IGNORECASE | re.MULTILINE
+                )
+
                 if new_text != clean_text:
                     applied_rules.append(pattern)
+
                 clean_text = new_text
+
             except re.error:
                 applied_rules.append(f"[INVALID REGEX] {pattern}")
 
-    # ===============================
-    # APPLY REGEX REPLACE RULES
-    # ===============================
-    replace_rules_raw = request.form.get("replace_rules", "").strip()
+        # =========================================================
+    # REGEX PRESETS (Only if engine enabled)
+    # =========================================================
+    if regex_replace_enabled:
 
-    if replace_rules_raw:
-        for line in replace_rules_raw.splitlines():
-            line = line.strip()
-            if not line or "=>" not in line:
-                continue
+        # Preserve checkbox state
+        preset_number_prefix_checked = bool(request.form.get("preset_number_prefix"))
+        preset_pdf_spacing_checked = bool(request.form.get("preset_pdf_spacing"))
+        preset_headers_checked = bool(request.form.get("preset_headers"))
 
-            pattern, replacement = line.split("=>", 1)
-            pattern = pattern.strip()
-            replacement = replacement.strip()
+        preset_patterns = []
 
+        # 1️⃣ Remove numbered prefixes "1. ", "22. "
+        if preset_number_prefix_checked:
+            preset_patterns.append((
+                r"^\s*\d+\.\s*",
+                "",
+                "Removed numbered prefixes (1. 22. 5. …)"
+            ))
+
+        # 2️⃣ Fix PDF / Microsoft wrapped lines + hyphenation
+        if preset_pdf_spacing_checked:
+            preset_patterns.append((
+                r"-\s*\n\s*",
+                "",
+                "Fixed PDF hyphen wraps"
+            ))
+            preset_patterns.append((
+                r"(?<![.!?])\n(?!\n)",
+                " ",
+                "Joined broken wrapped lines"
+            ))
+
+        # 3️⃣ Remove likely header/footer lines
+        if preset_headers_checked:
+            preset_patterns.append((
+                r"^\s*(Page\s+\d+.*|Copyright.*|All\s+Rights\s+Reserved.*)$",
+                "",
+                "Removed header/footer text"
+            ))
+
+        # ---------- APPLY PRESETS ----------
+        for pattern, replacement, label in preset_patterns:
             try:
-                clean_text = re.sub(pattern, replacement, clean_text, flags=re.IGNORECASE | re.MULTILINE)
-            except re.error:
-                # do NOT crash if user enters bad regex
-                pass
+                new_text = re.sub(
+                    pattern,
+                    replacement,
+                    clean_text,
+                    flags=re.IGNORECASE | re.MULTILINE
+                )
 
-        
+                if new_text != clean_text:
+                    applied_rules.append(label)
+
+                clean_text = new_text
+
+            except re.error:
+                applied_rules.append(f"[INVALID PRESET REGEX] {pattern}")
+
+
+    # =========================
+    # AUTO BOM / INVISIBLE CLEAN
+    # =========================
+    cfg = load_portal_config()
+    invis_cleanup_enabled = cfg.get("auto_bom_clean", False)
+
+    removed_unicode = []
+
+    if invis_cleanup_enabled:
+        # Common hidden troublemakers
+        invisibles = [
+            ("\uFEFF", "BOM"),
+            ("\u200B", "Zero-Width Space"),
+            ("\u200C", "Zero-Width Non-Joiner"),
+            ("\u200D", "Zero-Width Joiner"),
+            ("\u2060", "Word Joiner"),
+        ]
+
+        before = clean_text
+
+        for char, label in invisibles:
+            if char in clean_text:
+                removed_unicode.append(label)
+                clean_text = clean_text.replace(char, "")
+
+        # Normalize multiple blank lines
+        clean_text = re.sub(r"\n{3,}", "\n\n", clean_text)
+
+        # If BOM only at start
+        if before != clean_text and "BOM" not in removed_unicode:
+            if before.startswith("\uFEFF"):
+                removed_unicode.append("BOM")
+                clean_text = clean_text.lstrip("\uFEFF")
 
     # -------- CONFIDENCE ANALYSIS (NEW) --------
     conf_summary = conf_details = None
     if get_confidence_setting():
         conf_summary, conf_details = analyze_confidence(clean_text)
+
+    # -------- SMART SUGGESTIONS --------
+    smart_suggestions = build_smart_suggestions(quiz_text, clean_text)
 
     # ---------- RENDER PREVIEW ----------
     return render_template_string("""
@@ -725,34 +906,211 @@ def preview_paste():
             <p>No strip rules applied.</p>
             {% endif %}
 
+            <!-- MANUAL REGEX -->
             {% if replace_rules %}
-            <h3>Regex Replace Rules Provided</h3>
+            <h3>Manual Regex Replace Rules</h3>
             <ul>
                 {% for r in replace_rules %}
                 <li>{{r}}</li>
                 {% endfor %}
             </ul>
             {% else %}
-            <p>No regex replace rules entered.</p>
+            <p>No manual regex replace rules entered.</p>
             {% endif %}
 
+            <!-- PRESET STATES -->
+            <h3>✨ Regex Presets</h3>
+            <ul>
+                <li>
+                    Number Prefix Removal:
+                    {% if preset_number_prefix_checked %}
+                        Enabled ✔
+                    {% else %}
+                        Off ❌
+                    {% endif %}
+                </li>
+
+                <li>
+                    PDF Line Wrapping Fix:
+                    {% if preset_pdf_spacing_checked %}
+                        Enabled ✔
+                    {% else %}
+                        Off ❌
+                    {% endif %}
+                </li>
+
+                <li>
+                    Header/Footer Cleanup:
+                    {% if preset_headers_checked %}
+                        Enabled ✔
+                    {% else %}
+                        Off ❌
+                    {% endif %}
+                </li>
+            </ul>
+
+            <!-- RULES THAT ACTUALLY FIRED -->
             {% if applied_rules %}
-            <h3>Applied Successfully</h3>
+            <h3>Rules That Actually Changed Text</h3>
             <ul>
                 {% for r in applied_rules %}
                 <li>✔ {{r}}</li>
                 {% endfor %}
             </ul>
+            {% else %}
+            <p>No regex rules altered text.</p>
+            {% endif %}
+
+            <!-- INVISIBLE CLEAN -->
+            <h3>Invisible Character Cleanup</h3>
+            {% if invis_cleanup_enabled %}
+                {% if removed_unicode %}
+                <p>Removed:</p>
+                <ul>
+                    {% for u in removed_unicode %}
+                    <li>{{u}}</li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p>No hidden Unicode issues found 🎉</p>
+                {% endif %}
+            {% else %}
+                <p>Invisible Character Cleanup: Disabled ❌</p>
+            {% endif %}
+
+            <!-- SMART SUGGESTIONS -->
+            <h3>💡 Smart Suggestions</h3>
+
+            {% if smart_suggestions and smart_suggestions|length > 0 %}
+                <ul>
+                    {% for s in smart_suggestions %}
+                    <li style="margin-bottom:10px;">
+                        <b>{{s.title}}</b><br>
+                        <span style="opacity:.85">{{s.detail}}</span><br>
+                        <span style="opacity:.7">Recommendation: {{s.recommend}}</span>
+
+                        {% if s.suggest_rule %}
+                        <br>
+                        <code style="background:#222;padding:4px 6px;border-radius:6px;">
+                            {{s.suggest_rule}}
+                        </code>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p>No suggestions — formatting already looks great 🎯</p>
             {% endif %}
         </div>
-        <!-- END STEP 7 -->
+        <!-- END SUMMARY -->
 
 
         <h2>Original Text</h2>
-        <pre style="background:black;padding:10px;border-radius:8px;white-space:pre-wrap;">{{original}}</pre>
+        <pre id="origBox" style="background:black;padding:10px;border-radius:8px;white-space:pre-wrap;">{{original}}</pre>
 
         <h2>Text To Be Parsed</h2>
-        <pre style="background:#102020;padding:10px;border-radius:8px;white-space:pre-wrap;">{{cleaned}}</pre>
+        <pre id="cleanBox" style="background:#102020;padding:10px;border-radius:8px;white-space:pre-wrap;">{{cleaned}}</pre>
+
+        <br>
+        <button onclick="toggleInvisible()" style="margin-top:5px;">
+            👁 Show / Hide Invisible Characters
+        </button>
+
+        <p style="opacity:.7">
+            This helps detect BOM, zero-width, Unicode junk, and newline issues.
+        </p>
+
+        <div id="visualPanel" style="display:none; margin-top:15px;">
+            <h2>🔍 Visualized Text</h2>
+
+            <h3>Original Input</h3>
+            <pre id="visualOrig" style="background:#222;padding:10px;border-radius:8px;white-space:pre-wrap;"></pre>
+
+            <h3>Parsed (Cleaned) Version</h3>
+            <pre id="visualClean" style="background:#333;padding:10px;border-radius:8px;white-space:pre-wrap;"></pre>
+        </div>
+
+        <script>
+        function visualize(text) {
+            return text
+                .replace(/\\u200B/g, "[ZWSP]")
+                .replace(/\\u200C/g, "[ZWNJ]")
+                .replace(/\\u200D/g, "[ZWJ]")
+                .replace(/\\u2060/g, "[WJ]")
+                .replace(/\\uFEFF/g, "[BOM]")
+                .replace(/ /g, "·")
+                .replace(/\\n/g, "\\\\n\\n");
+        }
+
+        function toggleInvisible() {
+            const panel = document.getElementById("visualPanel");
+            const show = panel.style.display === "none";
+
+            if (show) {
+                document.getElementById("visualOrig").innerText =
+                    visualize(document.getElementById("origBox").innerText);
+
+                document.getElementById("visualClean").innerText =
+                    visualize(document.getElementById("cleanBox").innerText);
+            }
+
+            panel.style.display = show ? "block" : "none";
+        }
+        </script>
+
+        <!-- 🔍 DIFF VIEW -->
+        <button onclick="toggleDiff()" style="margin-top:10px;">
+            🔍 Show / Hide Differences
+        </button>
+
+        <div id="diffPanel" style="display:none; margin-top:15px;">
+            <h2>⚖️ Text Differences</h2>
+
+            <h3>Original vs Cleaned Comparison</h3>
+            <pre id="diffView"
+                 style="background:#252525;padding:10px;border-radius:8px;white-space:pre-wrap;"></pre>
+
+            <p style="opacity:.7">
+                Green = added · Red = removed · Yellow = changed
+            </p>
+        </div>
+
+        <script>
+        function toggleDiff() {
+            const panel = document.getElementById("diffPanel");
+            const show = panel.style.display === "none";
+            if (show) runDiff();
+            panel.style.display = show ? "block" : "none";
+        }
+
+        function runDiff() {
+            const orig = document.getElementById("origBox").innerText.split("\\n");
+            const clean = document.getElementById("cleanBox").innerText.split("\\n");
+
+            let out = "";
+            const max = Math.max(orig.length, clean.length);
+
+            for (let i = 0; i < max; i++) {
+                const o = orig[i] || "";
+                const c = clean[i] || "";
+
+                if (o === c) {
+                    out += o + "\\n";
+                } 
+                else if (!c) {
+                    out += "[REMOVED] " + o + "\\n";
+                }
+                else if (!o) {
+                    out += "[ADDED] " + c + "\\n";
+                }
+                else {
+                    out += "[CHANGED] " + o + "  →  " + c + "\\n";
+                }
+            }
+
+            document.getElementById("diffView").innerText = out;
+        }
+        </script>
 
         {% if conf_details %}
         <h2>🧠 Confidence Analysis</h2>
@@ -803,6 +1161,8 @@ def preview_paste():
 </body>
 </html>
 """,
+
+
 quiz_title=quiz_title,
 original=quiz_text,
 cleaned=clean_text,
@@ -811,8 +1171,16 @@ conf_details=conf_details,
 temp_logo_name=temp_logo_name,
 regex_mode=regex_mode,
 strip_rules=strip_rules,
-replace_rules=regex_rules_raw.splitlines() if regex_rules_raw else [],
-applied_rules=applied_rules
+replace_rules=replace_rules_raw.splitlines() if replace_rules_raw else [],
+applied_rules=applied_rules,
+invis_cleanup_enabled=invis_cleanup_enabled,
+removed_unicode=removed_unicode,
+
+# NEW FOR STEP 11C
+preset_number_prefix_checked=bool(request.form.get("preset_number_prefix")),
+preset_pdf_spacing_checked=bool(request.form.get("preset_pdf_spacing")),
+preset_headers_checked=bool(request.form.get("preset_headers")),
+smart_suggestions=smart_suggestions
 )
 
 
@@ -1041,9 +1409,6 @@ def process_paste():
 
 
 
-
-
-
 # =========================
 # PROCESS UPLOAD
 # =========================
@@ -1131,34 +1496,58 @@ def settings_page():
 
                 <br><br>
 
-<h3>Confidence Analysis</h3>
-<p style="opacity:.7">
-    Controls whether the 🧠 Confidence Analysis panel appears on quiz preview.
-</p>
+                <h3>Confidence Analysis</h3>
+                <p style="opacity:.7">
+                    Controls whether the 🧠 Confidence Analysis panel appears on quiz preview.
+                </p>
 
-<label style="display:flex; gap:10px; align-items:center;">
-    <input type="checkbox" name="show_confidence"
-           value="1"
-           {% if cfg.show_confidence %}checked{% endif %}>
-    Enable Confidence Analysis on Preview
-</label>
+                <label style="display:flex; gap:10px; align-items:center;">
+                    <input type="checkbox" name="show_confidence"
+                           value="1"
+                           {% if cfg.show_confidence %}checked{% endif %}>
+                    Enable Confidence Analysis on Preview
+                </label>
 
-<br><br>
+                <br><br>
 
-<h3>Regex Strip Mode</h3>
-<p style="opacity:.7">
-    If enabled, the Strip Text box in Paste Mode will treat entries as REGEX patterns
-    instead of simple text matches.
-</p>
+                <h3>Regex Strip Mode</h3>
+                <p style="opacity:.7">
+                    If enabled, the Strip Text box in Paste Mode will treat entries as REGEX patterns
+                    instead of simple text matches.
+                </p>
 
-<label style="display:flex; gap:10px; align-items:center;">
-    <input type="checkbox" name="enable_regex_replace"
-           value="1"
-           {% if cfg.enable_regex_replace %}checked{% endif %}>
-    Enable Regex Replace Engine
-</label>
+                <label style="display:flex; gap:10px; align-items:center;">
+                    <input type="checkbox" name="enable_regex_replace"
+                           value="1"
+                           {% if cfg.enable_regex_replace %}checked{% endif %}>
+                    Enable Regex Replace Engine
+                </label>
 
-              
+                <br><br>
+
+                <!-- 🔹 Hidden Character Handling -->
+                <h3>Hidden Character Handling</h3>
+                <p style="opacity:.7">
+                    Automatically clean hidden formatting noise and optionally visualize invisible characters on preview.
+                </p>
+
+                <label style="display:flex; gap:10px; align-items:center;">
+                    <input type="checkbox" name="auto_clean_hidden"
+                           value="1"
+                           {% if cfg.auto_clean_hidden %}checked{% endif %}>
+                    Auto remove BOM / hidden Unicode garbage
+                </label>
+
+                <br>
+
+                <label style="display:flex; gap:10px; align-items:center;">
+                    <input type="checkbox" name="enable_show_invisibles"
+                           value="1"
+                           {% if cfg.enable_show_invisibles %}checked{% endif %}>
+                    Enable "Show Invisible Characters" toggle on preview
+                </label>
+
+                <br><br>
 
                 <button type="submit">💾 Save Settings</button>
             </form>
@@ -1173,33 +1562,14 @@ def settings_page():
     </html>
     """, cfg=cfg)
 
-def load_portal_config():
-    default = {
-        "title": "Training & Practice Center",
-        "show_confidence": True,
-        "enable_regex_replace": False
-    }
-
-    if not os.path.exists(PORTAL_CONFIG):
-        return default
-
-    try:
-        with open(PORTAL_CONFIG, "r") as f:
-            data = json.load(f)
-            return {
-                "title": data.get("title", default["title"]),
-                "show_confidence": data.get("show_confidence", default["show_confidence"]),
-                "enable_regex_replace": data.get("enable_regex_replace", default["enable_regex_replace"])
-            }
-    except:
-        return default
-
 
 def load_portal_config():
     default = {
         "title": "Training & Practice Center",
         "show_confidence": True,
-        "enable_regex_replace": False
+        "enable_regex_replace": False,
+        "auto_clean_hidden": True,
+        "enable_show_invisibles": False
     }
 
     if not os.path.exists(PORTAL_CONFIG):
@@ -1211,29 +1581,32 @@ def load_portal_config():
             return {
                 "title": data.get("title", default["title"]),
                 "show_confidence": data.get("show_confidence", True),
-                "enable_regex_replace": data.get("enable_regex_replace", False)
+                "enable_regex_replace": data.get("enable_regex_replace", False),
+                "auto_clean_hidden": data.get("auto_clean_hidden", True),
+                "enable_show_invisibles": data.get("enable_show_invisibles", False)
             }
     except:
         return default
 
 
+
 @app.route("/save_settings", methods=["POST"])
 def save_settings():
-    title = request.form.get("portal_title", "Training & Practice Center")
+    cfg = load_portal_config()
 
-    show_conf = request.form.get("show_confidence") == "1"
-    regex_enabled = request.form.get("enable_regex_replace") == "1"
+    title = request.form.get("portal_title", cfg["title"]).strip()
 
-    cfg = {
-        "title": title,
-        "show_confidence": show_conf,
-        "enable_regex_replace": regex_enabled
-    }
+    cfg["title"] = title
+    cfg["show_confidence"] = ("show_confidence" in request.form)
+    cfg["enable_regex_replace"] = ("enable_regex_replace" in request.form)
+    cfg["auto_clean_hidden"] = ("auto_clean_hidden" in request.form)
+    cfg["enable_show_invisibles"] = ("enable_show_invisibles" in request.form)
 
     with open(PORTAL_CONFIG, "w") as f:
         json.dump(cfg, f, indent=4)
 
     return redirect("/settings")
+
 
 
 
