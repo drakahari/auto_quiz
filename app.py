@@ -687,7 +687,7 @@ def quick_structural_scan(text):
         "issues": issues
     }
 
-scan_result = quick_structural_scan(clean_text)
+
 
 
 
@@ -1557,106 +1557,121 @@ def process_file():
 def settings_page():
     cfg = load_portal_config()
 
+    # Ensure safe defaults if missing from portal.json
+    cfg.setdefault("show_confidence", True)
+    cfg.setdefault("enable_regex_replace", False)
+    cfg.setdefault("auto_bom_clean", False)
+    cfg.setdefault("enable_show_invisibles", True)
+
     return render_template_string("""
-    <html>
-    <head>
-    <title>Portal Settings</title>
-    <link rel="stylesheet" href="/style.css">
-    </head>
+<html>
+<head>
+<title>Portal Settings</title>
+<link rel="stylesheet" href="/style.css">
+</head>
 
-    <body>
-    <div class="container">
+<body>
+<div class="container">
 
-        <h1 class="hero-title">
-            ⚙️ Portal Configuration
-        </h1>
+    <h1 class="hero-title">
+        ⚙️ Portal Configuration
+    </h1>
 
-        <div class="card">
+    <div class="card">
 
-            <form action="/save_settings" method="POST">
+        <form action="/save_settings" method="POST">
 
-                <h3>Training Portal Title</h3>
-                <input type="text"
-                       name="portal_title"
-                       value="{{cfg.title}}"
-                       required style="width:100%; padding:6px">
+            <h3>Training Portal Title</h3>
+            <input type="text"
+                   name="portal_title"
+                   value="{{cfg.title}}"
+                   required style="width:100%; padding:6px">
 
-                <br><br>
+            <br><br>
 
-                <h3>Confidence Analysis</h3>
-                <p style="opacity:.7">
-                    Controls whether the 🧠 Confidence Analysis panel appears on quiz preview.
-                </p>
+            <h3>Confidence Analysis</h3>
+            <p style="opacity:.7">
+                Controls whether the 🧠 Confidence Analysis panel appears on quiz preview.
+            </p>
 
-                <label style="display:flex; gap:10px; align-items:center;">
-                    <input type="checkbox" name="show_confidence"
-                           value="1"
-                           {% if cfg.show_confidence %}checked{% endif %}>
-                    Enable Confidence Analysis on Preview
-                </label>
+            <label style="display:flex; gap:10px; align-items:center;">
+                <input type="checkbox" name="show_confidence"
+                       value="1"
+                       {% if cfg.show_confidence %}checked{% endif %}>
+                Enable Confidence Analysis on Preview
+            </label>
 
-                <br><br>
+            <br><br>
 
-                <h3>Regex Strip Mode</h3>
-                <p style="opacity:.7">
-                    If enabled, the Strip Text box in Paste Mode will treat entries as REGEX patterns
-                    instead of simple text matches.
-                </p>
+            <h3>Regex Strip / Replace Engine</h3>
+            <p style="opacity:.7">
+                Enables advanced REGEX-based cleanup tools when pasting quiz content.
+            </p>
 
-                <label style="display:flex; gap:10px; align-items:center;">
-                    <input type="checkbox" name="enable_regex_replace"
-                           value="1"
-                           {% if cfg.enable_regex_replace %}checked{% endif %}>
-                    Enable Regex Replace Engine
-                </label>
+            <label style="display:flex; gap:10px; align-items:center;">
+                <input type="checkbox" name="enable_regex_replace"
+                       value="1"
+                       {% if cfg.enable_regex_replace %}checked{% endif %}>
+                Enable Regex Replace Engine
+            </label>
 
-                <br><br>
+            <br><br>
 
-                <!-- 🔹 Hidden Character Handling -->
-                <h3>Hidden Character Handling</h3>
-                <p style="opacity:.7">
-                    Automatically clean hidden formatting noise and optionally visualize invisible characters on preview.
-                </p>
+            <h3>Invisible / BOM Cleanup</h3>
+            <p style="opacity:.7">
+                Automatically removes BOM characters, zero-width spaces, and hidden Unicode junk
+                that can break parsing when copying text from PDFs or Microsoft Word.
+            </p>
 
-                <label style="display:flex; gap:10px; align-items:center;">
-                    <input type="checkbox" name="auto_clean_hidden"
-                           value="1"
-                           {% if cfg.auto_clean_hidden %}checked{% endif %}>
-                    Auto remove BOM / hidden Unicode garbage
-                </label>
+            <label style="display:flex; gap:10px; align-items:center;">
+                <input type="checkbox"
+                       name="auto_bom_clean"
+                       value="1"
+                       {% if cfg.auto_bom_clean %}checked{% endif %}>
+                Enable Invisible Character & BOM Cleanup
+            </label>
 
-                <br>
+            <br><br>
 
-                <label style="display:flex; gap:10px; align-items:center;">
-                    <input type="checkbox" name="enable_show_invisibles"
-                           value="1"
-                           {% if cfg.enable_show_invisibles %}checked{% endif %}>
-                    Enable "Show Invisible Characters" toggle on preview
-                </label>
+            <h3>Show Invisible Characters Tool</h3>
+            <p style="opacity:.7">
+                Allows user to toggle visualization of hidden characters during preview.
+            </p>
 
-                <br><br>
+            <label style="display:flex; gap:10px; align-items:center;">
+                <input type="checkbox"
+                       name="enable_show_invisibles"
+                       value="1"
+                       {% if cfg.enable_show_invisibles %}checked{% endif %}>
+                Enable "Show Invisible Characters" Debug Tool
+            </label>
 
-                <button type="submit">💾 Save Settings</button>
-            </form>
+            <br><br>
 
-            <br>
-            <button onclick="location.href='/'">⬅ Back To Portal</button>
+            <button type="submit">💾 Save Settings</button>
+        </form>
 
-        </div>
+        <br>
+        <button onclick="location.href='/'">⬅ Back To Portal</button>
 
     </div>
-    </body>
-    </html>
-    """, cfg=cfg)
+
+</div>
+</body>
+</html>
+""", cfg=cfg)
+
+
 
 
 def load_portal_config():
+    """Always returns a valid portal config dict."""
     default = {
         "title": "Training & Practice Center",
         "show_confidence": True,
         "enable_regex_replace": False,
-        "auto_clean_hidden": True,
-        "enable_show_invisibles": False
+        "auto_bom_clean": False,
+        "enable_show_invisibles": False,
     }
 
     if not os.path.exists(PORTAL_CONFIG):
@@ -1665,15 +1680,21 @@ def load_portal_config():
     try:
         with open(PORTAL_CONFIG, "r") as f:
             data = json.load(f)
-            return {
-                "title": data.get("title", default["title"]),
-                "show_confidence": data.get("show_confidence", True),
-                "enable_regex_replace": data.get("enable_regex_replace", False),
-                "auto_clean_hidden": data.get("auto_clean_hidden", True),
-                "enable_show_invisibles": data.get("enable_show_invisibles", False)
-            }
+
+        # 🔄 Backward compatibility: if old key exists, map it
+        if "auto_clean_hidden" in data and "auto_bom_clean" not in data:
+            data["auto_bom_clean"] = bool(data.get("auto_clean_hidden"))
+
+        return {
+            "title": data.get("title", default["title"]),
+            "show_confidence": data.get("show_confidence", default["show_confidence"]),
+            "enable_regex_replace": data.get("enable_regex_replace", default["enable_regex_replace"]),
+            "auto_bom_clean": data.get("auto_bom_clean", default["auto_bom_clean"]),
+            "enable_show_invisibles": data.get("enable_show_invisibles", default["enable_show_invisibles"]),
+        }
     except:
         return default
+
 
 
 
@@ -1681,12 +1702,16 @@ def load_portal_config():
 def save_settings():
     cfg = load_portal_config()
 
-    title = request.form.get("portal_title", cfg["title"]).strip()
+    title = request.form.get("portal_title", cfg.get("title", "Training Portal")).strip()
 
     cfg["title"] = title
     cfg["show_confidence"] = ("show_confidence" in request.form)
     cfg["enable_regex_replace"] = ("enable_regex_replace" in request.form)
-    cfg["auto_clean_hidden"] = ("auto_clean_hidden" in request.form)
+
+    # 🔥 Correct Key Name
+    cfg["auto_bom_clean"] = ("auto_bom_clean" in request.form)
+
+    # (optional future UI toggle, keep or remove)
     cfg["enable_show_invisibles"] = ("enable_show_invisibles" in request.form)
 
     with open(PORTAL_CONFIG, "w") as f:
