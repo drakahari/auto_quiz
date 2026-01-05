@@ -25,6 +25,31 @@ QUIZ_REGISTRY = os.path.join(CONFIG_FOLDER, "quizzes.json")
 
 
 # =========================
+# Auto Logo Removal
+# =========================
+def cleanup_temp_logos(max_age_minutes=30):
+    now = time.time()
+
+    for fname in os.listdir(LOGO_FOLDER):
+        if not fname.startswith("temp_logo_"):
+            continue
+
+        path = os.path.join(LOGO_FOLDER, fname)
+
+        try:
+            stat = os.stat(path)
+            age_minutes = (now - stat.st_mtime) / 60
+
+            if age_minutes > max_age_minutes:
+                os.remove(path)
+                print(f"[CLEANUP] Removed abandoned temp logo: {fname}")
+
+        except Exception as e:
+            print(f"[CLEANUP ERROR] {fname}: {e}")
+
+
+
+# =========================
 # PORTAL CONFIG MANAGEMENT
 # =========================
 def load_portal_config():
@@ -500,7 +525,10 @@ Practice Only"
 # =========================
 @app.route("/preview_paste", methods=["POST"])
 def preview_paste():
+    cleanup_temp_logos()   # 🧹 auto-clean old temp logos
+    
     quiz_text = request.form.get("quiz_text", "").strip()
+
     quiz_title = request.form.get("quiz_title", "Generated Quiz From Paste")
     strip_rules_raw = request.form.get("strip_text", "").strip()
 
@@ -674,6 +702,8 @@ def download_cleaned():
 # =========================
 @app.route("/process_paste", methods=["POST"])
 def process_paste():
+    cleanup_temp_logos()   # 🧹 clean abandoned logos again
+
     quiz_text = request.form.get("quiz_text", "").strip()
     quiz_title = request.form.get("quiz_title", "Generated Quiz From Paste")
 
