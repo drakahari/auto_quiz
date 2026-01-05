@@ -1071,42 +1071,65 @@ def preview_paste():
                 <p>Invisible Character Cleanup: Disabled ❌</p>
             {% endif %}
 
-                        <h3>💡 Smart Suggestions</h3>
+                       <!-- SMART SUGGESTIONS -->
+                    <h3>💡 Smart Suggestions</h3>
 
-            {% if smart_suggestions and smart_suggestions|length > 0 %}
-            <ul>
-            {% for s in smart_suggestions %}
-            <li style="margin-bottom:10px;">
-                <b>{{s.title}}</b><br>
-                <span style="opacity:.85">{{s.detail}}</span><br>
-                <span style="opacity:.7">Recommendation: {{s.recommend}}</span>
+                    {% if smart_suggestions and smart_suggestions|length > 0 %}
+                    <ul>
+                    {% for s in smart_suggestions %}
+                    <li style="margin-bottom:10px;">
+                        <b>{{s.title}}</b><br>
+                        <span style="opacity:.85">{{s.detail}}</span><br>
+                        <span style="opacity:.7">Recommendation: {{s.recommend}}</span>
 
-                {% if s.suggest_rule %}
-                <br>
-                <code style="background:#222;padding:4px 6px;border-radius:6px;">
-                    {{s.suggest_rule}}
-                </code>
-                {% endif %}
+                        {% if s.suggest_rule %}
+                        <br>
+                        <code style="background:#222;padding:4px 6px;border-radius:6px;">
+                            {{s.suggest_rule}}
+                        </code>
+                        {% endif %}
 
-                <!-- ⭐ APPLY FIX BUTTON ⭐ -->
-                <form action="/preview_paste" method="POST" style="margin-top:6px;">
-                    <input type="hidden" name="quiz_title" value="{{quiz_title}}">
-                    <textarea name="quiz_text" style="display:none;">{{cleaned}}</textarea>
+                        <!-- APPLY BUTTON -->
+                        <form action="/preview_paste" method="POST" style="margin-top:8px;">
 
-                    {% if temp_logo_name %}
-                        <input type="hidden" name="temp_logo_name" value="{{temp_logo_name}}">
+                            <!-- always resend original data -->
+                            <input type="hidden" name="quiz_title" value="{{quiz_title}}">
+                            <textarea name="quiz_text" style="display:none;">{{original}}</textarea>
+
+                            <!-- preserve user cleanup fields if they existed -->
+                            <textarea name="strip_text" style="display:none;">
+                    {% for r in strip_rules %}{{r}}
+                    {% endfor %}
+                            </textarea>
+
+                            <textarea name="replace_rules" style="display:none;">
+                    {% for r in replace_rules %}{{r}}
+                    {% endfor %}
+                            </textarea>
+
+                            <!-- turn on correct preset -->
+                            {% if "PDF" in s.title %}
+                                <input type="hidden" name="preset_pdf_spacing" value="1">
+                            {% endif %}
+
+                            {% if "Number" in s.title %}
+                                <input type="hidden" name="preset_number_prefix" value="1">
+                            {% endif %}
+
+                            {% if "Header" in s.title or "Footer" in s.title %}
+                                <input type="hidden" name="preset_headers" value="1">
+                            {% endif %}
+
+                            <button type="submit">⚙ Apply This Fix</button>
+                        </form>
+
+                    </li>
+                    {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p>No suggestions — formatting already looks great 🎯</p>
                     {% endif %}
 
-                    <input type="hidden" name="apply_fix" value="{{s.fix_code}}">
-                    <button type="submit">⚙ Apply This Fix</button>
-                </form>
-
-            </li>
-            {% endfor %}
-            </ul>
-            {% else %}
-            <p>No suggestions — formatting already looks great 🎯</p>
-            {% endif %}
 
         </div>
         <!-- END SUMMARY -->
