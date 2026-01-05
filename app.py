@@ -53,10 +53,10 @@ def cleanup_temp_logos(max_age_minutes=30):
 # PORTAL CONFIG MANAGEMENT
 # =========================
 def load_portal_config():
-    """Always returns a valid config"""
     default = {
         "title": "Training & Practice Center",
-        "show_confidence": True
+        "show_confidence": True,
+        "enable_regex_strip": False
     }
 
     if not os.path.exists(PORTAL_CONFIG):
@@ -65,19 +65,28 @@ def load_portal_config():
     try:
         with open(PORTAL_CONFIG, "r") as f:
             data = json.load(f)
+
+            if not isinstance(data, dict):
+                return default
+
             return {
                 "title": data.get("title", default["title"]),
-                "show_confidence": data.get("show_confidence", True)
+                "show_confidence": data.get("show_confidence", default["show_confidence"]),
+                "enable_regex_strip": data.get("enable_regex_strip", default["enable_regex_strip"]),
             }
-    except:
+
+    except Exception:
         return default
 
 
-def save_portal_config(title, show_confidence=True):
+
+def save_portal_config(title, show_confidence=True, enable_regex_strip=False):
     cfg = {
         "title": title,
-        "show_confidence": show_confidence
+        "show_confidence": show_confidence,
+        "enable_regex_strip": enable_regex_strip
     }
+
 
     with open(PORTAL_CONFIG, "w") as f:
         json.dump(cfg, f, indent=4)
@@ -560,20 +569,39 @@ def preview_paste():
     )
 
 
-    # -------- APPLY STRIP RULES --------
+       # -------- APPLY STRIP RULES --------
     strip_rules = []
     if strip_rules_raw:
         strip_rules = [r.strip() for r in strip_rules_raw.splitlines() if r.strip()]
 
+    cfg = load_portal_config()
+    regex_mode = cfg.get("enable_regex_strip", False)
+
     if strip_rules:
         cleaned_lines = []
+
         for line in clean_text.splitlines():
-            low = line.lower()
+            test = line
             remove = False
+
             for rule in strip_rules:
-                if rule.lower() in low:
-                    remove = True
-                    break
+
+                # --- REGEX MODE ---
+                if regex_mode:
+                    try:
+                        if re.search(rule, test, re.IGNORECASE):
+                            remove = True
+                            break
+                    except re.error:
+                        # Bad regex shouldn't crash parsing — ignore invalid patterns
+                        pass
+
+                # --- NORMAL MODE ---
+                else:
+                    if rule.lower() in test.lower():
+                        remove = True
+                        break
+
             if not remove:
                 cleaned_lines.append(line)
 
@@ -581,10 +609,8 @@ def preview_paste():
 
     # -------- CONFIDENCE ANALYSIS (NEW) --------
     conf_summary = conf_details = None
-
     if get_confidence_setting():
         conf_summary, conf_details = analyze_confidence(clean_text)
-
 
     # ---------- RENDER PREVIEW ----------
     return render_template_string("""
@@ -632,27 +658,23 @@ def preview_paste():
             <p style="opacity:.7">
                 If this looks correct, continue. Otherwise, go back and adjust rules.
             </p>
+
             <form action="/download_cleaned" method="POST" style="display:inline;">
-    <textarea name="clean_text" style="display:none;">{{cleaned}}</textarea>
-    <button type="submit">📥 Download Cleaned Text</button>
-</form>
-              
+                <textarea name="clean_text" style="display:none;">{{cleaned}}</textarea>
+                <button type="submit">📥 Download Cleaned Text</button>
+            </form>
 
-            <!-- IMPORTANT:
-                 Now we send the CLEANED text forward
-                 to actual build handler -->
+            <!-- IMPORTANT: Send CLEANED text forward -->
             <form action="/process_paste" method="POST">
+                <input type="hidden" name="quiz_title" value="{{quiz_title}}">
+                <textarea name="quiz_text" style="display:none;">{{cleaned}}</textarea>
 
-    <input type="hidden" name="quiz_title" value="{{quiz_title}}">
-    <textarea name="quiz_text" style="display:none;">{{cleaned}}</textarea>
+                {% if temp_logo_name %}
+                    <input type="hidden" name="temp_logo_name" value="{{temp_logo_name}}">
+                {% endif %}
 
-    {% if temp_logo_name %}
-        <input type="hidden" name="temp_logo_name" value="{{temp_logo_name}}">
-    {% endif %}
-
-    <button type="submit">✅ Yes, Build My Quiz</button>
-</form>
-
+                <button type="submit">✅ Yes, Build My Quiz</button>
+            </form>
 
             <br>
             <button onclick="history.back()">⬅ Go Back & Edit</button>
@@ -661,14 +683,15 @@ def preview_paste():
     </div>
     </body>
     </html>
-        """,
+    """,
     quiz_title=quiz_title,
     original=quiz_text,
     cleaned=clean_text,
     conf_summary=conf_summary,
     conf_details=conf_details,
     temp_logo_name=temp_logo_name
-)
+    )
+
 
 
 
@@ -982,17 +1005,34 @@ def settings_page():
 
                 <br><br>
 
-                <h3>Confidence Analysis</h3>
-                <p style="opacity:.7">Controls whether the 🧠 Confidence Analysis panel appears on quiz preview.</p>
+<h3>Confidence Analysis</h3>
+<p style="opacity:.7">
+    Controls whether the 🧠 Confidence Analysis panel appears on quiz preview.
+</p>
 
-                <label style="display:flex; gap:10px; align-items:center;">
-                    <input type="checkbox" name="show_confidence"
-                           value="1"
-                           {% if cfg.show_confidence %}checked{% endif %}>
-                    Enable Confidence Analysis on Preview
-                </label>
+<label style="display:flex; gap:10px; align-items:center;">
+    <input type="checkbox" name="show_confidence"
+           value="1"
+           {% if cfg.show_confidence %}checked{% endif %}>
+    Enable Confidence Analysis on Preview
+</label>
 
-                <br><br>
+<br><br>
+
+<h3>Regex Strip Mode</h3>
+<p style="opacity:.7">
+    If enabled, the Strip Text box in Paste Mode will treat entries as REGEX patterns
+    instead of simple text matches.
+</p>
+
+<label style="display:flex; gap:10px; align-items:center;">
+    <input type="checkbox" name="enable_regex_strip"
+           value="1"
+           {% if cfg.enable_regex_strip %}checked{% endif %}>
+    Enable Regex Strip Rules
+</label>
+
+              
 
                 <button type="submit">💾 Save Settings</button>
             </form>
@@ -1010,13 +1050,13 @@ def settings_page():
 @app.route("/save_settings", methods=["POST"])
 def save_settings():
     title = request.form.get("portal_title", "Training & Practice Center")
-
-    # Checkbox returns "1" when checked, None when not
     show_conf = request.form.get("show_confidence") == "1"
+    enable_regex = request.form.get("enable_regex_strip") == "1"
 
-    save_portal_config(title, show_conf)
+    save_portal_config(title, show_conf, enable_regex)
 
     return redirect("/settings")
+
 
 
 
