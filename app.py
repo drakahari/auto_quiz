@@ -572,19 +572,20 @@ Question\\s*#\\d+ => "
 
 
 # =========================================================
-# SMART SUGGESTIONS ENGINE (Step 11A)
+# SMART SUGGESTIONS ENGINE (Final Stable Version)
 # =========================================================
 def build_smart_suggestions(original_text, cleaned_text):
     suggestions = []
 
-    # Normalize
-    o = original_text.strip()
-    c = cleaned_text.strip()
+    import re
+
+    # Normalize clearly
+    o = (original_text or "").strip()
+    c = (cleaned_text or "").strip()
 
     # ---------------------------------------
     # Detect numbered question prefixes
     # ---------------------------------------
-    import re
     if re.search(r"^\s*\d+\.\s+", o, re.MULTILINE):
         suggestions.append({
             "title": "Numbered Questions Detected",
@@ -593,15 +594,33 @@ def build_smart_suggestions(original_text, cleaned_text):
             "suggest_rule": r"^\s*\d+\.\s* =>"
         })
 
+
     # ---------------------------------------
-    # Detect PDF wrapped lines / broken sentences
+    # PDF Wrapper Detection (FINAL FIX)
+    #
+    # 🎯 Only warn if CLEANED TEXT is STILL broken
     # ---------------------------------------
-    if re.search(r"[a-z]\n[a-z]", o):
-        suggestions.append({
-            "title": "Possible PDF Line Breaks",
-            "detail": "Detected mid-sentence line breaks that may be from PDF extraction.",
-            "recommend": "Enable PDF Wrapping Repair preset"
-        })
+    pdf_wrap_detected = False
+
+    # Case 1: hyphen breaks still exist
+    if re.search(r"-\s*\n\s*", c):
+        pdf_wrap_detected = True
+
+    # Case 2: ANY single line break in the middle of a sentence
+    # Meaning: previous line does NOT end with . ! ? and next line is text
+    elif re.search(r"(?<![.!?])\s*\n\s*\S", c):
+        pdf_wrap_detected = True
+
+
+        # If we truly detected something → then warn
+        if pdf_wrap_detected:
+            suggestions.append({
+                "title": "Possible PDF Wrap Detected",
+                "detail": "Lines appear split where they should be continuous sentences.",
+                "recommend": "Enable PDF Line Wrapping Fix preset.",
+                "suggest_rule": "Enable preset: PDF Wrapping"
+            })
+
 
     # ---------------------------------------
     # Detect Choose statements
@@ -613,6 +632,7 @@ def build_smart_suggestions(original_text, cleaned_text):
             "recommend": "Consider removing choose instructions",
             "suggest_rule": r"\(Choose.*?\) =>"
         })
+
 
     # ---------------------------------------
     # Detect repeated headers / footers
@@ -626,6 +646,10 @@ def build_smart_suggestions(original_text, cleaned_text):
             "detail": "Multiple lines repeat across document; likely page headers or footers.",
             "recommend": "Enable Header/Footer Cleanup preset"
         })
+
+    return suggestions
+
+
 
     # ---------------------------------------
     # Detect BOM / Unicode weirdness still present
@@ -819,34 +843,35 @@ def preview_paste():
     if regex_replace_enabled:
         preset_patterns = []
 
-        # 1️⃣ Remove numbered prefixes "1. ", "22. "
-        if preset_number_prefix_checked:
-            preset_patterns.append((
-                r"^\s*\d+\.\s*",
-                "",
-                "Removed numbered prefixes"
-            ))
+    # 1️⃣ Remove numbered prefixes FIRST
+    if preset_number_prefix_checked:
+        preset_patterns.append((
+            r"^\s*\d+\.\s*",
+            "",
+            "Removed numbered prefixes"
+        ))
 
-        # 2️⃣ Fix PDF / Microsoft wrapped lines + hyphenation
-        if preset_pdf_spacing_checked:
-            preset_patterns.append((
-                r"-\s*\n\s*",
-                "",
-                "Fixed PDF hyphen wraps"
-            ))
-            preset_patterns.append((
-                r"(?<![.!?])\n(?!\n)",
-                " ",
-                "Joined wrapped lines"
-            ))
+    # 2️⃣ REMOVE HEADERS / FOOTERS SECOND
+    if preset_headers_checked:
+        preset_patterns.append((
+            r"^\s*(Page\s+\d+.*|Copyright.*|All\s+Rights\s+Reserved.*)$",
+            "",
+            "Removed header/footer text"
+        ))
 
-        # 3️⃣ Remove likely header/footer lines
-        if preset_headers_checked:
-            preset_patterns.append((
-                r"^\s*(Page\s+\d+.*|Copyright.*|All\s+Rights\s+Reserved.*)$",
-                "",
-                "Removed header/footer text"
-            ))
+    # 3️⃣ FIX PDF WRAPS LAST
+    if preset_pdf_spacing_checked:
+        preset_patterns.append((
+            r"-\s*\n\s*",
+            "",
+            "Fixed PDF hyphen wraps"
+        ))
+        preset_patterns.append((
+            r"(?<![.!?])\n(?!\n)",
+            " ",
+            "Joined wrapped lines"
+        ))
+
 
         # ---------- APPLY PRESETS ----------
         for pattern, replacement, label in preset_patterns:
