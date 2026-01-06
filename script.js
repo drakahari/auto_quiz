@@ -9,6 +9,30 @@ let paused = false;
 let examTimer = null;
 let timeRemaining = 90 * 60; // 90 minutes
 
+
+/* =====================================================
+   SAFELY RELOCATE SUBMIT BUTTON (OLD QUIZZES → NEW UI)
+===================================================== */
+document.addEventListener("DOMContentLoaded", () => {
+    // Find submit button
+    const submitBtn = document.getElementById("submitBtn");
+    if (!submitBtn) return;   // nothing to do
+
+    // Find top-left bar target
+    const topLeft = document.querySelector(".top-left");
+    if (!topLeft) return;     // quiz HTML doesn't support it → do nothing
+
+    // If it's already in top-left, leave it alone
+    if (submitBtn.parentElement === topLeft) return;
+
+    console.log("Relocating Submit Exam button to top-left...");
+    topLeft.appendChild(submitBtn);
+});
+
+
+
+
+
 /* =====================================================
    LOAD QUIZ JSON
 ===================================================== */
@@ -26,6 +50,68 @@ async function loadQuiz() {
     }
 }
 loadQuiz();
+
+/* =====================================================
+   UI UPGRADE — Create Top Bar + Move Submit + Timer
+   Works for OLD quizzes only.
+   If new layout already exists → does nothing.
+===================================================== */
+document.addEventListener("DOMContentLoaded", () => {
+
+    // If new top-bar already exists (new quizzes), do nothing
+    if (document.querySelector(".top-bar")) {
+        console.log("Top bar already exists — layout OK");
+        return;
+    }
+
+    const quizDiv = document.getElementById("quiz");
+    const progress = document.getElementById("progressBarOuter");
+    const timer = document.getElementById("timer");
+    const controls = document.querySelector(".controls");
+
+    // Fail-safe: if we can't find required elements, do nothing
+    if (!quizDiv || !progress || !timer || !controls) {
+        console.warn("Top bar patch skipped — layout elements missing");
+        return;
+    }
+
+    // Find submit button
+    const submitBtn =
+        document.getElementById("submitBtn") ||
+        document.querySelector("button[onclick='submitQuiz()']");
+
+    if (!submitBtn) {
+        console.warn("Submit button not found — skipping patch");
+        return;
+    }
+
+    console.log("Applying TOP BAR UI upgrade...");
+
+    // Create top bar containers
+    const topBar = document.createElement("div");
+    topBar.className = "top-bar";
+
+    const left = document.createElement("div");
+    left.className = "top-left";
+
+    const right = document.createElement("div");
+    right.className = "top-right";
+
+    // Move submit into left
+    left.appendChild(submitBtn);
+
+    // Move timer into right
+    right.appendChild(timer);
+
+    // Assemble bar
+    topBar.appendChild(left);
+    topBar.appendChild(right);
+
+    // Insert bar RIGHT AFTER progress bar
+    progress.insertAdjacentElement("afterend", topBar);
+});
+
+
 
 /* =====================================================
    RENDER QUESTION
