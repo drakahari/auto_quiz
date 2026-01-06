@@ -1926,22 +1926,62 @@ def record_attempt():
 
     print("Saving attempt to DB:", quiz_title, percent)
 
-    success = db_execute(
-        """
-        INSERT INTO attempts (id, quiz_id, completed_at, percent_score)
-        VALUES (?, 
-            (SELECT id FROM quizzes WHERE title = ? LIMIT 1),
-            ?, 
-            ?
-        )
-        """,
-        (attempt_id, quiz_title, completed_at, percent)
-    )
+    conn = get_db()
+    cur = conn.cursor()
 
-    if success:
+    try:
+        # 1️⃣ Ensure quiz exists (create if not)
+        cur.execute(
+            """
+            INSERT OR IGNORE INTO quizzes (title)
+            VALUES (?)
+            """,
+            (quiz_title,),
+        )
+
+        # 2️⃣ Get quiz_id
+        cur.execute(
+            "SELECT id FROM quizzes WHERE title = ? LIMIT 1",
+            (quiz_title,),
+        )
+        row = cur.fetchone()
+
+        if not row:
+            raise Exception("Quiz ID lookup failed")
+
+        quiz_id = row["id"]
+
+        # 3️⃣ Insert attempt
+        cur.execute(
+            """
+            INSERT INTO attempts (
+                id, quiz_id, completed_at,
+                score, total, percent, mode
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                attempt_id,
+                quiz_id,
+                completed_at,
+                score,
+                total,
+                percent,
+                "Exam",
+            ),
+        )
+
+        conn.commit()
+        conn.close()
         return {"status": "ok"}
-    else:
+
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        print("DB ERROR:", e)
         return {"status": "db_error"}, 500
+
+
 
 
 
@@ -2371,9 +2411,13 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
 
 
 <script>
-  /* This tells script.js which JSON file to load for this quiz */
+  /* Make title available to script.js + DB saving */
+  window.quiz_title = "{quiz_title}";
+
+  /* This tells script.js which JSON file to load */
   const QUIZ_FILE = "/data/{jsonfile}";
 </script>
+
 
 <script src="/script.js"></script>
 </body>

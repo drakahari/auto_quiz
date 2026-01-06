@@ -508,8 +508,31 @@ function submitQuiz(force = false) {
     // Save history for dashboard/history.html
     saveHistory(percent, correct, total, missed, attemptId);
 
+
+    // =========================
+    // ALSO SAVE TO SERVER DB
+    // (safe: if it fails nothing breaks)
+    // =========================
+    fetch("/record_attempt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            quizTitle: window.quiz_title || "Unknown Quiz",
+            attemptId: attemptId,
+            score: correct,
+            total: total,
+            percent: percent
+        })
+    })
+    .then(res => res.json().catch(() => ({})))
+    .then(data => console.log("DB save response:", data))
+    .catch(err => console.warn("DB save failed (but app is fine):", err));
+
+
+    // existing code continues normally after this
     const quizDiv = document.getElementById("quiz");
     const resultDiv = document.getElementById("result");
+
 
     if (quizDiv) quizDiv.classList.add("hidden");
 
