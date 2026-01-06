@@ -362,7 +362,8 @@ function startExamTimer() {
         if (timeRemaining <= 0) {
             clearInterval(examTimer);
             examTimer = null;
-            submitQuiz();
+            submitQuiz(true);
+
         }
     }, 1000);
 }
@@ -409,12 +410,23 @@ function stopExamTimer() {
 /* =====================================================
    SUBMIT — EXAM ONLY
 ===================================================== */
-function submitQuiz() {
+function submitQuiz(force = false) {
+
     // Do nothing in Study Mode
     if (!examMode) {
         console.log("submitQuiz called but examMode = false; ignoring.");
         return;
     }
+
+    // Manual submit confirmation
+    if (!force) {
+        const ok = confirm("Are you sure you want to submit your exam?");
+        if (!ok) {
+            console.log("User cancelled exam submission.");
+            return;
+        }
+    }
+
 
     console.log("SUBMIT EXAM");
 
