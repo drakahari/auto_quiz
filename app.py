@@ -2291,41 +2291,50 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
         </div>
 
         <!-- Quiz Area -->
-        <div id="quiz" class="hidden">
+    <div id="quiz" class="hidden">
 
-            <!-- Progress Bar -->
-            <div id="progressBarOuter">
-                <div id="progressBarInner"></div>
+        <!-- Progress Bar -->
+        <div id="progressBarOuter">
+            <div id="progressBarInner"></div>
+        </div>
+
+        <!-- TOP BAR: Submit (LEFT) — Timer & Pause (RIGHT) -->
+        <div class="top-bar">
+
+            <!-- LEFT SIDE -->
+            <div class="top-left">
+                <button onclick="submitQuiz()" id="submitBtn" class="danger">
+                    Submit Exam
+                </button>
             </div>
 
-            <!-- Exam Timer -->
-            <div id="timer" class="hidden timerBox">
+            <!-- RIGHT SIDE -->
+            <div id="timer" class="hidden timerBox top-right">
                 <b>Time Remaining:</b>
                 <span id="timeDisplay">--:--</span>
 
                 <button id="pauseBtn" onclick="pauseExam()">Pause</button>
-                
             </div>
 
-            <div id="qHeader"></div>
-            <div id="qText"></div>
-            <div id="choices"></div>
-
-            <div class="controls">
-                <button onclick="prev()">Prev</button>
-                <button onclick="next()">Next</button>
-                <button onclick="submitQuiz()">Submit Exam</button>
-            </div>
         </div>
 
-        <div id="result" class="hidden"></div>
+        <div id="qHeader"></div>
+        <div id="qText"></div>
+        <div id="choices"></div>
 
-        <br>
-        <button onclick="location.href='/'">🏠 Return To Portal</button>
-        <button onclick="location.href='/library'">📚 Return To Quiz Library</button>
-
+        <div class="controls">
+            <button onclick="prev()">Prev</button>
+            <button onclick="next()">Next</button>
+            <!-- Submit Exam REMOVED from here -->
+        </div>
     </div>
-</div>
+
+    <div id="result" class="hidden"></div>
+
+    <br>
+    <button onclick="location.href='/'">🏠 Return To Portal</button>
+    <button onclick="location.href='/library'">📚 Return To Quiz Library</button>
+
 
 <script>
   /* This tells script.js which JSON file to load for this quiz */

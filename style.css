@@ -441,3 +441,15 @@ body.blurred .blur-wrapper {
     background: rgba(200,0,0,.65) !important;
     border: 2px solid red !important;
 }
+
+.top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+
+.top-right button {
+    margin-left: 8px;
+}
