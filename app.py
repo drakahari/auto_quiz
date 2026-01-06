@@ -1,5 +1,5 @@
 from flask import Flask, send_from_directory, request, redirect, render_template_string
-import os, re, json, time
+import os, re, json, time, sqlite3
 
 app = Flask(__name__, static_folder=".", static_url_path="")
 
@@ -22,6 +22,8 @@ os.makedirs(LOGO_FOLDER, exist_ok=True)
 
 PORTAL_CONFIG = os.path.join(CONFIG_FOLDER, "portal.json")
 QUIZ_REGISTRY = os.path.join(CONFIG_FOLDER, "quizzes.json")
+DB_PATH = os.path.join(BASE_DIR, "results.db")
+
 
 
 # =========================
@@ -1911,6 +1913,38 @@ def save_settings():
 
 
 
+@app.route("/record_attempt", methods=["POST"])
+def record_attempt():
+    data = request.json
+
+    quiz_title = data.get("quizTitle")
+    score = data.get("score")
+    total = data.get("total")
+    percent = data.get("percent")
+    attempt_id = data.get("attemptId")
+    completed_at = time.strftime("%Y-%m-%d %H:%M:%S")
+
+    print("Saving attempt to DB:", quiz_title, percent)
+
+    success = db_execute(
+        """
+        INSERT INTO attempts (id, quiz_id, completed_at, percent_score)
+        VALUES (?, 
+            (SELECT id FROM quizzes WHERE title = ? LIMIT 1),
+            ?, 
+            ?
+        )
+        """,
+        (attempt_id, quiz_title, completed_at, percent)
+    )
+
+    if success:
+        return {"status": "ok"}
+    else:
+        return {"status": "db_error"}, 500
+
+
+
 
 # =========================
 # CONFIDENCE ANALYSIS ENGINE
@@ -2349,6 +2383,32 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
         f.write(html)
 
 
+# =========================
+# DATABASE CONFIG
+# =========================
+DB_PATH = os.path.join(BASE_DIR, "results.db")
+
+
+# =========================
+# DATABASE HELPERS
+# =========================
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def db_execute(query, params=()):
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(query, params)
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print("DB ERROR:", e)
+        return False
 
 
 # =========================
