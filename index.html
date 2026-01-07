@@ -17,34 +17,43 @@
         </span>
     </h1>
 
-    <div class="card" style="text-align:center">
+    <div class="card">
 
-        <h2>Welcome!</h2>
-        <p>
-            This platform allows you to upload custom question banks, generate quizzes,
-            take exams, track performance, and review your progress over time.
+        <h2 style="text-align:center">Welcome!</h2>
+        <p style="text-align:center">
+            This platform allows you to upload custom question banks,
+            generate quizzes, take exams, track performance, and review progress.
         </p>
 
-        <div style="display:flex; flex-direction:column; gap:10px; margin-top:20px">
+        <!-- ============================= -->
+        <!--        Main Action Grid       -->
+        <!-- ============================= -->
+        <div class="portal-grid">
 
-            <button onclick="location.href='/settings'">⚙️ Portal Settings</button>
+            <div class="portal-card" onclick="location.href='/library'">
+                <h2>📚 View Quiz Library</h2>
+                <p>Browse and launch available quizzes.</p>
+            </div>
 
-            <button onclick="location.href='/library'">
-                📚 View Quiz Library
-            </button>
+            <div class="portal-card" onclick="location.href='/upload'">
+                <h2>📤 Upload or Build Quiz</h2>
+                <p>Create or import a new quiz.</p>
+            </div>
 
-            <button onclick="location.href='/upload'">
-                📤 Upload or Build New Quiz
-            </button>
+            <div class="portal-card" onclick="location.href='/history.html'">
+                <h2>📜 Test History</h2>
+                <p>Review your completed attempts.</p>
+            </div>
 
-            <button onclick="location.href='/history.html'">📜 View Test History</button>
-            <!--
-            <button onclick="location.href='/review.html'">
-                🔁 Review Missed Questions
-            </button>
-            -->
+            <div class="portal-card" onclick="location.href='/dashboard.html'">
+                <h2>📊 Analytics Dashboard</h2>
+                <p>See trends, improvements, and insights.</p>
+            </div>
 
-            <button onclick="location.href='/dashboard.html'">📊 View Analytics Dashboard</button>
+            <div class="portal-card settings-card" onclick="location.href='/settings'">
+                <h2>⚙️ Portal Settings</h2>
+                <p>Advanced options & maintenance tools.</p>
+            </div>
 
 
         </div>

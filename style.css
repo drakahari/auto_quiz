@@ -453,3 +453,63 @@ body.blurred .blur-wrapper {
 .top-right button {
     margin-left: 8px;
 }
+
+/* =========================================
+   MAIN PORTAL GRID & ACTION CARDS
+========================================= */
+
+.portal-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit,minmax(260px,1fr));
+    gap: 18px;
+    margin-top: 22px;
+}
+
+/* Larger, more “app like” feature cards */
+.portal-card {
+    background: rgba(0,0,0,.78);
+    border-radius: 14px;
+    padding: 24px;
+    text-align: center;
+    border: 1px solid rgba(255,255,255,.35);
+    box-shadow: 0 0 32px rgba(0,0,0,.9);
+    transition: transform .2s ease, box-shadow .2s ease, opacity .2s ease;
+    backdrop-filter: blur(6px);
+}
+
+.portal-card:hover {
+    transform: scale(1.04);
+    box-shadow: 0 0 40px rgba(0,0,0,1);
+}
+
+.portal-card h2 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 22px;
+    letter-spacing: .6px;
+}
+
+.portal-card p {
+    opacity: .9;
+    font-size: 14px;
+    margin-bottom: 12px;
+}
+
+/* Smaller + visually de-emphasized settings */
+.settings-card {
+    transform: scale(.92);
+    opacity: .92;
+}
+
+.settings-card:hover {
+    transform: scale(.95);
+    opacity: 1;
+}
+
+.portal-card {
+    cursor: pointer;
+}
+
+.portal-card:active {
+    transform: scale(.99);
+}
