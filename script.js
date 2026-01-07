@@ -8,6 +8,8 @@ let userAnswers = {};
 let paused = false;
 let examTimer = null;
 let timeRemaining = 90 * 60; // 90 minutes
+let examStartTime = null;
+
 
 
 /* =====================================================
@@ -330,6 +332,9 @@ function startQuiz(isExam) {
         timeRemaining = 90 * 60;
         startExamTimer();
     }
+    // NEW: record start time
+    examStartTime = new Date().toISOString();
+
 
     renderQuestion();
 }
@@ -517,12 +522,15 @@ function submitQuiz(force = false) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-            quizTitle: window.quiz_title || "Unknown Quiz",
-            attemptId: attemptId,
-            score: correct,
-            total: total,
-            percent: percent
-        })
+        quizTitle: window.quiz_title || "Unknown Quiz",
+        attemptId: attemptId,
+        score: correct,
+        total: total,
+        percent: percent,
+        timeRemaining: timeRemaining,
+        startedAt: examStartTime
+    })
+
     })
     .then(res => res.json().catch(() => ({})))
     .then(data => console.log("DB save response:", data))

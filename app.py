@@ -1955,21 +1955,31 @@ def record_attempt():
         cur.execute(
             """
             INSERT INTO attempts (
-                id, quiz_id, completed_at,
-                score, total, percent, mode
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                attempt_id,
+                id,
                 quiz_id,
+                started_at,
                 completed_at,
                 score,
                 total,
                 percent,
+                time_remaining,
+                mode
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                attempt_id,
+                quiz_id,
+                data.get("startedAt", None),
+                completed_at,
+                score,
+                total,
+                percent,
+                data.get("timeRemaining", None),
                 "Exam",
             ),
         )
+
 
         conn.commit()
         conn.close()
