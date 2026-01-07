@@ -1823,35 +1823,85 @@ def settings_page():
                 Enable Invisible Character & BOM Cleanup
             </label>
 
-            <br><br>
+         <br><br>
 
-            <h3>Show Invisible Characters Tool</h3>
-            <p style="opacity:.7">
-                Allows user to toggle visualization of hidden characters during preview.
-            </p>
+        <h3>Show Invisible Characters Tool</h3>
+        <p style="opacity:.7">
+            Allows user to toggle visualization of hidden characters during preview.
+        </p>
 
-            <label style="display:flex; gap:10px; align-items:center;">
-                <input type="checkbox"
-                       name="enable_show_invisibles"
-                       value="1"
-                       {% if cfg.enable_show_invisibles %}checked{% endif %}>
-                Enable "Show Invisible Characters" Debug Tool
-            </label>
+        <label style="display:flex; gap:10px; align-items:center;">
+            <input type="checkbox"
+                name="enable_show_invisibles"
+                value="1"
+                {% if cfg.enable_show_invisibles %}checked{% endif %}>
+            Enable "Show Invisible Characters" Debug Tool
+        </label>
 
-            <br><br>
+        <br><br>
 
-            <button type="submit">💾 Save Settings</button>
+        <button type="submit">💾 Save Settings</button>
         </form>
+
+        <br>
+
+        <hr>
+
+        <h3>Persistent Exam Storage</h3>
+        <p style="opacity:.75">
+            These results are stored in the application database.  
+            Clearing will permanently delete all recorded attempts and missed-question history.
+        </p>
+
+        <button id="clearDBBtn" style="
+            background:#ff4d4d;
+            color:white;
+            padding:10px 14px;
+            border-radius:8px;
+            border:1px solid rgba(255,255,255,.3);
+        ">
+            🗑 Clear Saved Permanent Results (Database)
+        </button>
+
+        <p id="clearDBStatus" style="margin-top:6px;"></p>
 
         <br>
         <button onclick="location.href='/'">⬅ Back To Portal</button>
 
-    </div>
+        </div>
 
-</div>
-</body>
-</html>
-""", cfg=cfg)
+        <script>
+        document.getElementById("clearDBBtn").addEventListener("click", async () => {
+
+            if (!confirm(
+                "⚠ This will permanently delete ALL saved exam results and missed question records.\\n\\nThis cannot be undone.\\n\\nContinue?"
+            )) return;
+
+            try {
+                const res = await fetch("/api/clear_db_history", { method: "POST" });
+                const data = await res.json();
+
+                if (data.status === "ok") {
+                    document.getElementById("clearDBStatus").innerText =
+                        "✅ Persistent history deleted successfully";
+                    alert("Persistent DB history cleared!");
+                    location.reload();
+                } else {
+                    throw new Error();
+                }
+
+            } catch (err) {
+                document.getElementById("clearDBStatus").innerText =
+                    "⚠️ Failed to clear persistent history.";
+            }
+        });
+        </script>
+
+
+        </div>
+        </body>
+        </html>
+        """, cfg=cfg)
 
 
 
@@ -2079,6 +2129,27 @@ def api_attempts():
     return jsonify({"attempts": attempts})
 
 
+@app.route("/api/clear_db_history", methods=["POST"])
+def clear_db_history():
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Respect foreign keys
+        cur.execute("PRAGMA foreign_keys = ON")
+
+        # Delete dependent rows first
+        cur.execute("DELETE FROM missed_questions")
+        cur.execute("DELETE FROM attempts")
+
+        conn.commit()
+        conn.close()
+
+        return {"status": "ok", "message": "Persistent history cleared"}
+
+    except Exception as e:
+        print("DB CLEAR ERROR:", e)
+        return {"status": "error"}, 500
 
 
 

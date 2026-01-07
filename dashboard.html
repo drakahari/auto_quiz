@@ -79,155 +79,101 @@
 </div>
 
 <script>
-const HISTORY_KEY = "serverplus_history_v2";
 
-/* ---------------------------------------------
-   QUIZ NAME REGISTRY (from quizzes.json)
---------------------------------------------- */
-let QUIZ_NAME_MAP = {};
-
-// Load quiz registry FIRST
-fetch('/config/quizzes.json')
-    .then(r => r.json())
-    .then(list => {
-        list.forEach(q => {
-    if (!q.title || !q.html) return;
-
-    // Example: quiz_1767557688.html
-    const htmlName = q.html;
-    const baseName = htmlName.replace(".html","");     // quiz_1767557688
-    const jsonName = baseName + ".json";               // quiz_1767557688.json
-
-    // Support ALL possible history keys
-    QUIZ_NAME_MAP[htmlName]          = q.title;
-    QUIZ_NAME_MAP["/data/" + htmlName] = q.title;
-
-    QUIZ_NAME_MAP[jsonName]          = q.title;
-    QUIZ_NAME_MAP["/data/" + jsonName] = q.title;
-});
-
-        buildDashboard();
-    })
-    .catch(() => {
-        console.warn("Could not load quizzes.json — fallback names only");
-        buildDashboard();
-    });
-
-
-/* ---------------------------------------------
-   SMART HISTORY LOADER (supports legacy)
---------------------------------------------- */
-function loadHistory() {
-    let v2 = JSON.parse(localStorage.getItem(HISTORY_KEY) || "{}");
-
-    if (Object.keys(v2).length)
-        return v2;
-
-    let legacy = JSON.parse(localStorage.getItem("history") || "[]");
-
-    if (legacy.length) {
-        let grouped = {};
-        legacy.forEach(entry => {
-            const key = entry.quiz || "Unknown Quiz";
-            if (!grouped[key]) grouped[key] = [];
-            grouped[key].push(entry);
-        });
-
-        localStorage.setItem(HISTORY_KEY, JSON.stringify(grouped));
-        return grouped;
-    }
-
-    return {};
+// =============== LOAD FROM DB ==================
+async function fetchAttempts() {
+    const res = await fetch("/api/attempts");
+    if (!res.ok) throw new Error("DB API Failed");
+    const data = await res.json();
+    return data.attempts || [];
 }
 
-
-/* ---------------------------------------------
-   DASHBOARD BUILDER
---------------------------------------------- */
-function buildDashboard() {
+// =============== MAIN DASHBOARD ================
+async function buildDashboard() {
     const div = document.getElementById("analytics");
-    const store = loadHistory();
-    const quizKeys = Object.keys(store);
 
-    if (!quizKeys.length) {
+    let attempts = [];
+    try {
+        attempts = await fetchAttempts();
+    } catch(e) {
+        console.error(e);
+        div.innerHTML = "<p>⚠️ Unable to load analytics (database error)</p>";
+        return;
+    }
+
+    if (!attempts.length) {
         div.innerHTML = "<p>No data yet. Take some exams 😊</p>";
         return;
     }
 
+    // ---- GROUP BY QUIZ ----
+    const grouped = {};
+    attempts.forEach(a => {
+        const key = a.quiz_title || "Unknown Quiz";
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(a);
+    });
+
     let html = "";
 
-    quizKeys.forEach(key => {
-        const attempts = store[key];
-        if (!attempts || !attempts.length) return;
+    Object.keys(grouped).forEach(key => {
+        const list = grouped[key];
+        if (!list.length) return;
 
-        const scores = attempts.map(a => a.percent);
+        const scores = list.map(a => Number(a.percent || 0));
         const avg = Math.round(scores.reduce((a,b)=>a+b,0) / scores.length);
         const best = Math.max(...scores);
-        const passes = attempts.filter(a=>a.percent>=75).length;
-        const passRate = Math.round((passes / attempts.length) * 100);
+        const passes = list.filter(a => a.percent >= 75).length;
+        const passRate = Math.round((passes / list.length) * 100);
 
-        // ---- Performance Trend ----
+        // ===== PERFORMANCE TREND =====
         let trendMsg = "Keep going!";
         let trendClass = "";
-        if (attempts.length >= 2) {
-            const last = attempts[attempts.length-1].percent;
-            const prev = attempts[attempts.length-2].percent;
+        if (list.length >= 2) {
+            const last = list[list.length-1].percent;
+            const prev = list[list.length-2].percent;
+
             if (last > prev) { trendMsg = "📈 Improving — Great work!"; trendClass="good"; }
-            else if (last < prev) { trendMsg = "📉 Slight drop — Review missed topics"; trendClass="bad"; }
+            else if (last < prev) { trendMsg = "📉 Slight drop — review weak spots"; trendClass="bad"; }
             else { trendMsg = "➡️ Holding steady"; trendClass="warn"; }
         }
 
-        // ---- Most Missed Questions ----
+        // ===== MOST MISSED QUESTIONS =====
         let missedMap = {};
 
-attempts.forEach(a => {
-    if (!a.missed) return;
+        list.forEach(a => {
+            if (!a.missedQuestions) return;
 
-    a.missed.forEach(m => {
+            a.missedQuestions.forEach(m => {
+                const id = m.number || m.question || "Unknown";
+                missedMap[id] = (missedMap[id] || 0) + 1;
+            });
+        });
 
-        // Support multiple formats safely
-        const key =
-            (typeof m === "number")
-                ? m
-                : (m.number || m.id || m.question || "Unknown");
-
-        missedMap[key] = (missedMap[key] || 0) + 1;
-    });
-});
-
-
-        let missedHtml = "<p>No problem questions yet 🎉</p>";
+        let missedHtml = "";
         const missedKeys = Object.keys(missedMap);
 
+        // Only show review button if there are missed questions
         if (missedKeys.length) {
-            missedHtml = missedKeys
-                .sort((a,b)=>missedMap[b]-missedMap[a])
-                .map(q=>`
-                <div class="barRow">
-                    <div class="barFill" style="width:${Math.min(missedMap[q]*20,100)}%"></div>
-                </div>
-                <div class="barLabel">
-    Question ${q} — ${missedMap[q]} misses
-</div>
-
-                `).join("");
+            missedHtml = `
+                <button onclick="location.href='review.html'">
+                    🔍 View Details & Review Missed Questions
+                </button>
+            `;
         }
+
+
+
 
         html += `
         <div class="section">
 
-            <!-- Show friendly quiz name when possible -->
-            <h2>📘 ${
-                (attempts[0]?.quizName ||     // if future stored name
-                 attempts[0]?.quiz ||         // if stored quiz label
-                 QUIZ_NAME_MAP[key] ||        // from quizzes.json (NOW WORKING 🎉)
-                 key.replace("/data/",""))     // fallback filename
-            }</h2>
+            <h2>📘 ${key}</h2>
 
             <div class="stat-grid">
                 <div class="stat-card">
                     <div>Total Attempts</div>
-                    <div class="big">${attempts.length}</div>
+                    <div class="big">${list.length}</div>
                 </div>
 
                 <div class="stat-card">
@@ -254,16 +200,21 @@ attempts.forEach(a => {
             </div>
 
             <div class="section">
-                <h3>🔥 Most Missed Questions</h3>
                 ${missedHtml}
             </div>
-        </div>
-        `;
+
+
+        </div>`;
     });
 
     div.innerHTML = html;
 }
+
+// ================= RUN ==================
+buildDashboard();
+
 </script>
+
 
 </body>
 </html>
