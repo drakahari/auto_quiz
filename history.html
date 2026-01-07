@@ -372,18 +372,30 @@ else if (rec.missed && rec.missed.length) {
     }).join("");
 }
 
-            const card = document.createElement("div");
-            card.className = "history-card " + cls;
-            card.setAttribute("data-attempt",
-                rec.attemptId || rec.id || rec.uuid || ""
-            );
+            const attemptKey =
+    rec.attemptId || rec.id || rec.uuid || "";
 
-            card.innerHTML = `
-                <div><b>${rec.date}</b></div>
-                <div>Mode: ${rec.mode}</div>
-                <div>Score: ${rec.score} / ${rec.total} (${rec.percent}%)</div>
-                <div>Time Used: ${minsUsed} min</div>
-            `;
+        const card = document.createElement("div");
+        card.className = "history-card " + cls;
+        card.setAttribute("data-attempt", attemptKey);
+
+        // 🔥 Make card clickable
+        card.style.cursor = "pointer";
+        card.onclick = () => {
+            if (!attemptKey) {
+                alert("No attempt ID stored for this record.");
+                return;
+            }
+            location.href = `/review.html?attempt=${attemptKey}`;
+        };
+
+        card.innerHTML = `
+            <div><b>${rec.date}</b></div>
+            <div>Mode: ${rec.mode}</div>
+            <div>Score: ${rec.score} / ${rec.total} (${rec.percent}%)</div>
+            <div>Time Used: ${minsUsed} min</div>
+        `;
+
 
             groupDiv.appendChild(card);
         });

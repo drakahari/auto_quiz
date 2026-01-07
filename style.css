@@ -513,3 +513,28 @@ body.blurred .blur-wrapper {
 .portal-card:active {
     transform: scale(.99);
 }
+
+.history-card {
+    transition: transform .15s ease, box-shadow .2s ease;
+}
+
+.history-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 20px rgba(0,255,170,.4);
+}
+
+/* ===== Hover Animation For History Attempt Cards ===== */
+.history-card {
+    transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+    cursor: pointer;
+}
+
+.history-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 18px 65px rgba(0,0,0,.9);
+}
+
+/* Boost border glow like homepage style */
+.history-card.good:hover { border-color: #00ff87; }
+.history-card.warn:hover { border-color: #ffe066; }
+.history-card.bad:hover  { border-color: #ff4d4d; }
