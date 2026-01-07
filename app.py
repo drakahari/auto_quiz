@@ -447,6 +447,7 @@ def upload_page():
 @app.route("/paste")
 def paste_page():
     portal_title = get_portal_title()
+    cfg = load_portal_config()   # <-- already needed
 
     return render_template_string("""
     <html>
@@ -506,8 +507,11 @@ Practice Only"
                 <br><br>
 
                 <!-- ========================= -->
-                <!--  REGEX REPLACE SECTION    -->
+                <!--  ADVANCED PARSING UI     -->
+                <!--  ONLY SHOW IF ENABLED    -->
                 <!-- ========================= -->
+                {% if cfg.enable_regex_replace %}
+
                 <h3>Optional: Regex Replace Rules</h3>
                 <p style="opacity:.8; font-size:12px">
                     Runs BEFORE parsing. Format:<br>
@@ -526,9 +530,6 @@ Question\\s*#\\d+ => "
 
                 <br><br>
 
-                <!-- ========================= -->
-                <!--  REGEX PRESET CHECKBOXES  -->
-                <!-- ========================= -->
                 <h3>✨ Regex Presets (Optional)</h3>
                 <p style="opacity:.8; font-size:12px">
                     These presets automatically apply helpful cleanup rules.<br>
@@ -551,6 +552,7 @@ Question\\s*#\\d+ => "
                 </label>
 
                 <br><br>
+                {% endif %}
 
                 <h3>Upload Logo (Optional)</h3>
                 <input type="file" name="quiz_logo" accept="image/*">
@@ -570,7 +572,9 @@ Question\\s*#\\d+ => "
     </div>
     </body>
     </html>
-    """, portal_title=portal_title)
+    """, portal_title=portal_title, cfg=cfg)
+
+
 
 
 # =========================================================
