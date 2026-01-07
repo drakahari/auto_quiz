@@ -1749,7 +1749,6 @@ def process_file():
 def settings_page():
     cfg = load_portal_config()
 
-    # Ensure safe defaults if missing from portal.json
     cfg.setdefault("show_confidence", True)
     cfg.setdefault("enable_regex_replace", False)
     cfg.setdefault("auto_bom_clean", False)
@@ -1781,75 +1780,98 @@ def settings_page():
 
             <br><br>
 
-            <h3>Confidence Analysis</h3>
-            <p style="opacity:.7">
-                Controls whether the 🧠 Confidence Analysis panel appears on quiz preview.
-            </p>
-
-            <label style="display:flex; gap:10px; align-items:center;">
-                <input type="checkbox" name="show_confidence"
-                       value="1"
-                       {% if cfg.show_confidence %}checked{% endif %}>
-                Enable Confidence Analysis on Preview
-            </label>
+            <button type="submit">💾 Save Settings</button>
 
             <br><br>
 
-            <h3>Regex Strip / Replace Engine</h3>
-            <p style="opacity:.7">
-                Enables advanced REGEX-based cleanup tools when pasting quiz content.
-            </p>
+            <!-- ============================= -->
+            <!--  ADVANCED BUTTON + COLLAPSE  -->
+            <!-- ============================= -->
+            <button type="button"
+                onclick="toggleAdvancedSettings()"
+                style="
+                    padding:10px 14px;
+                    border-radius:8px;
+                    border:1px solid rgba(255,255,255,.3);
+                ">
+                ⚙️ Show / Hide Advanced Parsing Settings
+            </button>
 
-            <label style="display:flex; gap:10px; align-items:center;">
-                <input type="checkbox" name="enable_regex_replace"
-                       value="1"
-                       {% if cfg.enable_regex_replace %}checked{% endif %}>
-                Enable Regex Replace Engine
-            </label>
+            <div id="advancedSettingsBox" style="
+                display:none;
+                margin-top:12px;
+                padding:12px;
+                border-radius:10px;
+                background:rgba(0,0,0,.55);
+                border:1px solid rgba(255,255,255,.25);
+            ">
 
-            <br><br>
+                <h3>Confidence Analysis</h3>
+                <p style="opacity:.7">
+                    Controls whether the 🧠 Confidence Analysis appears on quiz preview.
+                </p>
 
-            <h3>Invisible / BOM Cleanup</h3>
-            <p style="opacity:.7">
-                Automatically removes BOM characters, zero-width spaces, and hidden Unicode junk
-                that can break parsing when copying text from PDFs or Microsoft Word.
-            </p>
+                <label style="display:flex; gap:10px; align-items:center;">
+                    <input type="checkbox" name="show_confidence"
+                           value="1"
+                           {% if cfg.show_confidence %}checked{% endif %}>
+                    Enable Confidence Analysis on Preview
+                </label>
 
-            <label style="display:flex; gap:10px; align-items:center;">
-                <input type="checkbox"
-                       name="auto_bom_clean"
-                       value="1"
-                       {% if cfg.auto_bom_clean %}checked{% endif %}>
-                Enable Invisible Character & BOM Cleanup
-            </label>
+                <br><br>
 
-         <br><br>
+                <h3>Regex Strip / Replace Engine</h3>
+                <p style="opacity:.7">
+                    Enables advanced REGEX cleanup when pasting quiz content.
+                </p>
 
-        <h3>Show Invisible Characters Tool</h3>
-        <p style="opacity:.7">
-            Allows user to toggle visualization of hidden characters during preview.
-        </p>
+                <label style="display:flex; gap:10px; align-items:center;">
+                    <input type="checkbox" name="enable_regex_replace"
+                           value="1"
+                           {% if cfg.enable_regex_replace %}checked{% endif %}>
+                    Enable Regex Replace Engine
+                </label>
 
-        <label style="display:flex; gap:10px; align-items:center;">
-            <input type="checkbox"
-                name="enable_show_invisibles"
-                value="1"
-                {% if cfg.enable_show_invisibles %}checked{% endif %}>
-            Enable "Show Invisible Characters" Debug Tool
-        </label>
+                <br><br>
 
-        <br><br>
+                <h3>Invisible / BOM Cleanup</h3>
+                <p style="opacity:.7">
+                    Automatically removes hidden Unicode and BOM junk.
+                </p>
 
-        <button type="submit">💾 Save Settings</button>
+                <label style="display:flex; gap:10px; align-items:center;">
+                    <input type="checkbox"
+                           name="auto_bom_clean"
+                           value="1"
+                           {% if cfg.auto_bom_clean %}checked{% endif %}>
+                    Enable Invisible Character & BOM Cleanup
+                </label>
+
+                <br><br>
+
+                <h3>Show Invisible Characters Tool</h3>
+                <p style="opacity:.7">
+                    Lets user visualize hidden characters.
+                </p>
+
+                <label style="display:flex; gap:10px; align-items:center;">
+                    <input type="checkbox"
+                        name="enable_show_invisibles"
+                        value="1"
+                        {% if cfg.enable_show_invisibles %}checked{% endif %}>
+                    Enable "Show Invisible Characters" Debug Tool
+                </label>
+
+            </div>
+
         </form>
 
         <br>
-
         <hr>
 
         <h3>Persistent Exam Storage</h3>
         <p style="opacity:.75">
-            These results are stored in the application database.  
+            These results are stored in the application database.<br>
             Clearing will permanently delete all recorded attempts and missed-question history.
         </p>
 
@@ -1868,40 +1890,44 @@ def settings_page():
         <br>
         <button onclick="location.href='/'">⬅ Back To Portal</button>
 
-        </div>
+    </div>
 
-        <script>
-        document.getElementById("clearDBBtn").addEventListener("click", async () => {
+<script>
+function toggleAdvancedSettings() {
+    const box = document.getElementById("advancedSettingsBox");
+    box.style.display = (box.style.display === "none" || !box.style.display)
+        ? "block"
+        : "none";
+}
 
-            if (!confirm(
-                "⚠ This will permanently delete ALL saved exam results and missed question records.\\n\\nThis cannot be undone.\\n\\nContinue?"
-            )) return;
+document.getElementById("clearDBBtn").addEventListener("click", async () => {
+    if (!confirm(
+        "⚠ This will permanently delete ALL saved exam results and missed question records.\\n\\nThis cannot be undone.\\n\\nContinue?"
+    )) return;
 
-            try {
-                const res = await fetch("/api/clear_db_history", { method: "POST" });
-                const data = await res.json();
+    try {
+        const res = await fetch("/api/clear_db_history", { method: "POST" });
+        const data = await res.json();
 
-                if (data.status === "ok") {
-                    document.getElementById("clearDBStatus").innerText =
-                        "✅ Persistent history deleted successfully";
-                    alert("Persistent DB history cleared!");
-                    location.reload();
-                } else {
-                    throw new Error();
-                }
+        if (data.status === "ok") {
+            document.getElementById("clearDBStatus").innerText =
+                "✅ Persistent history deleted successfully";
+            alert("Persistent DB history cleared!");
+            location.reload();
+        } else throw new Error();
 
-            } catch (err) {
-                document.getElementById("clearDBStatus").innerText =
-                    "⚠️ Failed to clear persistent history.";
-            }
-        });
-        </script>
+    } catch (err) {
+        document.getElementById("clearDBStatus").innerText =
+            "⚠️ Failed to clear persistent history.";
+    }
+});
+</script>
+
+</body>
+</html>
+    """, cfg=cfg)
 
 
-        </div>
-        </body>
-        </html>
-        """, cfg=cfg)
 
 
 
