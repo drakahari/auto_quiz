@@ -170,15 +170,38 @@ async function loadDbHistory() {
                    "<th>Quiz</th><th>Score</th><th>Date</th><th>Mode</th></tr>";
 
         attempts.forEach(a => {
-            html += `
-                <tr>
-                    <td>${a.quiz_title || "Unknown Quiz"}</td>
-                    <td>${a.score}/${a.total} (${a.percent}%)</td>
-                    <td>${a.completed_at || ""}</td>
-                    <td>${a.mode}</td>
-                </tr>
-            `;
-        });
+    html += `
+        <tr>
+            <td>${a.quiz_title || "Unknown Quiz"}</td>
+            <td>${a.score}/${a.total} (${a.percent}%)</td>
+            <td>${a.completed_at || ""}</td>
+            <td>${a.mode}</td>
+        </tr>
+        <tr>
+            <td colspan="4">
+                ${(!a.missedQuestions || !a.missedQuestions.length)
+                    ? "<i>None 🎉</i>"
+                    : a.missedQuestions.map(m => `
+                        <div style="margin-top:6px; padding:8px; background:rgba(0,0,0,.6); border-radius:6px;">
+                            <b>Question ${m.number}</b><br>
+                            ${m.question}<br>
+
+                            <div style="margin-top:6px; color:#00ff80">
+                                <b>Correct Answer(s):</b><br>
+                                ${(m.correctText || m.correctLetters || []).join("<br>")}
+                            </div>
+
+                            <div style="margin-top:6px; color:#ff6b6b">
+                                <b>Your Answer:</b><br>
+                                ${(m.selectedText || m.selectedLetters || []).join("<br>")}
+                            </div>
+                        </div>
+                    `).join("")}
+            </td>
+        </tr>
+    `;
+});
+
 
         html += "</table>";
         box.innerHTML = html;
@@ -290,6 +313,76 @@ function renderHistory() {
                 : "--";
 
             let missedBlock = "<i>None 🎉</i>";
+
+/* ============================================================
+   DB MODE — attempts coming from /history_db
+============================================================ */
+if (rec.missedQuestions && rec.missedQuestions.length) {
+    missedBlock = rec.missedQuestions.map(m => `
+        <div style="margin-top:6px; padding:8px; background:rgba(0,0,0,.6); border-radius:6px;">
+
+            <b>Question ${m.number}</b><br>
+            ${m.question}<br>
+
+            <div style="margin-top:6px; color:#00ff80">
+                <b>Correct Answer(s):</b><br>
+                ${(m.correctText || m.correctLetters || []).map
+                    ? (m.correctText || m.correctLetters).join("<br>")
+                    : m.correctText || m.correctLetters
+                }
+            </div>
+
+            <div style="margin-top:6px; color:#ff6b6b">
+                <b>Your Answer:</b><br>
+                ${(m.selectedText || m.selectedLetters || []).map
+                    ? (m.selectedText || m.selectedLetters).join("<br>")
+                    : m.selectedText || m.selectedLetters
+                }
+            </div>
+
+        </div>
+    `).join("");
+}
+
+/* ============================================================
+   LOCAL STORAGE (old mode)
+============================================================ */
+else if (rec.missedDetails && rec.missedDetails.length) {
+    missedBlock = rec.missedDetails.map(m => `
+        <div style="margin-top:6px; padding:8px; background:rgba(0,0,0,.6); border-radius:6px;">
+            <b>Question ${m.number}</b><br>
+            ${m.question}<br>
+            <span style="color:#00ff80">
+                ✓ Correct Answer: (${m.correctLetters}) ${m.correctText}
+            </span>
+        </div>
+    `).join("");
+}
+else if (rec.missed && rec.missed.length) {
+    missedBlock = rec.missed.map(m => {
+        if (typeof m === "number") {
+            return `<div>Question ${m}</div>`;
+        }
+
+        const correctSection =
+            m.correctText && m.correctText.length
+                ? `<ul>${m.correctText.map(c => `<li>${c}</li>`).join("")}</ul>`
+                : `<span style="color:#00ff80">
+                        ✓ Correct Answer: ${(m.correctLetters || []).join(", ")}
+                   </span>`;
+
+        return `
+            <div style="margin-top:6px; padding:8px; background:rgba(0,0,0,.6); border-radius:6px;">
+                <b>Question ${m.number}</b><br>
+                ${m.question || ""}<br>
+                <div style="margin-top:6px; color:#00ff80">
+                    <b>Correct Answer(s):</b>
+                    ${correctSection}
+                </div>
+            </div>
+        `;
+    }).join("");
+}
 
             const card = document.createElement("div");
             card.className = "history-card " + cls;

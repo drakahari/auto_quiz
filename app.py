@@ -1,4 +1,4 @@
-from flask import Flask, send_from_directory, request, redirect, render_template_string
+from flask import Flask, send_from_directory, request, redirect, render_template_string, jsonify
 import os, re, json, time, sqlite3
 
 app = Flask(__name__, static_folder=".", static_url_path="")
@@ -2029,30 +2029,58 @@ def api_attempts():
     conn = get_db()
     cur = conn.cursor()
 
-    cur.execute(
-        """
-        SELECT 
-            attempts.id,
-            quizzes.title AS quiz_title,
-            attempts.started_at,
-            attempts.completed_at,
-            attempts.score,
-            attempts.total,
-            attempts.percent,
-            attempts.time_remaining,
-            attempts.mode
-        FROM attempts
-        JOIN quizzes ON attempts.quiz_id = quizzes.id
-        ORDER BY attempts.completed_at DESC
-        """
-    )
+    # Load attempts
+    cur.execute("""
+        SELECT a.id,
+               a.quiz_id,
+               q.title AS quiz_title,
+               a.score,
+               a.total,
+               a.percent,
+               a.started_at,
+               a.completed_at,
+               a.time_remaining,
+               a.mode
+        FROM attempts a
+        LEFT JOIN quizzes q ON a.quiz_id = q.id
+        ORDER BY a.completed_at DESC
+    """)
+    attempts = [dict(row) for row in cur.fetchall()]
 
-    rows = cur.fetchall()
+    # Attach missed questions
+    for attempt in attempts:
+        cur.execute("""
+            SELECT
+                question_number,
+                question_text,
+                correct_letters,
+                correct_text,
+                selected_letters,
+                selected_text
+            FROM missed_questions
+            WHERE attempt_id = ?
+        """, (attempt["id"],))
+
+        mq = cur.fetchall()
+
+        attempt["missedQuestions"] = [
+            {
+                "number": m["question_number"],
+                "question": m["question_text"],
+                "correctLetters": (m["correct_letters"] or "").split(","),
+                "correctText": (m["correct_text"] or "").split("\n"),
+                "selectedLetters": (m["selected_letters"] or "").split(","),
+                "selectedText": (m["selected_text"] or "").split("\n")
+            }
+            for m in mq
+        ]
+
     conn.close()
+    return jsonify({"attempts": attempts})
 
-    return {
-        "attempts": [dict(r) for r in rows]
-    }
+
+
+
 
 
 
@@ -2526,6 +2554,68 @@ def db_execute(query, params=()):
     except Exception as e:
         print("DB ERROR:", e)
         return False
+
+
+@app.route("/history_db")
+def history_db():
+    conn = get_db()
+    cur = conn.cursor()
+
+    # 1️⃣ Pull all attempts with quiz name
+    cur.execute("""
+        SELECT 
+            a.id,
+            q.title AS quiz_title,
+            a.score,
+            a.total,
+            a.percent,
+            a.mode,
+            a.started_at,
+            a.completed_at,
+            a.time_remaining
+        FROM attempts a
+        LEFT JOIN quizzes q ON a.quiz_id = q.id
+        ORDER BY a.completed_at DESC
+    """)
+    attempts = cur.fetchall()
+
+    results = []
+
+    for row in attempts:
+        attempt_id = row["id"]
+
+        # 2️⃣ Pull missed questions for this attempt
+        cur.execute("""
+            SELECT
+                question_number,
+                question_text,
+                correct_letters,
+                correct_text,
+                selected_letters,
+                selected_text
+            FROM missed_questions
+            WHERE attempt_id = ?
+        """, (attempt_id,))
+
+        missed = [dict(m) for m in cur.fetchall()]
+
+        results.append({
+            "id": row["id"],
+            "quiz_title": row["quiz_title"] or "Unknown Quiz",
+            "score": row["score"],
+            "total": row["total"],
+            "percent": row["percent"],
+            "mode": row["mode"],
+            "started_at": row["started_at"],
+            "completed_at": row["completed_at"],
+            "time_remaining": row["time_remaining"],
+            "missed": missed
+        })
+
+    conn.close()
+    return jsonify(results)
+
+
 
 
 # =========================
