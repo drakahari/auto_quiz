@@ -19,10 +19,25 @@
     margin-bottom: 14px;
 }
 
-.missedLabel {
-    color: #ff8080;
-    font-weight: bold;
+.reviewCard {
+    background: rgba(0,0,0,.85);
+    padding: 12px;
+    margin: 12px 0;
+    border-radius: 8px;
+    border-left: 8px solid #ff4d4d;
 }
+
+.correctBox {
+    color: #00ff80;
+    margin-top: 6px;
+}
+
+.userBox {
+    color: #ff6b6b;
+    margin-top: 6px;
+}
+
+small { color:#ccc; }
 </style>
 </head>
 
@@ -35,7 +50,7 @@
     </h1>
 
     <div id="info" class="info-box">
-        Loading missed questions…
+        Loading…
     </div>
 
     <div id="reviewArea"></div>
@@ -47,171 +62,82 @@
 </div>
 
 <script>
-const HISTORY_KEY = "serverplus_history_v2";
+async function loadReview() {
 
-/* =========================
-   LOAD HISTORY
-========================= */
-function loadHistoryStore() {
-    try {
-        return JSON.parse(localStorage.getItem(HISTORY_KEY) || "{}");
-    } catch (e) {
-        console.error("History JSON corrupted, clearing", e);
-        localStorage.removeItem(HISTORY_KEY);
-        return {};
-    }
-}
-
-/* =========================
-   LOAD QUIZ JSON
-========================= */
-async function loadQuizData() {
-    const file = (typeof QUIZ_FILE !== "undefined") ? QUIZ_FILE : "quiz.json";
-    const res = await fetch(file);
-    return await res.json();
-}
-
-/* =========================
-   RENDER MISSED QUESTIONS
-========================= */
-async function renderMissedReview() {
     const info = document.getElementById("info");
-    const container = document.getElementById("reviewArea");
+    const box = document.getElementById("reviewArea");
 
-    if (!info || !container) return;
+    const params = new URLSearchParams(window.location.search);
+    const attemptId = params.get("attempt");
 
-    const store = loadHistoryStore();
-    const quizKeys = Object.keys(store);
-
-    if (!quizKeys.length) {
-        info.innerHTML = "❌ No history found yet. Take an exam first.";
+    if (!attemptId) {
+        info.innerHTML = "❌ No attempt specified.";
         return;
     }
 
-    let html = "";
-    let totalMissedSet = new Set();
+    try {
+        const res = await fetch("/api/attempts");
+        if (!res.ok) throw new Error("HTTP " + res.status);
 
-    for (const key of quizKeys) {
-        const attempts = store[key];
-        if (!attempts || !attempts.length) continue;
+        const data = await res.json();
+        const attempts = data.attempts || [];
 
-        let missed = [];
+        const attempt = attempts.find(a => a.id == attemptId);
 
-        attempts.forEach(r => {
-            if (!r.missed) return;
-
-            r.missed.forEach(m => missed.push(m));
-        });
-
-        if (!missed.length) continue;
+        if (!attempt) {
+            info.innerHTML = "❌ Attempt not found in database.";
+            return;
+        }
 
         info.innerHTML = `
-            <b>Total Quiz Sets Tracked:</b> ${quizKeys.length}<br>
-            <span class="missedLabel">Total Unique Missed Questions:</span> 
-            ${new Set(missed.map(m => normalizeMissedValue(m))).size}
+            <b>Quiz:</b> ${attempt.quiz_title || "Unknown Quiz"}<br>
+            <b>Score:</b> ${attempt.score}/${attempt.total} (${attempt.percent}%)<br>
+            <b>Date:</b> ${attempt.completed_at || ""}<br>
+            <b>Mode:</b> ${attempt.mode}
         `;
 
-        html += `<h2>📘 ${key.replace("/data/","")}</h2>`;
+        if (!attempt.missedQuestions || !attempt.missedQuestions.length) {
+            box.innerHTML = "<p>🎉 No missed questions!</p>";
+            return;
+        }
 
-        const quiz = await fetchQuizSafely(key);
+        let html = "";
 
-        const uniqueMissed = [...new Set(missed.map(m => normalizeMissedValue(m)))];
-
-        uniqueMissed.forEach(raw => {
-
-            const missedNum = normalizeMissedValue(raw);
-
-            if (!missedNum) {
-                html += renderProblemCard("Unknown", `Unrecognized entry: ${JSON.stringify(raw)}`);
-                return;
-            }
-
-            totalMissedSet.add(missedNum);
-
-            const q = quiz.find(q => Number(q.number) === Number(missedNum));
-
-            if (!q) {
-                html += renderProblemCard(missedNum,
-                    `Could not locate this question in quiz JSON.<br>
-                     This usually happens if numbering changed.`);
-                return;
-            }
-
-            // get choices
-            let choicesHtml = "";
-            q.choices.forEach((c,i)=>{
-                const letter = String.fromCharCode(65+i);
-                choicesHtml += `<div><b>${letter}.</b> ${extractChoiceText(c)}</div>`;
-            });
-
-            // correct answers
-            const correctLetters =
-                (q.correct_answers || q.correct || [])
-                .map(x => typeof x === "string"
-                    ? x
-                    : String.fromCharCode(65 + x))
-                .join(", ");
-
+        attempt.missedQuestions.forEach(m => {
             html += `
-            <div class="review-card review-wrong">
-                <h3>Question ${q.number}</h3>
-                <p>${q.question}</p>
-                <b>Choices:</b><br>
-                ${choicesHtml}
-                <p><b>Correct Answer:</b> ${correctLetters}</p>
-            </div>`;
+                <div class="reviewCard">
+                    <h3>Question ${m.number}</h3>
+
+                    <div>${m.question || "(No question text stored)"}</div>
+
+                    <div class="correctBox">
+                        <b>Correct Answer(s)</b><br>
+                        ${(m.correctText && m.correctText.length)
+                            ? m.correctText.join("<br>")
+                            : (m.correctLetters || []).join(", ")
+                        }
+                    </div>
+
+                    <div class="userBox">
+                        <b>Your Answer</b><br>
+                        ${(m.selectedText && m.selectedText.length)
+                            ? m.selectedText.join("<br>")
+                            : (m.selectedLetters || []).join(", ")
+                        }
+                    </div>
+                </div>
+            `;
         });
-    }
 
-    if (totalMissedSet.size === 0) {
-        info.innerHTML = "🎉 You haven't missed anything recently! Great job!";
-    }
+        box.innerHTML = html;
 
-    container.innerHTML = html;
-}
-
-/* =========================
-   HELPERS
-========================= */
-
-function renderProblemCard(num, msg) {
-    return `
-        <div class="review-card review-wrong">
-            <h3>Question ${num}</h3>
-            <p>${msg}</p>
-        </div>`;
-}
-
-function extractChoiceText(c) {
-    if (typeof c === "string") return c;
-    if (c.text) return c.text;
-    if (c.answer) return c.answer;
-    return JSON.stringify(c);
-}
-
-function normalizeMissedValue(raw) {
-    if (typeof raw === "number") return raw;
-    if (typeof raw === "string" && /^\d+$/.test(raw)) return Number(raw);
-    if (typeof raw === "object" && raw !== null)
-        return raw.number ?? raw.id ?? raw.q ?? raw.index ?? null;
-    return null;
-}
-
-// load quiz by key
-async function fetchQuizSafely(key) {
-    try {
-        const file = key.startsWith("/") ? key : `/data/${key}`;
-        const res = await fetch(file);
-        return await res.json();
-    } catch {
-        return [];
+    } catch(err) {
+        console.error(err);
+        info.innerHTML = "⚠️ Failed to load review data.";
     }
 }
 
-/* =========================
-   RUN
-========================= */
-renderMissedReview();
+loadReview();
 </script>
 
 </body>
