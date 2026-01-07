@@ -1916,13 +1916,19 @@ def save_settings():
 @app.route("/record_attempt", methods=["POST"])
 def record_attempt():
     data = request.json
+    print("📩 Incoming Attempt Payload:", json.dumps(data, indent=2))
 
     quiz_title = data.get("quizTitle")
     score = data.get("score")
     total = data.get("total")
     percent = data.get("percent")
     attempt_id = data.get("attemptId")
-    completed_at = time.strftime("%Y-%m-%d %H:%M:%S")
+
+    # CamelCase coming from JS
+    started_at = data.get("startedAt")
+    completed_at = data.get("completedAt")
+    time_remaining = data.get("timeRemaining")
+    mode = data.get("mode", "Exam")
 
     print("Saving attempt to DB:", quiz_title, percent)
 
@@ -1930,28 +1936,24 @@ def record_attempt():
     cur = conn.cursor()
 
     try:
-        # 1️⃣ Ensure quiz exists (create if not)
+        # 1️⃣ Ensure quiz exists
         cur.execute(
-            """
-            INSERT OR IGNORE INTO quizzes (title)
-            VALUES (?)
-            """,
-            (quiz_title,),
+            "INSERT OR IGNORE INTO quizzes (title) VALUES (?)",
+            (quiz_title,)
         )
 
-        # 2️⃣ Get quiz_id
+        # 2️⃣ Lookup quiz_id
         cur.execute(
             "SELECT id FROM quizzes WHERE title = ? LIMIT 1",
-            (quiz_title,),
+            (quiz_title,)
         )
         row = cur.fetchone()
 
         if not row:
-            raise Exception("Quiz ID lookup failed")
-
+            raise Exception("Quiz lookup failed")
         quiz_id = row["id"]
 
-        # 3️⃣ Insert attempt
+        # 3️⃣ Insert Attempt
         cur.execute(
             """
             INSERT INTO attempts (
@@ -1970,15 +1972,43 @@ def record_attempt():
             (
                 attempt_id,
                 quiz_id,
-                data.get("startedAt", None),
+                started_at,
                 completed_at,
                 score,
                 total,
                 percent,
-                data.get("timeRemaining", None),
-                "Exam",
-            ),
+                time_remaining,
+                mode
+            )
         )
+
+        # 4️⃣ Store missed questions (if any)
+        missed = data.get("missedDetails", [])
+
+        for m in missed:
+            cur.execute(
+                """
+                INSERT INTO missed_questions (
+                    attempt_id,
+                    question_number,
+                    question_text,
+                    correct_letters,
+                    correct_text,
+                    selected_letters,
+                    selected_text
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    attempt_id,
+                    m.get("number"),
+                    m.get("question"),
+                    ",".join(m.get("correctLetters", [])),
+                    "\n".join(m.get("correctText", [])),
+                    ",".join(m.get("selectedLetters", [])),
+                    "\n".join(m.get("selectedText", []))
+                )
+            )
 
 
         conn.commit()
@@ -1990,6 +2020,39 @@ def record_attempt():
         conn.close()
         print("DB ERROR:", e)
         return {"status": "db_error"}, 500
+
+
+
+
+@app.route("/api/attempts")
+def api_attempts():
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT 
+            attempts.id,
+            quizzes.title AS quiz_title,
+            attempts.started_at,
+            attempts.completed_at,
+            attempts.score,
+            attempts.total,
+            attempts.percent,
+            attempts.time_remaining,
+            attempts.mode
+        FROM attempts
+        JOIN quizzes ON attempts.quiz_id = quizzes.id
+        ORDER BY attempts.completed_at DESC
+        """
+    )
+
+    rows = cur.fetchall()
+    conn.close()
+
+    return {
+        "attempts": [dict(r) for r in rows]
+    }
 
 
 
@@ -2424,10 +2487,10 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
   /* Make title available to script.js + DB saving */
   window.quiz_title = "{quiz_title}";
 
-  /* This tells script.js which JSON file to load */
+ /* This tells script.js which JSON file to load for this quiz */
   const QUIZ_FILE = "/data/{jsonfile}";
+  window.quiz_title = "{quiz_title}";
 </script>
-
 
 <script src="/script.js"></script>
 </body>

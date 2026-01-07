@@ -9,6 +9,7 @@ let paused = false;
 let examTimer = null;
 let timeRemaining = 90 * 60; // 90 minutes
 let examStartTime = null;
+let examStartedAt = null;
 
 
 
@@ -298,6 +299,14 @@ function startQuiz(isExam) {
     index = 0;
     userAnswers = {};
 
+    if (examMode) {
+    examStartTime = new Date().toISOString();
+    } else {
+        examStartTime = null;
+    }
+
+
+
     console.log("START QUIZ. examMode =", examMode);
 
     // Show Submit ONLY in Exam Mode
@@ -443,6 +452,7 @@ function submitQuiz(force = false) {
 
     let correct = 0;
     let missed = [];
+    let answerDetails = [];
 
     console.log("QUESTIONS:", quiz.length);
 
@@ -476,22 +486,24 @@ function submitQuiz(force = false) {
             if (isCorrect) {
                 correct++;
             } else {
-                missed.push({
-    number: q.number || (i + 1),
-    question: q.question,
+    missed.push({
+        number: q.number || (i + 1),
+        question: q.question,
 
-    // Letters like ["A","C"]
-    correctLetters: q.correct,
+        // Correct Answers
+        correctLetters: q.correct,
+        correctText: q.correct.map(letter => {
+            const idx = letter.toUpperCase().charCodeAt(0) - 65;
+            return `${letter} — ${q.choices[idx]}`;
+        }),
 
-    // Convert to readable text like:
-    // "A — Encryption prevents access"
-    correctText: q.correct.map(letter => {
-        const idx = letter.toUpperCase().charCodeAt(0) - 65;
-        return `${letter} — ${q.choices[idx]}`;
-    })
-});
+        // What the user actually selected
+        selectedIndexes: ans,
+        selectedLetters: ans.map(idx => String.fromCharCode(65 + idx)),
+        selectedText: ans.map(idx => `${String.fromCharCode(65 + idx)} — ${q.choices[idx]}`)
+    });
+}
 
-            }
         }
     } catch (e) {
         console.error("ERROR DURING SCORING:", e);
@@ -522,19 +534,25 @@ function submitQuiz(force = false) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-        quizTitle: window.quiz_title || "Unknown Quiz",
-        attemptId: attemptId,
-        score: correct,
-        total: total,
-        percent: percent,
-        timeRemaining: timeRemaining,
-        startedAt: examStartTime
-    })
+            quizTitle: window.quiz_title || QUIZ_FILE || "Unknown Quiz",
 
+            score: correct,
+            total: total,
+            percent: percent,
+            attemptId: attemptId,
+            startedAt: examStartTime,
+            completedAt: new Date().toISOString(),
+            timeRemaining: timeRemaining,
+
+            mode: "Exam",
+
+            missedDetails: missed   // <-- ADD THIS LINE
+        })
     })
     .then(res => res.json().catch(() => ({})))
     .then(data => console.log("DB save response:", data))
     .catch(err => console.warn("DB save failed (but app is fine):", err));
+
 
 
     // existing code continues normally after this

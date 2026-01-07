@@ -11,9 +11,6 @@
     margin: auto;
 }
 
-/* -------------------------
-   MODE BANNER / TITLE BAR
-------------------------- */
 .mode-banner {
     display: flex;
     justify-content: space-between;
@@ -36,7 +33,6 @@
     opacity: 1;
 }
 
-/* Nice readable banner title */
 .hero-title {
     text-align: center;
     margin-top: 10px;
@@ -100,6 +96,22 @@
 small { color: #bbb; }
 
 button { margin-top: 15px; }
+
+/* DB HISTORY TABLE */
+.historyTable {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+.historyTable th, .historyTable td {
+    padding: 8px;
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+.historyTable th {
+    background: rgba(0,0,0,.7);
+}
 </style>
 </head>
 
@@ -114,9 +126,20 @@ button { margin-top: 15px; }
         <img id="rightLogo" class="mode-badge" style="visibility:hidden">
     </div>
 
+    <!-- ============================= -->
+    <!--   NEW: PERSISTENT DB HISTORY  -->
+    <!-- ============================= -->
+    <h2>📌 Persistent History (Saved in App Database)</h2>
+    <div id="dbHistoryBox" class="quiz-group">
+        <p>Loading history…</p>
+    </div>
+
+    <hr>
+
+    <!-- EXISTING LOCAL STORAGE HISTORY -->
     <div id="historyOutput"></div>
 
-    <button onclick="clearHistory()">🗑 Clear All History</button>
+    <button onclick="clearHistory()">🗑 Clear All Local History</button>
     <br><br>
     <button onclick="location.href='/'">⬅ Back to Portal</button>
 
@@ -125,12 +148,52 @@ button { margin-top: 15px; }
 <script>
 const HISTORY_KEY = "serverplus_history_v2";
 
+/* ============================
+   LOAD DB HISTORY
+============================ */
+async function loadDbHistory() {
+    const box = document.getElementById("dbHistoryBox");
+
+    try {
+        const res = await fetch("/api/attempts");
+        if (!res.ok) throw new Error("HTTP " + res.status);
+
+        const data = await res.json();
+        const attempts = data.attempts || [];
+
+        if (!attempts.length) {
+            box.innerHTML = "<p>No persistent attempts yet.</p>";
+            return;
+        }
+
+        let html = "<table class='historyTable'><tr>" +
+                   "<th>Quiz</th><th>Score</th><th>Date</th><th>Mode</th></tr>";
+
+        attempts.forEach(a => {
+            html += `
+                <tr>
+                    <td>${a.quiz_title || "Unknown Quiz"}</td>
+                    <td>${a.score}/${a.total} (${a.percent}%)</td>
+                    <td>${a.completed_at || ""}</td>
+                    <td>${a.mode}</td>
+                </tr>
+            `;
+        });
+
+        html += "</table>";
+        box.innerHTML = html;
+
+    } catch (err) {
+        console.error("DB history failed:", err);
+        box.innerHTML = "<p>⚠️ Unable to load persistent history.</p>";
+    }
+}
+
 /* ---------------------------------------------------
-   QUIZ NAME REGISTRY MAP (like dashboard)
+   QUIZ NAME REGISTRY MAP (unchanged)
 --------------------------------------------------- */
 let QUIZ_NAME_MAP = {};
 
-// Load registry FIRST, THEN render history
 fetch('/config/quizzes.json')
     .then(r => r.json())
     .then(list => {
@@ -141,7 +204,6 @@ fetch('/config/quizzes.json')
             const base = html.replace(".html","");
             const json = base + ".json";
 
-            // Support ALL forms history might use
             QUIZ_NAME_MAP[html] = q.title;
             QUIZ_NAME_MAP["/data/" + html] = q.title;
             QUIZ_NAME_MAP[json] = q.title;
@@ -149,20 +211,21 @@ fetch('/config/quizzes.json')
         });
 
         loadLogo();
+        loadDbHistory();
         renderHistory();
     })
     .catch(() => {
         console.warn("Could not load quizzes.json — titles fallback to filenames");
         loadLogo();
+        loadDbHistory();
         renderHistory();
     });
 
 
 /* =========================
-   LOAD HISTORY
+   LOCAL STORAGE HISTORY (unchanged logic)
 ========================= */
 function loadHistoryStore() {
-
     let v2 = JSON.parse(localStorage.getItem(HISTORY_KEY) || "{}");
     if (Object.keys(v2).length) return v2;
 
@@ -183,9 +246,8 @@ function loadHistoryStore() {
     return {};
 }
 
-
 /* =========================
-   RENDER HISTORY
+   RENDER EXISTING HISTORY
 ========================= */
 function renderHistory() {
     const historyDiv = document.getElementById("historyOutput");
@@ -195,7 +257,7 @@ function renderHistory() {
     const quizKeys = Object.keys(history);
 
     if (!quizKeys.length) {
-        historyDiv.innerHTML = "<p>No history yet. Take some exams 😊</p>";
+        historyDiv.innerHTML = "<p>No local history yet.</p>";
         return;
     }
 
@@ -204,12 +266,11 @@ function renderHistory() {
         const groupDiv = document.createElement("div");
         groupDiv.className = "quiz-group";
 
-        // 🔥 FRIENDLY QUIZ NAME LOGIC
         const friendlyName =
-            records[0]?.quizName ||     // future saved name
-            records[0]?.quiz     ||     // if saved
-            QUIZ_NAME_MAP[key]   ||     // lookup match
-            key.replace("/data/","");   // final fallback
+            records[0]?.quizName ||
+            records[0]?.quiz ||
+            QUIZ_NAME_MAP[key] ||
+            key.replace("/data/","");
 
         groupDiv.innerHTML += `
             <div class="quiz-title">
@@ -230,49 +291,6 @@ function renderHistory() {
 
             let missedBlock = "<i>None 🎉</i>";
 
-            /* ---- FORMAT MISSED QUESTIONS ---- */
-            if (rec.missedDetails && rec.missedDetails.length) {
-                missedBlock = rec.missedDetails.map(m => `
-                    <div style="margin-top:6px; padding:8px; background:rgba(0,0,0,.6); border-radius:6px;">
-                        <b>Question ${m.number}</b><br>
-                        ${m.question}<br>
-                        <span style="color:#00ff80">
-                            ✓ Correct Answer: (${m.correctLetter}) ${m.correctText}
-                        </span>
-                    </div>
-                `).join("");
-
-            } else if (rec.missed && rec.missed.length) {
-                missedBlock = rec.missed.map(m => {
-                    if (typeof m === "number") {
-                        return `<div>Question ${m}</div>`;
-                    }
-
-                    if (!m.correctText && m.correct) {
-                        m.correctText = Array.isArray(m.correct)
-                            ? m.correct.map(l => l)
-                            : [m.correct];
-                    }
-
-                    const correctSection = (m.correctText && m.correctText.length)
-                        ? `<ul>${m.correctText.map(c => `<li>${c}</li>`).join("")}</ul>`
-                        : `<span style="color:#00ff80">
-                                ✓ Correct Answer: ${(m.correctLetters || []).join(", ")}
-                           </span>`;
-
-                    return `
-                        <div style="margin-top:6px; padding:8px; background:rgba(0,0,0,.6); border-radius:6px;">
-                            <b>Question ${m.number}</b><br>
-                            ${m.question || ""}<br>
-                            <div style="margin-top:6px; color:#00ff80">
-                                <b>Correct Answer(s):</b>
-                                ${correctSection}
-                            </div>
-                        </div>
-                    `;
-                }).join("");
-            }
-
             const card = document.createElement("div");
             card.className = "history-card " + cls;
             card.setAttribute("data-attempt",
@@ -284,8 +302,6 @@ function renderHistory() {
                 <div>Mode: ${rec.mode}</div>
                 <div>Score: ${rec.score} / ${rec.total} (${rec.percent}%)</div>
                 <div>Time Used: ${minsUsed} min</div>
-                <div>❌ Missed Questions:</div>
-                <div>${missedBlock}</div>
             `;
 
             groupDiv.appendChild(card);
@@ -297,21 +313,13 @@ function renderHistory() {
     highlightTargetAttempt();
 }
 
-
-/* =========================
-   CLEAR HISTORY
-========================= */
 function clearHistory() {
-    if (!confirm("Delete ALL quiz history?")) return;
+    if (!confirm("Delete ALL quiz history from this browser only?")) return;
     localStorage.removeItem(HISTORY_KEY);
     localStorage.removeItem("history");
     renderHistory();
 }
 
-
-/* ===============================
-   LOAD LOGO
-=============================== */
 function loadLogo() {
     fetch('/config/quizzes.json')
         .then(r => r.json())
@@ -328,10 +336,6 @@ function loadLogo() {
         .catch(()=>{});
 }
 
-
-/* =========================
-   HIGHLIGHT ATTEMPT
-========================= */
 function highlightTargetAttempt() {
     const params = new URLSearchParams(window.location.search);
     const target = params.get("attempt");
