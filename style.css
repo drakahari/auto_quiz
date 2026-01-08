@@ -1,3 +1,5 @@
+@import url("/dynamic.css");
+
 /* =======================
    GLOBAL SITE BACKGROUND
    ======================= */
@@ -6,14 +8,14 @@ body {
     margin: 0;
     padding: 0;
 
-    /* Lighter Fiber Background with glow */
+    /* Uses dynamic BG when available, else your fiber default */
     background:
         radial-gradient(
             circle at top,
             rgba(255,255,255,0.35),
             rgba(0,0,0,0.65)
         ),
-        url("/static/fiber.jpg");
+        var(--portal-bg, url("/static/fiber.jpg"));
 
     background-position: center;
     background-size: cover;
@@ -23,6 +25,7 @@ body {
     color: #e9eef5;
     font-family: Arial, Helvetica, sans-serif;
 }
+
 
 
 /* =======================
@@ -512,15 +515,6 @@ body.blurred .blur-wrapper {
 
 .portal-card:active {
     transform: scale(.99);
-}
-
-.history-card {
-    transition: transform .15s ease, box-shadow .2s ease;
-}
-
-.history-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 0 20px rgba(0,255,170,.4);
 }
 
 /* ===== Hover Animation For History Attempt Cards ===== */

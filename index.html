@@ -4,7 +4,26 @@
 <meta charset="UTF-8">
 <title>Training & Practice Center</title>
 <link rel="stylesheet" href="/style.css">
+
+<script>
+fetch("/config/portal.json")
+  .then(r => r.json())
+  .then(cfg => {
+      if (cfg.background_image) {
+          document.documentElement.style.setProperty(
+              "--portal-bg",
+              `url(${cfg.background_image})`
+          );
+      }
+  });
+</script>
+
+
+
+
+
 </head>
+
 
 <body>
 

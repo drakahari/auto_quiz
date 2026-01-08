@@ -50,6 +50,19 @@
 <body>
 <div class="container">
 
+<script>
+fetch("/config/portal.json")
+  .then(r => r.json())
+  .then(cfg => {
+      if (cfg.background_image) {
+          document.documentElement.style.setProperty(
+              "--portal-bg",
+              `url(${cfg.background_image})`
+          );
+      }
+  });
+</script>
+
 <h1 class="hero-title">
 📊 Performance & Study Analytics
 </h1>
@@ -104,7 +117,7 @@ async function buildDashboard() {
         const list = grouped[key];
         if (!list.length) return;
 
-        // Sort newest → oldest to be safe
+        // Sort newest → oldest
         list.sort((a,b) => (b.completed_at || "").localeCompare(a.completed_at || ""));
 
         const scores = list.map(a => Number(a.percent || 0));

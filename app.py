@@ -1,5 +1,7 @@
 from flask import Flask, send_from_directory, request, redirect, render_template_string, jsonify
 import os, re, json, time, sqlite3
+from werkzeug.utils import secure_filename
+
 
 app = Flask(__name__, static_folder=".", static_url_path="")
 
@@ -13,7 +15,9 @@ DATA_FOLDER = os.path.join(BASE_DIR, "data")
 QUIZ_FOLDER = os.path.join(BASE_DIR, "quizzes")
 CONFIG_FOLDER = os.path.join(BASE_DIR, "config")
 LOGO_FOLDER = os.path.join(BASE_DIR, "static", "logos")
+BACKGROUND_FOLDER = os.path.join(BASE_DIR, "static", "bg")
 
+os.makedirs(BACKGROUND_FOLDER, exist_ok=True)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(DATA_FOLDER, exist_ok=True)
 os.makedirs(QUIZ_FOLDER, exist_ok=True)
@@ -23,6 +27,20 @@ os.makedirs(LOGO_FOLDER, exist_ok=True)
 PORTAL_CONFIG = os.path.join(CONFIG_FOLDER, "portal.json")
 QUIZ_REGISTRY = os.path.join(CONFIG_FOLDER, "quizzes.json")
 DB_PATH = os.path.join(BASE_DIR, "results.db")
+
+
+@app.route("/dynamic.css")
+def dynamic_css():
+    cfg = load_portal_config()
+    bg = cfg.get("background_image", "/static/fiber.jpg")
+
+    return f"""
+:root {{
+  --portal-bg: url('{bg}');
+}}
+""", 200, {"Content-Type": "text/css"}
+
+
 
 
 
@@ -236,129 +254,147 @@ def quiz_library():
 
         <!-- Drag + Drop Library -->
         <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+
+        <!-- Background Loader -->
+        <script>
+        fetch("/config/portal.json")
+          .then(r => r.json())
+          .then(cfg => {
+              if (cfg.background_image) {
+                  document.documentElement.style.setProperty(
+                      "--portal-bg",
+                      `url(${cfg.background_image})`
+                  );
+              }
+          });
+        </script>
     </head>
 
-    <body>
-    <div class="container">
+<body>
 
-        <h1 class="hero-title">
-            {{portal_title}}<br>
-            <span style="font-size:22px;opacity:.85">📚 Quiz Library</span>
-        </h1>
+<div class="container">
 
-        <div class="card">
+    <h1 class="hero-title">
+        {{portal_title}}<br>
+        <span style="font-size:22px;opacity:.85">📚 Quiz Library</span>
+    </h1>
 
-            {% if quizzes %}
-                <h2>Drag to Reorder</h2>
+    <div class="card">
 
-                <div id="quizList">
+        {% if quizzes %}
+            <h2>Drag to Reorder</h2>
 
-                {% for q in quizzes %}
-                <div class="quiz-card"
-                     data-id="{{q['html']}}"
-                     style="
-                        padding:14px;
-                        margin:10px;
-                        background:rgba(0,0,0,.6);
-                        border-radius:8px;
-                        display:flex;
-                        justify-content:space-between;
-                        gap:20px;
-                        cursor:grab;
-                     ">
+            <div id="quizList">
 
-                    <div style="flex:1;">
-                        <h3 style="
-                            margin-top:0;
-                            margin-bottom:6px;
-                            font-size:24px;
-                            font-weight:900;
-                            letter-spacing:.5px;">
-                            {{q['title']}}
-                        </h3>
+            {% for q in quizzes %}
+            <div class="quiz-card"
+                 data-id="{{q['html']}}"
+                 style="
+                    padding:14px;
+                    margin:10px;
+                    background:rgba(0,0,0,.6);
+                    border-radius:8px;
+                    display:flex;
+                    justify-content:space-between;
+                    gap:20px;
+                    cursor:grab;
+                 ">
 
-                        <div style="margin-top:10px;">
-                            <button onclick="location.href='/quizzes/{{q['html']}}'"
-                                    style="padding:8px 14px; border-radius:6px;">
-                                ▶ Open Quiz
-                            </button>
-                        </div>
-                    </div>
+                <div style="flex:1;">
+                    <h3 style="
+                        margin-top:0;
+                        margin-bottom:6px;
+                        font-size:24px;
+                        font-weight:900;
+                        letter-spacing:.5px;">
+                        {{q['title']}}
+                    </h3>
 
-                    <div style="
-                        width:150px;
-                        display:flex;
-                        flex-direction:column;
-                        justify-content:space-between;
-                        align-items:center;
-                    ">
-
-                        {% if q.get('logo') %}
-                        <img src="/static/logos/{{q['logo']}}"
-                             style="max-height:90px; width:auto;">
-                        {% else %}
-                        <div style="height:90px;"></div>
-                        {% endif %}
-
-                        <form method="POST"
-                              action="/delete_quiz/{{q['html']}}"
-                              onsubmit="return confirm('Delete this quiz permanently?');"
-                              style="margin-top:12px; width:100%; text-align:center;">
-
-                            <button type="submit" style="
-                                width:100%;
-                                background:#7a0000;
-                                color:white;
-                                border:none;
-                                padding:7px 0;
-                                font-size:13px;
-                                border-radius:6px;
-                                cursor:pointer;">
-                                🗑 Delete
-                            </button>
-                        </form>
-
+                    <div style="margin-top:10px;">
+                        <button onclick="location.href='/quizzes/{{q['html']}}'"
+                                style="padding:8px 14px; border-radius:6px;">
+                            ▶ Open Quiz
+                        </button>
                     </div>
                 </div>
-                {% endfor %}
+
+                <div style="
+                    width:150px;
+                    display:flex;
+                    flex-direction:column;
+                    justify-content:space-between;
+                    align-items:center;
+                ">
+
+                    {% if q.get('logo') %}
+                    <img src="/static/logos/{{q['logo']}}"
+                         style="max-height:90px; width:auto;">
+                    {% else %}
+                    <div style="height:90px;"></div>
+                    {% endif %}
+
+                    <form method="POST"
+                          action="/delete_quiz/{{q['html']}}"
+                          onsubmit="return confirm('Delete this quiz permanently?');"
+                          style="margin-top:12px; width:100%; text-align:center;">
+
+                        <button type="submit" style="
+                            width:100%;
+                            background:#7a0000;
+                            color:white;
+                            border:none;
+                            padding:7px 0;
+                            font-size:13px;
+                            border-radius:6px;
+                            cursor:pointer;">
+                            🗑 Delete
+                        </button>
+                    </form>
+
                 </div>
+            </div>
+            {% endfor %}
+            </div>
 
-            {% else %}
-                <p>No quizzes created yet. Upload one 😊</p>
-            {% endif %}
+        {% else %}
+            <p>No quizzes created yet. Upload one 😊</p>
+        {% endif %}
 
-            <br>
-            <button onclick="location.href='/upload'">📤 Upload New Quiz</button>
-            <button onclick="location.href='/paste'">📋 Paste Questions Instead</button>
-                      
-            <button onclick="location.href='/'">⬅ Back To Portal</button>
-
-        </div>
+        <br>
+        <button onclick="location.href='/upload'">📤 Upload New Quiz</button>
+        <button onclick="location.href='/paste'">📋 Paste Questions Instead</button>
+        <button onclick="location.href='/'">⬅ Back To Portal</button>
 
     </div>
+
+</div>
+
 
 <script>
 const list = document.getElementById("quizList");
 
-Sortable.create(list, {
-    animation: 150,
-    handle: ".quiz-card",
-    onEnd: () => {
-        const order = [...document.querySelectorAll(".quiz-card")]
-            .map(card => card.getAttribute("data-id"));
+if (list) {
+    Sortable.create(list, {
+        animation: 150,
+        handle: ".quiz-card",
+        onEnd: () => {
+            const order = [...document.querySelectorAll(".quiz-card")]
+                .map(card => card.getAttribute("data-id"));
 
-        fetch("/save_order", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ order })
-        });
-    }
-});
+            fetch("/save_order", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ order })
+            });
+        }
+    });
+}
 </script>
 
-    </body>
-    </html>
+</body>
+</html>
     """, quizzes=quizzes, portal_title=portal_title)
+
 
 
 
@@ -369,14 +405,31 @@ Sortable.create(list, {
 def upload_page():
     portal_title = get_portal_title()
 
-    return render_template_string(f"""
+    return render_template_string("""
+    <!DOCTYPE html>
     <html>
     <head>
+        <meta charset="UTF-8">
         <title>Upload Quiz File</title>
         <link rel="stylesheet" href="/style.css">
     </head>
 
     <body>
+
+    <script>
+fetch("/config/portal.json")
+  .then(r => r.json())
+  .then(cfg => {
+      if (cfg.background_image) {
+          document.documentElement.style.setProperty(
+              "--portal-bg",
+              `url(${cfg.background_image})`
+          );
+      }
+  });
+</script>
+
+
     <div class="container">
 
         <h1 class="hero-title">
@@ -417,9 +470,7 @@ def upload_page():
                 <button type="submit">📤 Upload & Build Quiz</button>
             </form>
 
-
             <hr style="margin:25px 0; opacity:.5">
-
 
             <h2>Option 2 — Paste Questions Instead</h2>
             <p style="opacity:.8">
@@ -437,7 +488,8 @@ def upload_page():
     </div>
     </body>
     </html>
-    """)
+    """, portal_title=portal_title)
+
 
 
 
@@ -447,16 +499,33 @@ def upload_page():
 @app.route("/paste")
 def paste_page():
     portal_title = get_portal_title()
-    cfg = load_portal_config()   # <-- already needed
+    cfg = load_portal_config()
 
     return render_template_string("""
+    <!DOCTYPE html>
     <html>
     <head>
+        <meta charset="UTF-8">
         <title>Paste Quiz Questions</title>
         <link rel="stylesheet" href="/style.css">
     </head>
 
     <body>
+
+    <script>
+    fetch("/config/portal.json")
+    .then(r => r.json())
+    .then(cfg => {
+        if (cfg.background_image) {
+            document.documentElement.style.setProperty(
+                "--portal-bg",
+                `url(${cfg.background_image})`
+            );
+        }
+    });
+    </script>
+
+
     <div class="container">
 
         <h1 class="hero-title">
@@ -573,6 +642,7 @@ Question\\s*#\\d+ => "
     </body>
     </html>
     """, portal_title=portal_title, cfg=cfg)
+
 
 
 
@@ -1063,6 +1133,21 @@ def preview_paste():
 </head>
 
 <body>
+
+  <script>
+    fetch("/config/portal.json")
+    .then(r => r.json())
+    .then(cfg => {
+        if (cfg.background_image) {
+            document.documentElement.style.setProperty(
+                "--portal-bg",
+                `url(${cfg.background_image})`
+            );
+        }
+    });
+    </script>
+                             
+
 <div class="container">
     
     <h1 class="hero-title">👀 Preview Quiz Before Building</h1>
@@ -1521,6 +1606,25 @@ def process_paste():
             <link rel="stylesheet" href="/style.css">
         </head>
         <body>
+         <script>
+        fetch("/config/portal.json")
+        .then(r => r.json())
+        .then(cfg => {
+            if (cfg.background_image) {
+                document.documentElement.style.setProperty(
+                    "--portal-bg",
+                    `url(${cfg.background_image})`
+                );
+            }
+        });
+        </script>                           
+
+
+
+
+
+
+
         <div class="container">
             <h1 class="hero-title">⚠️ Could Not Parse Any Questions</h1>
 
@@ -1613,6 +1717,21 @@ def process_paste():
     </head>
 
     <body>
+
+    <script>
+    fetch("/config/portal.json")
+    .then(r => r.json())
+    .then(cfg => {
+        if (cfg.background_image) {
+            document.documentElement.style.setProperty(
+                "--portal-bg",
+                `url(${cfg.background_image})`
+            );
+        }
+    });
+    </script>
+
+
     <div class="container">
 
         <h1 class="hero-title">
@@ -1700,6 +1819,22 @@ def process_file():
             <link rel="stylesheet" href="/style.css">
         </head>
         <body>
+                                    
+        <script>
+        fetch("/config/portal.json")
+        .then(r => r.json())
+        .then(cfg => {
+            if (cfg.background_image) {
+                document.documentElement.style.setProperty(
+                    "--portal-bg",
+                    `url(${cfg.background_image})`
+                );
+            }
+        });
+        </script>
+
+
+
         <div class="container">
             <h1 class="hero-title">⚠️ Could Not Parse Any Questions</h1>
             <div class="card">
@@ -1767,6 +1902,22 @@ def settings_page():
 </head>
 
 <body>
+                                  
+<script>
+fetch("/config/portal.json")
+  .then(r => r.json())
+  .then(cfg => {
+      if (cfg.background_image) {
+          document.documentElement.style.setProperty(
+              "--portal-bg",
+              `url(${cfg.background_image})`
+          );
+      }
+  });
+</script>
+
+
+
 <div class="container">
 
     <h1 class="hero-title">
@@ -2008,22 +2159,41 @@ def load_portal_config():
 def save_settings():
     cfg = load_portal_config()
 
+    # Portal title
     title = request.form.get("portal_title", cfg.get("title", "Training Portal")).strip()
-
     cfg["title"] = title
-    cfg["show_confidence"] = ("show_confidence" in request.form)
-    cfg["enable_regex_replace"] = ("enable_regex_replace" in request.form)
 
-    # 🔥 Correct Key Name
-    cfg["auto_bom_clean"] = ("auto_bom_clean" in request.form)
-
-    # (optional future UI toggle, keep or remove)
+    # Advanced toggles
+    cfg["show_confidence"]        = ("show_confidence" in request.form)
+    cfg["enable_regex_replace"]   = ("enable_regex_replace" in request.form)
+    cfg["auto_bom_clean"]         = ("auto_bom_clean" in request.form)
     cfg["enable_show_invisibles"] = ("enable_show_invisibles" in request.form)
 
+    # =========================
+    #  BACKGROUND IMAGE UPLOAD
+    # =========================
+    file = request.files.get("background_image")
+
+    if file and file.filename.strip():
+        filename = secure_filename(file.filename)
+
+        # Ensure folder exists
+        os.makedirs(BACKGROUND_FOLDER, exist_ok=True)
+
+        save_path = os.path.join(BACKGROUND_FOLDER, filename)
+        file.save(save_path)
+
+        # Store URL for UI use
+        cfg["background_image"] = f"/static/bg/{filename}"
+        print("Saved new background:", cfg["background_image"])
+
+    # Save config JSON
     with open(PORTAL_CONFIG, "w") as f:
         json.dump(cfg, f, indent=4)
 
     return redirect("/settings")
+
+
 
 
 
@@ -2215,7 +2385,14 @@ def clear_db_history():
         print("DB CLEAR ERROR:", e)
         return {"status": "error"}, 500
 
-
+@app.route("/api/portal_config")
+def api_portal_config():
+    try:
+        cfg = load_portal_config()
+        return jsonify(cfg)
+    except Exception as e:
+        print("portal_config API error:", e)
+        return jsonify({"error": "failed"}), 500
 
 
 
@@ -2568,6 +2745,20 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
 
 <body>
 
+<!-- 🔹 Load background dynamically -->
+<script>
+fetch("/config/portal.json")
+  .then(r => r.json())
+  .then(cfg => {{
+      if (cfg.background_image) {{
+          document.documentElement.style.setProperty(
+              "--portal-bg",
+              `url(${cfg.background_image})`
+          );
+      }}
+  }});
+</script>
+
 <!-- 🔹 Overlay shown when exam is paused -->
 <div id="pauseOverlay" class="pause-overlay">
     <div class="pause-overlay-content">
@@ -2601,66 +2792,64 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
         </div>
 
         <!-- Quiz Area -->
-    <div id="quiz" class="hidden">
+        <div id="quiz" class="hidden">
 
-        <!-- Progress Bar -->
-        <div id="progressBarOuter">
-            <div id="progressBarInner"></div>
-        </div>
-
-        <!-- TOP BAR: Submit (LEFT) — Timer & Pause (RIGHT) -->
-        <div class="top-bar">
-
-            <!-- LEFT SIDE -->
-            <div class="top-left">
-                <button onclick="submitQuiz()" id="submitBtn" class="danger">
-                    Submit Exam
-                </button>
+            <!-- Progress Bar -->
+            <div id="progressBarOuter">
+                <div id="progressBarInner"></div>
             </div>
 
-            <!-- RIGHT SIDE -->
-            <div id="timer" class="hidden timerBox top-right">
-                <b>Time Remaining:</b>
-                <span id="timeDisplay">--:--</span>
+            <!-- TOP BAR -->
+            <div class="top-bar">
 
-                <button id="pauseBtn" onclick="pauseExam()">Pause</button>
+                <!-- LEFT -->
+                <div class="top-left">
+                    <button onclick="submitQuiz()" id="submitBtn" class="danger">
+                        Submit Exam
+                    </button>
+                </div>
+
+                <!-- RIGHT -->
+                <div id="timer" class="hidden timerBox top-right">
+                    <b>Time Remaining:</b>
+                    <span id="timeDisplay">--:--</span>
+                    <button id="pauseBtn" onclick="pauseExam()">Pause</button>
+                </div>
+
             </div>
 
+            <div id="qHeader"></div>
+            <div id="qText"></div>
+            <div id="choices"></div>
+
+            <div class="controls">
+                <button onclick="prev()">Prev</button>
+                <button onclick="next()">Next</button>
+            </div>
         </div>
 
-        <div id="qHeader"></div>
-        <div id="qText"></div>
-        <div id="choices"></div>
+        <div id="result" class="hidden"></div>
 
-        <div class="controls">
-            <button onclick="prev()">Prev</button>
-            <button onclick="next()">Next</button>
-            <!-- Submit Exam REMOVED from here -->
-        </div>
-    </div>
-
-    <div id="result" class="hidden"></div>
-
-    <br>
-    <button onclick="location.href='/'">🏠 Return To Portal</button>
-    <button onclick="location.href='/library'">📚 Return To Quiz Library</button>
-
+        <br>
+        <button onclick="location.href='/'">🏠 Return To Portal</button>
+        <button onclick="location.href='/library'">📚 Return To Quiz Library</button>
 
 <script>
   /* Make title available to script.js + DB saving */
   window.quiz_title = "{quiz_title}";
 
- /* This tells script.js which JSON file to load for this quiz */
+  /* This tells script.js which JSON file to load */
   const QUIZ_FILE = "/data/{jsonfile}";
-  window.quiz_title = "{quiz_title}";
 </script>
 
 <script src="/script.js"></script>
+
 </body>
 </html>
 """
     with open(outpath, "w", encoding="utf-8") as f:
         f.write(html)
+
 
 
 # =========================

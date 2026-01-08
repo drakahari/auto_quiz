@@ -43,6 +43,20 @@ small { color:#ccc; }
 
 <body>
 
+<!-- 🔥 Dynamic Background Loader -->
+<script>
+fetch("/config/portal.json")
+  .then(r => r.json())
+  .then(cfg => {
+      if (cfg.background_image) {
+          document.documentElement.style.setProperty(
+              "--portal-bg",
+              `url(${cfg.background_image})`
+          );
+      }
+  });
+</script>
+
 <div class="container review-container">
 
     <h1 class="hero-title">
