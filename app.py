@@ -2368,6 +2368,181 @@ def api_attempts():
     return jsonify({"attempts": attempts})
 
 
+# =========================
+# EXPORT SELECTED MISSED QUESTIONS TO ANKI
+# =========================
+@app.route("/export/anki", methods=["POST"], endpoint="export_anki_selected")
+
+def export_anki():
+    import genanki
+    import sqlite3
+    import tempfile
+    import time
+    import os
+    import json
+    from flask import send_file
+
+    data = request.get_json(force=True)
+    missed_ids = data.get("missed_ids", [])
+
+    if not missed_ids:
+        return {"error": "No questions selected"}, 400
+
+    # -------------------------
+    # LOAD MISSED QUESTIONS
+    # -------------------------
+    conn = sqlite3.connect("results.db")
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    q_marks = ",".join("?" for _ in missed_ids)
+    cur.execute(
+        f"""
+        SELECT
+            mq.question_number,
+            mq.question_text,
+            mq.correct_text,
+            mq.correct_letters,
+            mq.selected_text,
+            mq.selected_letters,
+            a.quiz_id
+        FROM missed_questions mq
+        JOIN attempts a ON mq.attempt_id = a.id
+        WHERE mq.id IN ({q_marks})
+        """,
+        missed_ids
+    )
+
+    rows = cur.fetchall()
+    conn.close()
+
+    if not rows:
+        return {"error": "No matching questions found"}, 404
+
+    # -------------------------
+    # CREATE ANKI MODEL
+    # -------------------------
+    model = genanki.Model(
+        1607392319,
+        "AutoQuiz Missed Question Model",
+        fields=[
+            {"name": "Question"},
+            {"name": "Choices"},
+            {"name": "Answer"},
+            {"name": "YourAnswer"},
+        ],
+        templates=[
+            {
+                "name": "Card 1",
+                "qfmt": """
+                <div style="font-size:18px;"><b>{{Question}}</b></div>
+                <hr>
+                {{Choices}}
+                """,
+                "afmt": """
+                {{FrontSide}}
+                <hr>
+                <b>Correct Answer:</b><br>{{Answer}}
+                <hr>
+                <b>Your Answer:</b><br>{{YourAnswer}}
+                """,
+            }
+        ],
+    )
+
+    # -------------------------
+    # CREATE DECK
+    # -------------------------
+    deck_id = int(time.time())
+    deck = genanki.Deck(deck_id, "AutoQuiz – Missed Questions")
+
+    for r in rows:
+        choices = ""
+        if r["correct_letters"]:
+            choices += "<br><i>Correct:</i> " + r["correct_letters"]
+        if r["selected_letters"]:
+            choices += "<br><i>Your Choice:</i> " + r["selected_letters"]
+
+        note = genanki.Note(
+            model=model,
+            fields=[
+                r["question_text"] or "(No question text)",
+                choices,
+                r["correct_text"] or r["correct_letters"] or "",
+                r["selected_text"] or r["selected_letters"] or "",
+            ],
+        )
+        deck.add_note(note)
+
+    # -------------------------
+    # WRITE APKG
+    # -------------------------
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".apkg")
+    genanki.Package(deck).write_to_file(tmp.name)
+
+    return send_file(
+        tmp.name,
+        as_attachment=True,
+        download_name="autoquiz_missed_questions.apkg",
+        mimetype="application/octet-stream",
+    )
+
+
+
+# =========================
+# API: MISSED QUESTIONS BY ATTEMPT
+# =========================
+@app.route("/api/missed_questions")
+def api_missed_questions():
+    import sqlite3
+    from flask import request, jsonify
+
+    attempt_id = request.args.get("attempt")
+    if not attempt_id:
+        return jsonify([])
+
+    conn = sqlite3.connect("results.db")
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            id,
+            question_number,
+            question_text,
+            correct_text,
+            correct_letters,
+            selected_text,
+            selected_letters
+        FROM missed_questions
+        WHERE attempt_id = ?
+        ORDER BY question_number
+    """, (attempt_id,))
+
+    rows = cur.fetchall()
+    conn.close()
+
+    return jsonify([
+        {
+            "id": r["id"],
+            "question_number": r["question_number"],
+            "question_text": r["question_text"],
+            "correct_text": r["correct_text"],
+            "correct_letters": r["correct_letters"],
+            "selected_text": r["selected_text"],
+            "selected_letters": r["selected_letters"],
+        }
+        for r in rows
+    ])
+
+
+
+
+
+
+
+
+
 @app.route("/api/clear_db_history", methods=["POST"])
 def clear_db_history():
     try:

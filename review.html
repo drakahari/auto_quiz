@@ -50,7 +50,6 @@ small { color:#ccc; }
 
 <body>
 
-<!-- 🔥 Dynamic Background Loader -->
 <script>
 fetch("/config/portal.json")
   .then(r => r.json())
@@ -66,26 +65,18 @@ fetch("/config/portal.json")
 
 <div class="container review-container">
 
-    <h1 class="hero-title">
-        🔁 Review Missed Questions
-    </h1>
+<h1 class="hero-title">🔁 Review Missed Questions</h1>
 
-    <div id="info" class="info-box">
-        Loading…
-    </div>
+<div id="info" class="info-box">Loading…</div>
+<div id="reviewArea"></div>
 
-    <div id="reviewArea"></div>
+<div style="margin-top:20px;">
+    <button onclick="exportSelectedToAnki()">🧠 Export Selected to Anki</button>
+</div>
 
-    <!-- ✅ Export Button -->
-    <div style="margin-top:20px;">
-        <button onclick="exportSelectedToAnki()">
-            🧠 Export Selected to Anki
-        </button>
-    </div>
-
-    <br>
-    <button onclick="location.href='/'">⬅ Back to Portal</button>
-    <button onclick="location.href='/history.html'">📜 Back to History</button>
+<br>
+<button onclick="location.href='/'">⬅ Back to Portal</button>
+<button onclick="location.href='/history.html'">📜 Back to History</button>
 
 </div>
 
@@ -93,8 +84,7 @@ fetch("/config/portal.json")
 async function loadReview() {
 
     const info = document.getElementById("info");
-    const box = document.getElementById("reviewArea");
-
+    const box  = document.getElementById("reviewArea");
     const params = new URLSearchParams(window.location.search);
     const attemptId = params.get("attempt");
 
@@ -104,109 +94,90 @@ async function loadReview() {
     }
 
     try {
+        /* 1️⃣ Load attempt metadata */
         const res = await fetch("/api/attempts");
-        if (!res.ok) throw new Error("HTTP " + res.status);
-
         const data = await res.json();
-        const attempts = data.attempts || [];
-
-        const attempt = attempts.find(a => a.id == attemptId);
+        const attempt = (data.attempts || []).find(a => a.id == attemptId);
 
         if (!attempt) {
-            info.innerHTML = "❌ Attempt not found in database.";
+            info.innerHTML = "❌ Attempt not found.";
             return;
         }
 
         info.innerHTML = `
-            <b>Quiz:</b> ${attempt.quiz_title || "Unknown Quiz"}<br>
+            <b>Quiz:</b> ${attempt.quiz_title}<br>
             <b>Score:</b> ${attempt.score}/${attempt.total} (${attempt.percent}%)<br>
-            <b>Date:</b> ${attempt.completed_at || ""}<br>
+            <b>Date:</b> ${attempt.completed_at}<br>
             <b>Mode:</b> ${attempt.mode}
         `;
 
-        if (!attempt.missedQuestions || !attempt.missedQuestions.length) {
+        /* 2️⃣ Load missed questions DIRECTLY from DB-backed API */
+        const missRes = await fetch(`/api/missed_questions?attempt=${attemptId}`);
+        const missed = await missRes.json();
+
+        if (!missed.length) {
             box.innerHTML = "<p>🎉 No missed questions!</p>";
             return;
         }
 
         let html = "";
 
-        attempt.missedQuestions.forEach(m => {
+        missed.forEach(m => {
             html += `
-                <div class="reviewCard">
+            <div class="reviewCard">
 
-                    <!-- ✅ Anki selection -->
-                    <div class="ankiRow">
-                        <input type="checkbox"
-                               class="anki-select"
-                               value="${m.id}">
-                        <span>Add to Anki deck</span>
-                    </div>
-
-                    <h3>Question ${m.number}</h3>
-
-                    <div>${m.question || "(No question text stored)"}</div>
-
-                    <div class="correctBox">
-                        <b>Correct Answer(s)</b><br>
-                        ${(m.correctText && m.correctText.length)
-                            ? m.correctText.join("<br>")
-                            : (m.correctLetters || []).join(", ")
-                        }
-                    </div>
-
-                    <div class="userBox">
-                        <b>Your Answer</b><br>
-                        ${(m.selectedText && m.selectedText.length)
-                            ? m.selectedText.join("<br>")
-                            : (m.selectedLetters || []).join(", ")
-                        }
-                    </div>
-
+                <div class="ankiRow">
+                    <input type="checkbox" class="anki-select" value="${m.id}">
+                    <span>Add to Anki deck</span>
                 </div>
-            `;
+
+                <h3>Question ${m.question_number}</h3>
+
+                <div>${m.question_text}</div>
+
+                <div class="correctBox">
+                    <b>Correct Answer</b><br>
+                    ${m.correct_text || m.correct_letters}
+                </div>
+
+                <div class="userBox">
+                    <b>Your Answer</b><br>
+                    ${m.selected_text || m.selected_letters}
+                </div>
+
+            </div>`;
         });
 
         box.innerHTML = html;
 
-    } catch(err) {
+    } catch (err) {
         console.error(err);
         info.innerHTML = "⚠️ Failed to load review data.";
     }
 }
 
-/* ============================
-   ANKI EXPORT (UI ONLY)
-============================ */
 function exportSelectedToAnki() {
     const selected = [...document.querySelectorAll(".anki-select:checked")]
-        .map(cb => cb.value);
+        .map(cb => Number(cb.value));
 
     if (!selected.length) {
-        alert("Please select at least one missed question.");
+        alert("Please select at least one question.");
         return;
     }
 
-    fetch("/export_anki", {
+    fetch("/export/anki", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({ missed_ids: selected })
     })
-    .then(res => {
-        if (!res.ok) throw new Error("Export failed");
-        return res.blob();
-    })
+    .then(res => res.blob())
     .then(blob => {
-        const url = window.URL.createObjectURL(blob);
+        const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
         a.download = "anki_missed_questions.apkg";
         a.click();
-        window.URL.revokeObjectURL(url);
-    })
-    .catch(err => {
-        console.error(err);
-        alert("Failed to generate Anki deck (backend not wired yet).");
+        URL.revokeObjectURL(url);
     });
 }
 
