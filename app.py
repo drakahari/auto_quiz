@@ -1778,6 +1778,9 @@ def settings_page():
         <!-- NOTE: enctype added so we can upload files -->
         <form action="/save_settings" method="POST" enctype="multipart/form-data">
 
+            <!-- ============================
+                 PORTAL TITLE
+                 ============================ -->
             <h3>Training Portal Title</h3>
             <input type="text"
                    name="portal_title"
@@ -1786,9 +1789,9 @@ def settings_page():
 
             <br><br>
 
-            <!-- ==============================
+            <!-- ============================
                  BACKGROUND IMAGE UPLOAD
-                 ============================== -->
+                 ============================ -->
             <h3>Background Image (Optional)</h3>
             <p style="opacity:.75; font-size:13px">
                 This image is used as the main background for the entire site.
@@ -1808,62 +1811,77 @@ def settings_page():
 
             <br><br>
 
-            <h3>Confidence Analysis</h3>
-            <p style="opacity:.7">
-                Controls whether the 🧠 Confidence Analysis panel appears on quiz preview.
-            </p>
+            <!-- ============================
+                 ADVANCED PARSING TOGGLE
+                 ============================ -->
+            <button type="button"
+                    id="toggleAdvancedBtn"
+                    style="margin-top:10px;">
+                🔧 Show Advanced Parsing Settings
+            </button>
 
-            <label style="display:flex; gap:10px; align-items:center;">
-                <input type="checkbox" name="show_confidence"
-                       value="1"
-                       {% if cfg.show_confidence %}checked{% endif %}>
-                Enable Confidence Analysis on Preview
-            </label>
+            <div id="advParsingPanel"
+                 style="margin-top:15px; display:none; padding:12px; border-radius:8px;
+                        background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.25);">
 
-            <br><br>
+                <h3>Confidence Analysis</h3>
+                <p style="opacity:.7">
+                    Controls whether the 🧠 Confidence Analysis panel appears on quiz preview.
+                </p>
 
-            <h3>Regex Strip / Replace Engine</h3>
-            <p style="opacity:.7">
-                Enables advanced REGEX-based cleanup tools when pasting quiz content.
-            </p>
+                <label style="display:flex; gap:10px; align-items:center;">
+                    <input type="checkbox" name="show_confidence"
+                           value="1"
+                           {% if cfg.show_confidence %}checked{% endif %}>
+                    Enable Confidence Analysis on Preview
+                </label>
 
-            <label style="display:flex; gap:10px; align-items:center;">
-                <input type="checkbox" name="enable_regex_replace"
-                       value="1"
-                       {% if cfg.enable_regex_replace %}checked{% endif %}>
-                Enable Regex Replace Engine
-            </label>
+                <br><br>
 
-            <br><br>
+                <h3>Regex Strip / Replace Engine</h3>
+                <p style="opacity:.7">
+                    Enables advanced REGEX-based cleanup tools when pasting quiz content.
+                </p>
 
-            <h3>Invisible / BOM Cleanup</h3>
-            <p style="opacity:.7">
-                Automatically removes BOM characters, zero-width spaces, and hidden Unicode junk
-                that can break parsing when copying text from PDFs or Microsoft Word.
-            </p>
+                <label style="display:flex; gap:10px; align-items:center;">
+                    <input type="checkbox" name="enable_regex_replace"
+                           value="1"
+                           {% if cfg.enable_regex_replace %}checked{% endif %}>
+                    Enable Regex Replace Engine
+                </label>
 
-            <label style="display:flex; gap:10px; align-items:center;">
-                <input type="checkbox"
-                       name="auto_bom_clean"
-                       value="1"
-                       {% if cfg.auto_bom_clean %}checked{% endif %}>
-                Enable Invisible Character & BOM Cleanup
-            </label>
+                <br><br>
 
-            <br><br>
+                <h3>Invisible / BOM Cleanup</h3>
+                <p style="opacity:.7">
+                    Automatically removes BOM characters, zero-width spaces, and hidden Unicode junk
+                    that can break parsing when copying text from PDFs or Microsoft Word.
+                </p>
 
-            <h3>Show Invisible Characters Tool</h3>
-            <p style="opacity:.7">
-                Allows user to toggle visualization of hidden characters during preview.
-            </p>
+                <label style="display:flex; gap:10px; align-items:center;">
+                    <input type="checkbox"
+                           name="auto_bom_clean"
+                           value="1"
+                           {% if cfg.auto_bom_clean %}checked{% endif %}>
+                    Enable Invisible Character & BOM Cleanup
+                </label>
 
-            <label style="display:flex; gap:10px; align-items:center;">
-                <input type="checkbox"
-                    name="enable_show_invisibles"
-                    value="1"
-                    {% if cfg.enable_show_invisibles %}checked{% endif %}>
-                Enable "Show Invisible Characters" Debug Tool
-            </label>
+                <br><br>
+
+                <h3>Show Invisible Characters Tool</h3>
+                <p style="opacity:.7">
+                    Allows user to toggle visualization of hidden characters during preview.
+                </p>
+
+                <label style="display:flex; gap:10px; align-items:center;">
+                    <input type="checkbox"
+                        name="enable_show_invisibles"
+                        value="1"
+                        {% if cfg.enable_show_invisibles %}checked{% endif %}>
+                    Enable "Show Invisible Characters" Debug Tool
+                </label>
+
+            </div> <!-- /advParsingPanel -->
 
             <br><br>
 
@@ -1898,6 +1916,23 @@ def settings_page():
     </div>
 
     <script>
+    // Toggle Advanced Parsing Panel
+    (function() {
+        const btn  = document.getElementById("toggleAdvancedBtn");
+        const panel = document.getElementById("advParsingPanel");
+        if (!btn || !panel) return;
+
+        let open = false;
+        btn.addEventListener("click", () => {
+            open = !open;
+            panel.style.display = open ? "block" : "none";
+            btn.textContent = open
+                ? "🔧 Hide Advanced Parsing Settings"
+                : "🔧 Show Advanced Parsing Settings";
+        });
+    })();
+
+    // Clear DB history button
     document.getElementById("clearDBBtn").addEventListener("click", async () => {
 
         if (!confirm(
