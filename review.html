@@ -37,6 +37,13 @@
     margin-top: 6px;
 }
 
+.ankiRow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
 small { color:#ccc; }
 </style>
 </head>
@@ -68,6 +75,13 @@ fetch("/config/portal.json")
     </div>
 
     <div id="reviewArea"></div>
+
+    <!-- ✅ Export Button -->
+    <div style="margin-top:20px;">
+        <button onclick="exportSelectedToAnki()">
+            🧠 Export Selected to Anki
+        </button>
+    </div>
 
     <br>
     <button onclick="location.href='/'">⬅ Back to Portal</button>
@@ -120,6 +134,15 @@ async function loadReview() {
         attempt.missedQuestions.forEach(m => {
             html += `
                 <div class="reviewCard">
+
+                    <!-- ✅ Anki selection -->
+                    <div class="ankiRow">
+                        <input type="checkbox"
+                               class="anki-select"
+                               value="${m.id}">
+                        <span>Add to Anki deck</span>
+                    </div>
+
                     <h3>Question ${m.number}</h3>
 
                     <div>${m.question || "(No question text stored)"}</div>
@@ -139,6 +162,7 @@ async function loadReview() {
                             : (m.selectedLetters || []).join(", ")
                         }
                     </div>
+
                 </div>
             `;
         });
@@ -149,6 +173,41 @@ async function loadReview() {
         console.error(err);
         info.innerHTML = "⚠️ Failed to load review data.";
     }
+}
+
+/* ============================
+   ANKI EXPORT (UI ONLY)
+============================ */
+function exportSelectedToAnki() {
+    const selected = [...document.querySelectorAll(".anki-select:checked")]
+        .map(cb => cb.value);
+
+    if (!selected.length) {
+        alert("Please select at least one missed question.");
+        return;
+    }
+
+    fetch("/export_anki", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ missed_ids: selected })
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("Export failed");
+        return res.blob();
+    })
+    .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "anki_missed_questions.apkg";
+        a.click();
+        window.URL.revokeObjectURL(url);
+    })
+    .catch(err => {
+        console.error(err);
+        alert("Failed to generate Anki deck (backend not wired yet).");
+    });
 }
 
 loadReview();

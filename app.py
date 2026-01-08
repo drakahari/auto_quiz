@@ -2945,6 +2945,66 @@ def history_db():
     return jsonify(results)
 
 
+@app.route("/export/anki", methods=["POST"])
+def export_anki():
+    data = request.json or {}
+    attempt_ids = data.get("attempt_ids", [])
+
+    if not attempt_ids:
+        return jsonify({"error": "No attempts selected"}), 400
+
+    # 1️⃣ Pull attempts from DB
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    placeholders = ",".join("?" for _ in attempt_ids)
+    cur.execute(
+        f"SELECT * FROM attempts WHERE id IN ({placeholders})",
+        attempt_ids
+    )
+
+    rows = cur.fetchall()
+    conn.close()
+
+    if not rows:
+        return jsonify({"error": "No attempts found"}), 404
+
+    # 2️⃣ Extract missed questions
+    questions = []
+
+    for row in rows:
+        missed = json.loads(row["missedQuestions"] or "[]")
+
+        for m in missed:
+            questions.append({
+                "question": m.get("question", ""),
+                "choices": m.get("allChoices", []),
+                "correct": m.get("correctText", []),
+                "selected": m.get("selectedText", []),
+                "quiz_title": row["quiz_title"],
+                "attempt_id": row["id"],
+            })
+
+    if not questions:
+        return jsonify({"error": "No missed questions to export"}), 400
+
+    # 3️⃣ Generate deck
+    from anki_deck import build_anki_deck
+
+    filename = build_anki_deck(
+        questions=questions,
+        deck_name="Missed Questions"
+    )
+
+    return send_from_directory(
+        directory=os.path.dirname(filename),
+        path=os.path.basename(filename),
+        as_attachment=True
+    )
+
+
+
 
 
 # =========================
