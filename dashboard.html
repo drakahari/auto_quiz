@@ -147,19 +147,37 @@ async function buildDashboard() {
         let missedHtml = "";
 
         if (hasMissed) {
-            const latest = list[0];   // newest attempt
+            const latest = list[0];
             const attemptId = latest.attemptId || latest.id;
 
             const reviewUrl = attemptId
                 ? `/review.html?attempt=${attemptId}`
                 : `/review.html`;
 
+            // Build dropdown for attempts
+            const options = list.map((a, i) => {
+                const label = `Attempt ${list.length - i} — ${a.percent}% — ${a.completed_at || "Unknown Date"}`;
+                return `<option value="${a.id || a.attemptId}">${label}</option>`;
+            }).join("");
+
             missedHtml = `
                 <button onclick="location.href='${reviewUrl}'">
-                    🔍 View Details & Review Missed Questions of Most Recent Quiz
+                    🔍 View Most Recent Attempt Review
+                </button>
+
+                <br><br>
+
+                <label style="font-weight:bold;">Select Attempt to Review:</label>
+                <select id="select-${key.replace(/\\s+/g,'')}">
+                    ${options}
+                </select>
+
+                <button onclick="reviewSelected('${key.replace(/\\s+/g,'')}')">
+                    📜 Review Selected Attempt
                 </button>
             `;
         }
+
 
         html += `
         <div class="section">
@@ -204,6 +222,23 @@ async function buildDashboard() {
 
     div.innerHTML = html;
 }
+
+function reviewSelected(key) {
+    const sel = document.getElementById(`select-${key}`);
+    if (!sel) return;
+
+    const id = sel.value;
+    if (!id) {
+        alert("No attempt selected.");
+        return;
+    }
+
+    location.href = `/review.html?attempt=${id}`;
+}
+
+
+
+
 
 // ================= RUN ==================
 buildDashboard();

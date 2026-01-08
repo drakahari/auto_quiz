@@ -852,7 +852,8 @@ def preview_paste():
 
     cfg = load_portal_config()
     regex_mode = cfg.get("enable_regex_strip", False)
-
+    regex_replace_enabled = cfg.get("enable_regex_replace", False)
+    
     if strip_rules:
         cleaned_lines = []
 
@@ -1123,6 +1124,20 @@ def preview_paste():
             "You can safely continue 👍"
         )
 
+
+    # =========================
+    # UI SUPPORT LOGIC — ensure template displays correctly
+    # =========================
+
+    # If global regex replace enabled but user did not submit rules,
+    # keep replace_rules list empty but still treat engine as active
+    replace_rules = replace_rules_raw.splitlines() if replace_rules_raw else []
+
+    # Make template show replace rules section when enabled globally
+    if regex_replace_enabled and not replace_rules:
+        replace_rules = ["(Regex engine enabled — no manual rules entered)"]
+
+
     # ---------- RENDER PREVIEW ----------
     return render_template_string("""
 
@@ -1157,99 +1172,88 @@ def preview_paste():
         <p><b>{{quiz_title}}</b></p>
 
         <!-- STEP 7: PRE-PROCESS SUMMARY PANEL -->
-        <div style="background:#1a1a1a; padding:12px; border-radius:8px; margin-bottom:18px;">
-            <h2>🧪 Pre-Processing Summary</h2>
+<div style="background:#1a1a1a; padding:12px; border-radius:8px; margin-bottom:18px;">
+    <h2>🧪 Pre-Processing Summary</h2>
 
-            <p><b>Regex Strip Mode:</b>
-                {% if regex_mode %}
-                    Enabled ✔
-                {% else %}
-                    Disabled ❌
-                {% endif %}
-            </p>
+    <!-- =============================
+          REGEX STRIP + STRIP RULES
+    ============================== -->
+    {% if regex_mode %}
+    <p><b>Regex Strip Mode:</b> Enabled ✔</p>
 
-            {% if strip_rules %}
-            <h3>Lines Removed By Strip Rules</h3>
-            <ul>
-                {% for r in strip_rules %}
-                <li>{{r}}</li>
-                {% endfor %}
-            </ul>
-            {% else %}
-            <p>No strip rules applied.</p>
-            {% endif %}
+        {% if strip_rules %}
+        <h3>Lines Removed By Strip Rules</h3>
+        <ul>
+            {% for r in strip_rules %}
+            <li>{{r}}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    {% endif %}
 
-            <!-- MANUAL REGEX -->
-            {% if replace_rules %}
-            <h3>Manual Regex Replace Rules</h3>
-            <ul>
-                {% for r in replace_rules %}
-                <li>{{r}}</li>
-                {% endfor %}
-            </ul>
-            {% else %}
-            <p>No manual regex replace rules entered.</p>
-            {% endif %}
+    <!-- =============================
+          MANUAL REGEX RULES
+    ============================== -->
+    {% if replace_rules %}
+    <h3>Manual Regex Replace Rules</h3>
+    <ul>
+        {% for r in replace_rules %}
+        <li>{{r}}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
 
-            <!-- PRESET STATES -->
-            <h3>✨ Regex Presets</h3>
-            <ul>
-                <li>
-                    Number Prefix Removal:
-                    {% if preset_number_prefix_checked %}
-                        Enabled ✔
-                    {% else %}
-                        Off ❌
-                    {% endif %}
-                </li>
+    <!-- =============================
+          PRESETS — ONLY IF ANY USED
+    ============================== -->
+    {% if preset_number_prefix_checked or preset_pdf_spacing_checked or preset_headers_checked %}
+    <h3>✨ Regex Presets</h3>
+    <ul>
+        {% if preset_number_prefix_checked %}
+        <li>Number Prefix Removal Enabled ✔</li>
+        {% endif %}
 
-                <li>
-                    PDF Line Wrapping Fix:
-                    {% if preset_pdf_spacing_checked %}
-                        Enabled ✔
-                    {% else %}
-                        Off ❌
-                    {% endif %}
-                </li>
+        {% if preset_pdf_spacing_checked %}
+        <li>PDF Line Wrapping Fix Enabled ✔</li>
+        {% endif %}
 
-                <li>
-                    Header/Footer Cleanup:
-                    {% if preset_headers_checked %}
-                        Enabled ✔
-                    {% else %}
-                        Off ❌
-                    {% endif %}
-                </li>
-            </ul>
+        {% if preset_headers_checked %}
+        <li>Header/Footer Cleanup Enabled ✔</li>
+        {% endif %}
+    </ul>
+    {% endif %}
 
-            <!-- RULES THAT ACTUALLY FIRED -->
-            {% if applied_rules %}
-            <h3>Rules That Actually Changed Text</h3>
-            <ul>
-                {% for r in applied_rules %}
-                <li>✔ {{r}}</li>
-                {% endfor %}
-            </ul>
-            {% else %}
-            <p>No regex rules altered text.</p>
-            {% endif %}
+    <!-- =============================
+          RULES THAT ACTUALLY FIRED
+    ============================== -->
+    {% if applied_rules %}
+    <h3>Rules That Actually Changed Text</h3>
+    <ul>
+        {% for r in applied_rules %}
+        <li>✔ {{r}}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
 
-            <!-- INVISIBLE CLEAN -->
-            <h3>Invisible Character Cleanup</h3>
-            {% if invis_cleanup_enabled %}
-                {% if removed_unicode %}
-                <p>Removed:</p>
-                <ul>
-                    {% for u in removed_unicode %}
-                    <li>{{u}}</li>
-                    {% endfor %}
-                </ul>
-                {% else %}
-                <p>No hidden Unicode issues found 🎉</p>
-                {% endif %}
-            {% else %}
-                <p>Invisible Character Cleanup: Disabled ❌</p>
-            {% endif %}
+    <!-- =============================
+          INVISIBLE CLEAN
+    ============================== -->
+    {% if invis_cleanup_enabled %}
+    <h3>Invisible Character Cleanup</h3>
+
+        {% if removed_unicode %}
+        <p>Removed:</p>
+        <ul>
+            {% for u in removed_unicode %}
+            <li>{{u}}</li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p>No hidden Unicode issues found 🎉</p>
+        {% endif %}
+    {% endif %}
+</div>
+
 
                        <!-- SMART SUGGESTIONS -->
                     <h3>💡 Smart Suggestions</h3>
@@ -1478,7 +1482,7 @@ def preview_paste():
         temp_logo_name=temp_logo_name,
         regex_mode=regex_mode,
         strip_rules=strip_rules,
-        replace_rules=replace_rules_raw.splitlines() if replace_rules_raw else [],
+        replace_rules=replace_rules,   # <-- FIXED
         applied_rules=applied_rules,
         invis_cleanup_enabled=invis_cleanup_enabled,
         removed_unicode=removed_unicode,
@@ -1486,7 +1490,8 @@ def preview_paste():
         preset_pdf_spacing_checked=preset_pdf_spacing_checked,
         preset_headers_checked=preset_headers_checked,
         smart_suggestions=smart_suggestions
-    )
+        )
+
 
 
 
