@@ -44,22 +44,6 @@
     border:1px solid rgba(255,255,255,.25);
 }
 
-.barRow {
-    margin:6px 0;
-    background:rgba(255,255,255,.1);
-    border-radius:6px;
-    overflow:hidden;
-}
-
-.barFill {
-    background:linear-gradient(90deg,#ff4d4d,#ffae00);
-    height:18px;
-}
-
-.barLabel {
-    font-size:13px;
-}
-
 </style>
 </head>
 
@@ -120,6 +104,9 @@ async function buildDashboard() {
         const list = grouped[key];
         if (!list.length) return;
 
+        // Sort newest → oldest to be safe
+        list.sort((a,b) => (b.completed_at || "").localeCompare(a.completed_at || ""));
+
         const scores = list.map(a => Number(a.percent || 0));
         const avg = Math.round(scores.reduce((a,b)=>a+b,0) / scores.length);
         const best = Math.max(...scores);
@@ -130,40 +117,36 @@ async function buildDashboard() {
         let trendMsg = "Keep going!";
         let trendClass = "";
         if (list.length >= 2) {
-            const last = list[list.length-1].percent;
-            const prev = list[list.length-2].percent;
+            const last = list[0].percent;
+            const prev = list[1].percent;
 
             if (last > prev) { trendMsg = "📈 Improving — Great work!"; trendClass="good"; }
             else if (last < prev) { trendMsg = "📉 Slight drop — review weak spots"; trendClass="bad"; }
             else { trendMsg = "➡️ Holding steady"; trendClass="warn"; }
         }
 
-        // ===== MOST MISSED QUESTIONS =====
-        let missedMap = {};
-
+        // ===== MISSED QUESTIONS =====
+        let hasMissed = false;
         list.forEach(a => {
-            if (!a.missedQuestions) return;
-
-            a.missedQuestions.forEach(m => {
-                const id = m.number || m.question || "Unknown";
-                missedMap[id] = (missedMap[id] || 0) + 1;
-            });
+            if (a.missedQuestions && a.missedQuestions.length) hasMissed = true;
         });
 
         let missedHtml = "";
-        const missedKeys = Object.keys(missedMap);
 
-        // Only show review button if there are missed questions
-        if (missedKeys.length) {
+        if (hasMissed) {
+            const latest = list[0];   // newest attempt
+            const attemptId = latest.attemptId || latest.id;
+
+            const reviewUrl = attemptId
+                ? `/review.html?attempt=${attemptId}`
+                : `/review.html`;
+
             missedHtml = `
-                <button onclick="location.href='review.html'">
-                    🔍 View Details & Review Missed Questions
+                <button onclick="location.href='${reviewUrl}'">
+                    🔍 View Details & Review Missed Questions of Most Recent Quiz
                 </button>
             `;
         }
-
-
-
 
         html += `
         <div class="section">
@@ -203,7 +186,6 @@ async function buildDashboard() {
                 ${missedHtml}
             </div>
 
-
         </div>`;
     });
 
@@ -214,7 +196,6 @@ async function buildDashboard() {
 buildDashboard();
 
 </script>
-
 
 </body>
 </html>
