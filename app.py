@@ -2371,26 +2371,19 @@ def api_attempts():
 # =========================
 # EXPORT SELECTED MISSED QUESTIONS TO ANKI
 # =========================
-@app.route("/export/anki", methods=["POST"], endpoint="export_anki_selected")
-
+@app.route("/export/anki", methods=["POST"])
 def export_anki():
-    import genanki
-    import sqlite3
-    import tempfile
-    import time
-    import os
-    import json
-    from flask import send_file
+    import genanki, sqlite3, tempfile, time, os
+    from flask import request, send_file
 
     data = request.get_json(force=True)
     missed_ids = data.get("missed_ids", [])
 
+    print("EXPORT ANKI HIT, missed_ids =", missed_ids)
+
     if not missed_ids:
         return {"error": "No questions selected"}, 400
 
-    # -------------------------
-    # LOAD MISSED QUESTIONS
-    # -------------------------
     conn = sqlite3.connect("results.db")
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
@@ -2399,16 +2392,11 @@ def export_anki():
     cur.execute(
         f"""
         SELECT
-            mq.question_number,
-            mq.question_text,
-            mq.correct_text,
-            mq.correct_letters,
-            mq.selected_text,
-            mq.selected_letters,
-            a.quiz_id
-        FROM missed_questions mq
-        JOIN attempts a ON mq.attempt_id = a.id
-        WHERE mq.id IN ({q_marks})
+            question_text,
+            correct_text,
+            correct_letters
+        FROM missed_questions
+        WHERE id IN ({q_marks})
         """,
         missed_ids
     )
@@ -2419,64 +2407,43 @@ def export_anki():
     if not rows:
         return {"error": "No matching questions found"}, 404
 
-    # -------------------------
-    # CREATE ANKI MODEL
-    # -------------------------
     model = genanki.Model(
-        1607392319,
-        "AutoQuiz Missed Question Model",
+        1700012319,
+        "AutoQuiz Simple MCQ",
         fields=[
             {"name": "Question"},
             {"name": "Choices"},
             {"name": "Answer"},
-            {"name": "YourAnswer"},
         ],
-        templates=[
-            {
-                "name": "Card 1",
-                "qfmt": """
-                <div style="font-size:18px;"><b>{{Question}}</b></div>
-                <hr>
-                {{Choices}}
-                """,
-                "afmt": """
-                {{FrontSide}}
-                <hr>
-                <b>Correct Answer:</b><br>{{Answer}}
-                <hr>
-                <b>Your Answer:</b><br>{{YourAnswer}}
-                """,
-            }
-        ],
+        templates=[{
+            "name": "Card 1",
+            "qfmt": "{{Question}}<hr>{{Choices}}",
+            "afmt": "{{FrontSide}}<hr><b>Correct:</b><br>{{Answer}}"
+        }]
     )
 
-    # -------------------------
-    # CREATE DECK
-    # -------------------------
-    deck_id = int(time.time())
-    deck = genanki.Deck(deck_id, "AutoQuiz – Missed Questions")
+    deck = genanki.Deck(int(time.time()), "AutoQuiz – Missed Questions")
 
     for r in rows:
-        choices = ""
-        if r["correct_letters"]:
-            choices += "<br><i>Correct:</i> " + r["correct_letters"]
-        if r["selected_letters"]:
-            choices += "<br><i>Your Choice:</i> " + r["selected_letters"]
+        choices_html = ""
+        if r["correct_text"]:
+            lines = [l.strip() for l in r["correct_text"].split("\n") if l.strip()]
+            letters = (r["correct_letters"] or "").split(",")
+
+            for i, txt in enumerate(lines):
+                label = letters[i] if i < len(letters) else chr(65+i)
+                choices_html += f"{label}. {txt}<br>"
 
         note = genanki.Note(
             model=model,
             fields=[
-                r["question_text"] or "(No question text)",
-                choices,
-                r["correct_text"] or r["correct_letters"] or "",
-                r["selected_text"] or r["selected_letters"] or "",
-            ],
+                r["question_text"],
+                choices_html or "(No choices)",
+                r["correct_letters"] or ""
+            ]
         )
         deck.add_note(note)
 
-    # -------------------------
-    # WRITE APKG
-    # -------------------------
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".apkg")
     genanki.Package(deck).write_to_file(tmp.name)
 
@@ -2484,8 +2451,12 @@ def export_anki():
         tmp.name,
         as_attachment=True,
         download_name="autoquiz_missed_questions.apkg",
-        mimetype="application/octet-stream",
+        mimetype="application/octet-stream"
     )
+
+
+
+
 
 
 
@@ -3120,63 +3091,63 @@ def history_db():
     return jsonify(results)
 
 
-@app.route("/export/anki", methods=["POST"])
-def export_anki():
-    data = request.json or {}
-    attempt_ids = data.get("attempt_ids", [])
+# @app.route("/export/anki", methods=["POST"])
+# def export_anki():
+#     data = request.json or {}
+#     attempt_ids = data.get("attempt_ids", [])
 
-    if not attempt_ids:
-        return jsonify({"error": "No attempts selected"}), 400
+#     if not attempt_ids:
+#         return jsonify({"error": "No attempts selected"}), 400
 
-    # 1️⃣ Pull attempts from DB
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    cur = conn.cursor()
+#     # 1️⃣ Pull attempts from DB
+#     conn = sqlite3.connect(DB_PATH)
+#     conn.row_factory = sqlite3.Row
+#     cur = conn.cursor()
 
-    placeholders = ",".join("?" for _ in attempt_ids)
-    cur.execute(
-        f"SELECT * FROM attempts WHERE id IN ({placeholders})",
-        attempt_ids
-    )
+#     placeholders = ",".join("?" for _ in attempt_ids)
+#     cur.execute(
+#         f"SELECT * FROM attempts WHERE id IN ({placeholders})",
+#         attempt_ids
+#     )
 
-    rows = cur.fetchall()
-    conn.close()
+#     rows = cur.fetchall()
+#     conn.close()
 
-    if not rows:
-        return jsonify({"error": "No attempts found"}), 404
+#     if not rows:
+#         return jsonify({"error": "No attempts found"}), 404
 
-    # 2️⃣ Extract missed questions
-    questions = []
+#     # 2️⃣ Extract missed questions
+#     questions = []
 
-    for row in rows:
-        missed = json.loads(row["missedQuestions"] or "[]")
+#     for row in rows:
+#         missed = json.loads(row["missedQuestions"] or "[]")
 
-        for m in missed:
-            questions.append({
-                "question": m.get("question", ""),
-                "choices": m.get("allChoices", []),
-                "correct": m.get("correctText", []),
-                "selected": m.get("selectedText", []),
-                "quiz_title": row["quiz_title"],
-                "attempt_id": row["id"],
-            })
+#         for m in missed:
+#             questions.append({
+#                 "question": m.get("question", ""),
+#                 "choices": m.get("allChoices", []),
+#                 "correct": m.get("correctText", []),
+#                 "selected": m.get("selectedText", []),
+#                 "quiz_title": row["quiz_title"],
+#                 "attempt_id": row["id"],
+#             })
 
-    if not questions:
-        return jsonify({"error": "No missed questions to export"}), 400
+#     if not questions:
+#         return jsonify({"error": "No missed questions to export"}), 400
 
-    # 3️⃣ Generate deck
-    from anki_deck import build_anki_deck
+#     # 3️⃣ Generate deck
+#     from anki_deck import build_anki_deck
 
-    filename = build_anki_deck(
-        questions=questions,
-        deck_name="Missed Questions"
-    )
+#     filename = build_anki_deck(
+#         questions=questions,
+#         deck_name="Missed Questions"
+#     )
 
-    return send_from_directory(
-        directory=os.path.dirname(filename),
-        path=os.path.basename(filename),
-        as_attachment=True
-    )
+#     return send_from_directory(
+#         directory=os.path.dirname(filename),
+#         path=os.path.basename(filename),
+#         as_attachment=True
+#     )
 
 
 
