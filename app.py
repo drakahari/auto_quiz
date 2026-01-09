@@ -2293,15 +2293,20 @@ def record_attempt():
                         "text": choice_text.strip()
                     })
 
-            # Get canonical question_id
+            # Canonical question identity (already working)
             question_id = get_or_create_question(conn, quiz_id, q)
 
-            # Insert missed question with canonical reference
+            # 🔑 THIS IS THE IMPORTANT NEW LINE
+            # This is the question number as shown during the quiz attempt
+            attempt_question_number = m.get("attemptQuestionNumber", m.get("number"))
+
+            # Insert missed question with canonical + attempt display number
             cur.execute(
                 """
                 INSERT INTO missed_questions (
                     attempt_id,
                     question_id,
+                    attempt_question_number,
                     question_number,
                     question_text,
                     correct_letters,
@@ -2309,11 +2314,12 @@ def record_attempt():
                     selected_letters,
                     selected_text
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     attempt_id,
                     question_id,
+                    attempt_question_number,
                     m.get("number"),
                     m.get("question"),
                     ",".join(m.get("correctLetters", [])),
@@ -2322,6 +2328,7 @@ def record_attempt():
                     "\n".join(m.get("selectedText", []))
                 )
             )
+
 
 
 
@@ -2594,6 +2601,7 @@ def api_missed_questions():
 
     cur.execute("""
         SELECT
+            attempt_question_number,
             id,
             question_number,
             question_text,
@@ -2612,6 +2620,7 @@ def api_missed_questions():
     return jsonify([
         {
             "id": r["id"],
+            "attempt_question_number": r["attempt_question_number"],  # 👈 REQUIRED
             "question_number": r["question_number"],
             "question_text": r["question_text"],
             "correct_text": r["correct_text"],
@@ -2621,6 +2630,7 @@ def api_missed_questions():
         }
         for r in rows
     ])
+
 
 
 

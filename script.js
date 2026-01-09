@@ -489,6 +489,7 @@ function submitQuiz(force = false) {
                 correct++;
             } else {
     missed.push({
+        attemptQuestionNumber: i + 1,
         number: q.number || (i + 1),
         question: q.question,
 
