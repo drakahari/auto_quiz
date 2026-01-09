@@ -2611,7 +2611,7 @@ def api_missed_questions():
             selected_letters
         FROM missed_questions
         WHERE attempt_id = ?
-        ORDER BY question_number
+        ORDER BY attempt_question_number ASC
     """, (attempt_id,))
 
     rows = cur.fetchall()
