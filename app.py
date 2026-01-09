@@ -1594,7 +1594,7 @@ def process_paste():
     # PARSE QUIZ
     # =========================
     quiz_data = parse_questions(path)
-
+    
     # Always save a parse log so failures are debuggable
     ts_fail = int(time.time())
     log_filename = f"parse_log_{ts_fail}.txt"
@@ -2733,6 +2733,7 @@ def dbg(*msg):
 
 def parse_questions(source):
     import re, os
+    
 
     global PARSE_LOG
     PARSE_LOG.clear()
@@ -2764,7 +2765,7 @@ def parse_questions(source):
     dbg("Total detected blocks:", len(blocks))
 
     questions = []
-    number = 1
+    fallback_number = 1  # used only if no source number found
 
     # ===================================
     # MAIN PARSE LOOP
@@ -2781,7 +2782,20 @@ def parse_questions(source):
             dbg("Skipped: too few lines:", repr(lines))
             continue
 
-        dbg(f"\n--- Parsing Question Candidate #{number} ---")
+        # Attempt to extract source question number from the first line
+        qnum_match = re.match(
+            r'^\s*(?:Question\s*#?\s*(\d+)|(\d+)\s*[.)])',
+            lines[0],
+            re.IGNORECASE
+        )
+
+        source_number = None
+        if qnum_match:
+            source_number = int(qnum_match.group(1) or qnum_match.group(2))
+
+        q_number = source_number if source_number is not None else fallback_number
+
+        dbg(f"\n--- Parsing Question Candidate #{q_number} ---")
         dbg(lines[0])
 
         q_lines = []
@@ -2797,23 +2811,26 @@ def parse_questions(source):
 
             # -------- Detect Choices --------
             mchoice = re.match(r"^\s*([A-Za-z])[\.\)]\s+(.*)", line)
-
             if mchoice:
                 label = mchoice.group(1).upper()
                 text_choice = mchoice.group(2).strip()
                 dbg(f"Choice detected: {label} → {text_choice}")
                 choices_started = True
-                choices.append(text_choice)
+
+                # IMPORTANT: structured choice
+                choices.append({
+                    "label": label,
+                    "text": text_choice
+                })
                 continue
 
             # -------- Detect Correct Answer --------
             if "correct answer" in lower or "suggested answer" in lower:
-
                 dbg("Found answer line:", line)
 
                 m = re.search(r"[:\-]\s*([A-Za-z]+)", line)
                 if m:
-                    ans = re.sub(r'[^A-Za-z]', '', m.group(1)).upper()
+                    ans = re.sub(r"[^A-Za-z]", "", m.group(1)).upper()
                     if ans:
                         correct = list(dict.fromkeys(list(ans)))
                         dbg("Parsed correct letters:", correct)
@@ -2825,7 +2842,11 @@ def parse_questions(source):
 
             # -------- Question Text --------
             if not choices_started:
-                q_lines.append(line)
+                if not (
+                    lower.startswith("correct answer")
+                    or lower.startswith("suggested answer")
+                ):
+                    q_lines.append(line)
 
         # ================================
         # VALIDATION
@@ -2848,19 +2869,19 @@ def parse_questions(source):
             '',
             question_text,
             flags=re.IGNORECASE
-        )
+        ).strip()
 
         dbg("Final Question Built:", question_text[:150])
 
         questions.append({
-            "number": number,
+            "number": q_number,
             "question": question_text,
             "choices": choices,
             "correct": correct
         })
 
         dbg("✓ Question Accepted\n")
-        number += 1
+        fallback_number += 1
 
     # ================================
     # END OF LOOP — FINALIZE
@@ -2868,7 +2889,11 @@ def parse_questions(source):
     dbg("\n==== PARSE COMPLETE ====")
     dbg("Total questions parsed:", len(questions))
 
+    
+
     return questions
+
+
 
 
 

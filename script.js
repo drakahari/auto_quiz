@@ -140,9 +140,11 @@ function renderQuestion() {
     if (!choicesEl) return;
 
     let html = "";
-    q.choices.forEach((choiceText, i) => {
-        const label = String.fromCharCode(65 + i);
+    q.choices.forEach((choice, i) => {
+        const label = choice.label;
+        const choiceText = choice.text;
         let cls = "choice";
+
 
 // Only visually “select” answers in EXAM MODE
 if (examMode && selected.includes(i)) {
@@ -494,13 +496,17 @@ function submitQuiz(force = false) {
         correctLetters: q.correct,
         correctText: q.correct.map(letter => {
             const idx = letter.toUpperCase().charCodeAt(0) - 65;
-            return `${letter} — ${q.choices[idx]}`;
+            return `${letter} — ${q.choices[idx].text}`;
+
         }),
 
         // What the user actually selected
         selectedIndexes: ans,
         selectedLetters: ans.map(idx => String.fromCharCode(65 + idx)),
-        selectedText: ans.map(idx => `${String.fromCharCode(65 + idx)} — ${q.choices[idx]}`)
+        selectedText: ans.map(idx =>
+            `${String.fromCharCode(65 + idx)} — ${q.choices[idx].text}`
+)
+
     });
 }
 
