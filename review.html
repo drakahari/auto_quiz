@@ -100,7 +100,8 @@ async function loadReview() {
         ============================== */
         const res = await fetch("/api/attempts");
         const data = await res.json();
-        const attempt = (data.attempts || []).find(a => a.id === attemptId);
+        const attempt = (data.attempts || []).find(a => String(a.id) === String(attemptId));
+
 
         if (!attempt) {
             info.innerHTML = "❌ Attempt not found.";
@@ -127,7 +128,8 @@ async function loadReview() {
 
         let html = "";
 
-        missed.forEach(m => {
+        missed.forEach((m, index) => {
+
             html += `
             <div class="reviewCard">
 
@@ -138,7 +140,8 @@ async function loadReview() {
                     <span>Add to Anki deck</span>
                 </div>
 
-                <h3>Question ${m.question_number}</h3>
+                <h3>Question ${index + 1}</h3>
+
 
                 <div>${m.question_text}</div>
 

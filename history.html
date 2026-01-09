@@ -323,7 +323,8 @@ if (rec.missedQuestions && rec.missedQuestions.length) {
     missedBlock = rec.missedQuestions.map(m => `
         <div style="margin-top:6px; padding:8px; background:rgba(0,0,0,.6); border-radius:6px;">
 
-            <b>Question ${m.number}</b><br>
+            <b>Question ${m.question_number}</b><br>
+
             ${m.question}<br>
 
             <div style="margin-top:6px; color:#00ff80">
