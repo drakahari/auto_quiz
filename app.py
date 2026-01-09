@@ -1,4 +1,4 @@
-from flask import Flask, send_from_directory, request, redirect, render_template_string, jsonify
+from flask import Flask, send_from_directory, request, redirect, render_template_string, jsonify, Response
 import os, re, json, time, sqlite3
 from werkzeug.utils import secure_filename
 
@@ -2400,180 +2400,331 @@ def api_attempts():
     return jsonify({"attempts": attempts})
 
 
-# =========================
-# EXPORT SELECTED MISSED QUESTIONS TO ANKI
-# =========================
-@app.route("/export/anki", methods=["POST"])
-def export_anki():
-    import genanki
-    import sqlite3
-    import tempfile
-    import time
-    import os
-    from flask import request, send_file
+def export_anki_tsv_for_quiz(quiz_id: int) -> str:
+    conn = get_db()
+    cur = conn.cursor()
 
-    data = request.get_json(force=True)
-
-    attempt_id = data.get("attempt_id")
-    question_numbers = data.get("question_numbers", [])
-
-    data = request.get_json(silent=True) or {}
-    print("RAW EXPORT PAYLOAD:", data)
-
-    attempt_id = data.get("attempt_id")
-    question_numbers = data.get("question_numbers")
-
-    print("PARSED PAYLOAD:", attempt_id, question_numbers)
-
-
-    print("EXPORT ANKI HIT:", attempt_id, question_numbers)
-
-    if not attempt_id or not question_numbers:
-        return {"error": "Missing attempt_id or question_numbers"}, 400
-
-    # -------------------------
-    # LOAD QUESTIONS + ALL CHOICES (AUTHORITATIVE)
-    # -------------------------
-    q_marks = ",".join("?" for _ in question_numbers)
-
-    cur.execute(
-        f"""
+    cur.execute("""
         SELECT
-            mq.question_number     AS question_number,
-            q.text                 AS question_text,
-            c.label                AS choice_label,
-            c.text                 AS choice_text,
-            c.is_correct           AS is_correct
-        FROM missed_questions mq
-        JOIN attempts a
-            ON mq.attempt_id = a.id
-        JOIN questions q
-            ON q.quiz_id = a.quiz_id
-        AND q.number = mq.question_number
-        JOIN choices c
-            ON c.question_id = q.id
-        WHERE mq.attempt_id = ?
-        AND mq.question_number IN ({q_marks})
-        ORDER BY mq.question_number, c.label
-        """,
-        [attempt_id, *question_numbers]
-    )
+            q.number AS question_number,
+            q.text   AS question_text,
+            qu.title AS quiz_title,
+            GROUP_CONCAT(
+                c.label || '. ' || c.text,
+                CHAR(10)
+            ) AS choices,
+            GROUP_CONCAT(
+                CASE WHEN c.is_correct = 1 THEN c.label END,
+                ', '
+            ) AS correct_letters
+        FROM questions q
+        JOIN quizzes qu ON qu.id = q.quiz_id
+        JOIN choices c ON c.question_id = q.id
+        WHERE q.quiz_id = ?
+        GROUP BY q.id
+        ORDER BY q.number
+    """, (quiz_id,))
 
     rows = cur.fetchall()
     conn.close()
 
-    if not rows:
-        return {"error": "No matching questions found"}, 404
-
-
-
-    # -------------------------
-    # CREATE ANKI MODEL (MCQ)
-    # -------------------------
-    model = genanki.Model(
-        model_id=1607392319,
-        name="AutoQuiz MCQ Model",
-        fields=[
-            {"name": "Question"},
-            {"name": "Choices"},
-            {"name": "Answer"},
-        ],
-        templates=[
-            {
-                "name": "MCQ Card",
-                "qfmt": """
-                    <div style="font-size:18px;">
-                        {{Question}}
-                    </div>
-                    <hr>
-                    <div style="margin-top:10px;">
-                        {{Choices}}
-                    </div>
-                """,
-                "afmt": """
-                    {{FrontSide}}
-                    <hr>
-                    <div style="color:#00aa00; font-weight:bold;">
-                        Correct Answer:
-                    </div>
-                    <div>
-                        {{Answer}}
-                    </div>
-                """,
-            }
-        ],
-    )
-
-
-    # -------------------------
-    # CREATE DECK (EXAM-STYLE)
-    # -------------------------
-    deck = genanki.Deck(
-        int(time.time()),
-        "AutoQuiz – Missed Questions"
-    )
-
-    current_qnum = None
-    question_text = ""
-    choices_html = ""
-    correct_answer = ""
+    lines = ["Front\tBack\tTags"]
 
     for r in rows:
-        qnum = r["question_number"]
+        # ---------- FRONT ----------
+        front = f"{r['question_text']}\n\n{r['choices'] or ''}".strip()
+        front = front.replace("\t", " ")
 
-        # New question → finalize previous card
-        if current_qnum is not None and qnum != current_qnum:
-            deck.add_note(
-                genanki.Note(
-                    model=model,
-                    fields=[
-                        question_text,
-                        choices_html,
-                        correct_answer or "(No correct answer flagged)",
-                    ],
-                )
-            )
-            choices_html = ""
-            correct_answer = ""
+        # ---------- BACK ----------
+        correct = (r["correct_letters"] or "").strip()
+        back = f"Correct Answer(s): {correct}"
+        back = back.replace("\t", " ")
 
-        current_qnum = qnum
-        question_text = r["question_text"]
+        # ---------- TAGS ----------
+        quiz_tag = (r["quiz_title"] or f"quiz_{quiz_id}").replace(" ", "_")
+        tags = f"{quiz_tag} autoquiz"
 
-        label = r["choice_label"]
-        text = r["choice_text"]
+        lines.append(f"{front}\t{back}\t{tags}")
 
-        choices_html += f"{label}. {text}<br>"
+    return "\n".join(lines)
 
-        if r["is_correct"]:
-            correct_answer = f"{label}. {text}"
+@app.route("/export/anki/quiz/<int:quiz_id>")
+def export_anki_quiz_tsv(quiz_id):
+    tsv = export_anki_tsv_for_quiz(quiz_id)
 
-    # ✅ Final question (CRITICAL)
-    if current_qnum is not None:
-        deck.add_note(
-            genanki.Note(
-                model=model,
-                fields=[
-                    question_text,
-                    choices_html,
-                    correct_answer or "(No correct answer flagged)",
-                ],
-            )
-        )
-
-
-
-        # -------------------------
-        # WRITE APKG (SAFE)
-        # -------------------------
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".apkg")
-    genanki.Package(deck).write_to_file(tmp.name)
-
-    return send_file(
-        tmp.name,
-        as_attachment=True,
-        download_name="autoquiz_missed_questions.apkg",
-        mimetype="application/octet-stream",
+    return Response(
+        tsv,
+        mimetype="text/tab-separated-values; charset=utf-8",
+        headers={
+            "Content-Disposition": f"attachment; filename=quiz_{quiz_id}_anki.tsv"
+        }
     )
+
+@app.route("/export/anki/missed", methods=["POST"])
+def export_anki_missed_tsv():
+    data = request.get_json(force=True)
+
+    attempt_id = data.get("attempt_id")
+    attempt_numbers = data.get("question_numbers", [])
+
+    if not attempt_id or not attempt_numbers:
+        return {"error": "Missing attempt_id or question_numbers"}, 400
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    q_marks = ",".join("?" for _ in attempt_numbers)
+
+    # 🔑 CRITICAL FIX:
+    # We filter on attempt_question_number, NOT canonical q.number
+    cur.execute(
+        f"""
+        SELECT
+            mq.attempt_question_number,
+            mq.question_text,
+            mq.correct_letters,
+            mq.correct_text,
+            qz.title AS quiz_title
+        FROM missed_questions mq
+        JOIN attempts a ON a.id = mq.attempt_id
+        JOIN quizzes qz ON qz.id = a.quiz_id
+        WHERE mq.attempt_id = ?
+        AND mq.attempt_question_number IN ({q_marks})
+        ORDER BY mq.attempt_question_number
+        """,
+        [attempt_id, *attempt_numbers]
+    )
+
+    rows = cur.fetchall()
+    print("ANKI MISSED EXPORT ROW COUNT:", len(rows))
+
+    conn.close()
+
+    lines = ["Front\tBack\tTags"]
+
+    for r in rows:
+        # ---------- FRONT ----------
+        front = r["question_text"].replace("\t", " ")
+
+        # ---------- BACK ----------
+        answers = []
+        if r["correct_letters"]:
+            answers.append(f"Letters: {r['correct_letters']}")
+        if r["correct_text"]:
+            answers.append(r["correct_text"])
+
+        back = "\n".join(answers).replace("\t", " ")
+
+        # ---------- TAGS ----------
+        quiz_tag = (r["quiz_title"] or "autoquiz").replace(" ", "_")
+        tags = f"{quiz_tag} missed"
+
+        lines.append(f"{front}\t{back}\t{tags}")
+
+    tsv = "\n".join(lines)
+
+    return Response(
+        tsv,
+        mimetype="text/tab-separated-values; charset=utf-8",
+        headers={
+            "Content-Disposition": "attachment; filename=missed_questions_anki.tsv"
+        }
+    )
+
+
+
+
+
+
+
+
+# =========================================================
+# DEPRECATED — DO NOT USE
+#
+# Old Anki export using genanki (.apkg)
+# Replaced by TSV-based exports:
+#   - /export/anki/quiz/<quiz_id>
+#   - /export/anki/missed
+#
+# Kept temporarily for reference only.
+# =========================================================
+
+
+
+# # =========================
+# # EXPORT SELECTED MISSED QUESTIONS TO ANKI
+# # =========================
+# @app.route("/export/anki", methods=["POST"])
+# def export_anki():
+#     import genanki
+#     import sqlite3
+#     import tempfile
+#     import time
+#     import os
+#     from flask import request, send_file
+
+#     data = request.get_json(force=True)
+
+#     attempt_id = data.get("attempt_id")
+#     question_numbers = data.get("question_numbers", [])
+
+#     data = request.get_json(silent=True) or {}
+#     print("RAW EXPORT PAYLOAD:", data)
+
+#     attempt_id = data.get("attempt_id")
+#     question_numbers = data.get("question_numbers")
+
+#     print("PARSED PAYLOAD:", attempt_id, question_numbers)
+
+
+#     print("EXPORT ANKI HIT:", attempt_id, question_numbers)
+
+#     if not attempt_id or not question_numbers:
+#         return {"error": "Missing attempt_id or question_numbers"}, 400
+
+#     # -------------------------
+#     # LOAD QUESTIONS + ALL CHOICES (AUTHORITATIVE)
+#     # -------------------------
+#     q_marks = ",".join("?" for _ in question_numbers)
+
+#     cur.execute(
+#         f"""
+#         SELECT
+#             mq.question_number     AS question_number,
+#             q.text                 AS question_text,
+#             c.label                AS choice_label,
+#             c.text                 AS choice_text,
+#             c.is_correct           AS is_correct
+#         FROM missed_questions mq
+#         JOIN attempts a
+#             ON mq.attempt_id = a.id
+#         JOIN questions q
+#             ON q.quiz_id = a.quiz_id
+#         AND q.number = mq.question_number
+#         JOIN choices c
+#             ON c.question_id = q.id
+#         WHERE mq.attempt_id = ?
+#         AND mq.question_number IN ({q_marks})
+#         ORDER BY mq.question_number, c.label
+#         """,
+#         [attempt_id, *question_numbers]
+#     )
+
+#     rows = cur.fetchall()
+#     conn.close()
+
+#     if not rows:
+#         return {"error": "No matching questions found"}, 404
+
+
+
+#     # -------------------------
+#     # CREATE ANKI MODEL (MCQ)
+#     # -------------------------
+#     model = genanki.Model(
+#         model_id=1607392319,
+#         name="AutoQuiz MCQ Model",
+#         fields=[
+#             {"name": "Question"},
+#             {"name": "Choices"},
+#             {"name": "Answer"},
+#         ],
+#         templates=[
+#             {
+#                 "name": "MCQ Card",
+#                 "qfmt": """
+#                     <div style="font-size:18px;">
+#                         {{Question}}
+#                     </div>
+#                     <hr>
+#                     <div style="margin-top:10px;">
+#                         {{Choices}}
+#                     </div>
+#                 """,
+#                 "afmt": """
+#                     {{FrontSide}}
+#                     <hr>
+#                     <div style="color:#00aa00; font-weight:bold;">
+#                         Correct Answer:
+#                     </div>
+#                     <div>
+#                         {{Answer}}
+#                     </div>
+#                 """,
+#             }
+#         ],
+#     )
+
+
+#     # -------------------------
+#     # CREATE DECK (EXAM-STYLE)
+#     # -------------------------
+#     deck = genanki.Deck(
+#         int(time.time()),
+#         "AutoQuiz – Missed Questions"
+#     )
+
+#     current_qnum = None
+#     question_text = ""
+#     choices_html = ""
+#     correct_answer = ""
+
+#     for r in rows:
+#         qnum = r["question_number"]
+
+#         # New question → finalize previous card
+#         if current_qnum is not None and qnum != current_qnum:
+#             deck.add_note(
+#                 genanki.Note(
+#                     model=model,
+#                     fields=[
+#                         question_text,
+#                         choices_html,
+#                         correct_answer or "(No correct answer flagged)",
+#                     ],
+#                 )
+#             )
+#             choices_html = ""
+#             correct_answer = ""
+
+#         current_qnum = qnum
+#         question_text = r["question_text"]
+
+#         label = r["choice_label"]
+#         text = r["choice_text"]
+
+#         choices_html += f"{label}. {text}<br>"
+
+#         if r["is_correct"]:
+#             correct_answer = f"{label}. {text}"
+
+#     # ✅ Final question (CRITICAL)
+#     if current_qnum is not None:
+#         deck.add_note(
+#             genanki.Note(
+#                 model=model,
+#                 fields=[
+#                     question_text,
+#                     choices_html,
+#                     correct_answer or "(No correct answer flagged)",
+#                 ],
+#             )
+#         )
+
+
+
+#         # -------------------------
+#         # WRITE APKG (SAFE)
+#         # -------------------------
+#         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".apkg")
+#     genanki.Package(deck).write_to_file(tmp.name)
+
+#     return send_file(
+#         tmp.name,
+#         as_attachment=True,
+#         download_name="autoquiz_missed_questions.apkg",
+#         mimetype="application/octet-stream",
+#     )
 
 
 
