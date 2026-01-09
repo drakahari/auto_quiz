@@ -1530,73 +1530,60 @@ def download_cleaned():
 # =========================
 @app.route("/process_paste", methods=["POST"])
 def process_paste():
-    cleanup_temp_logos()   # 🧹 clean abandoned logos again
+    cleanup_temp_logos()
 
     quiz_text = request.form.get("quiz_text", "").strip()
     quiz_title = request.form.get("quiz_title", "Generated Quiz From Paste")
-
-    # Checkbox flag (Auto Junk Cleanup)
     auto_cleanup = request.form.get("auto_cleanup") == "1"
 
     if not quiz_text:
         return "No text provided.", 400
 
-    clean_text = quiz_text
-
-    # Normalize ALL newline styles (Windows, Linux, Literal \n)
+    # -------------------------
+    # NORMALIZE TEXT
+    # -------------------------
     clean_text = (
-        clean_text
+        quiz_text
         .replace("\\r\\n", "\n")
         .replace("\\n", "\n")
         .replace("\r\n", "\n")
         .replace("\r", "\n")
     )
 
-    # Optional auto cleanup (only runs if you wire a checkbox)
     if auto_cleanup:
-        cleaned_lines = []
         junk_patterns = [
-            "topic",
-            "chapter",
-            "exam version",
-            "objective",
-            "learning goal",
-            "case study",
-            "scenario",
-            "explanation",
-            "rationale",
-            "reference",
-            "page",
+            "topic", "chapter", "exam version", "objective",
+            "learning goal", "case study", "scenario",
+            "explanation", "rationale", "reference", "page"
         ]
+        clean_text = "\n".join(
+            line for line in clean_text.splitlines()
+            if line.strip() and not any(p in line.lower() for p in junk_patterns)
+        )
 
-        for line in clean_text.splitlines():
-            stripped = line.strip()
-            if not stripped:
-                continue
-            low = stripped.lower()
-            if any(p in low for p in junk_patterns):
-                continue
-            cleaned_lines.append(line)
-
-        clean_text = "\n".join(cleaned_lines)
-
-    # Save cleaned text (for debugging / consistency)
+    # -------------------------
+    # SAVE CLEANED TEXT (optional)
+    # -------------------------
     path = os.path.join(UPLOAD_FOLDER, "pasted.txt")
     with open(path, "w", encoding="utf-8") as f:
         f.write(clean_text)
 
-    # =========================
-    # PARSE QUIZ
-    # =========================
+    # -------------------------
+    # PARSE QUIZ (RAW TEXT)
+    # -------------------------
     quiz_data = parse_questions(clean_text)
 
-    # Always save a parse log (success or failure)
+    # -------------------------
+    # ALWAYS SAVE PARSE LOG
+    # -------------------------
     ts = int(time.time())
     log_filename = f"parse_log_{ts}.txt"
     with open(os.path.join(DATA_FOLDER, log_filename), "w", encoding="utf-8") as f:
         f.write("\n".join(PARSE_LOG))
 
-    # If no questions parsed, show failure UI + log link
+    # -------------------------
+    # FAILURE PATH
+    # -------------------------
     if not quiz_data:
         return render_template_string("""
         <html>
@@ -1623,7 +1610,6 @@ def process_paste():
 
             <div class="card">
                 <p>No valid questions were parsed. Please check the formatting.</p>
-                <p>You can download the parser log for troubleshooting:</p>
 
                 <button onclick="location.href='/data/{{log_filename}}'">
                     📥 Download Parse Log
@@ -1631,37 +1617,92 @@ def process_paste():
 
                 <br><br>
 
-                <button onclick="location.href='/upload'">
-                    ⬅ Back To Upload Page
-                </button>
-
-                <button onclick="location.href='/paste'">
-                    📋 Try Paste Mode Instead
-                </button>
-
-                <button onclick="location.href='/'">
-                    🏠 Return To Portal
-                </button>
+                <button onclick="location.href='/upload'">⬅ Back To Upload Page</button>
+                <button onclick="location.href='/paste'">📋 Try Paste Mode Instead</button>
+                <button onclick="location.href='/'">🏠 Return To Portal</button>
             </div>
         </div>
         </body>
         </html>
         """, log_filename=log_filename), 400
 
-    # =========================
-    # HANDLE LOGO (supports preview temp logo)
+    # -------------------------
+    # SUCCESS PATH: SAVE TO DB
+    # -------------------------
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        "INSERT INTO quizzes (title) VALUES (?)",
+        (quiz_title,)
+    )
+    quiz_id = cur.lastrowid
+
+    for q in quiz_data:
+        number = q["number"]
+        text = q["question"]
+        choices = q["choices"]
+
+        cur.execute("""
+            INSERT INTO questions (
+                quiz_id,
+                number,
+                text
+            ) VALUES (?, ?, ?)
+        """, (quiz_id, number, text))
+
+        question_id = cur.lastrowid
+
+        for c in choices:
+            cur.execute("""
+                INSERT INTO choices (
+                    question_id,
+                    label,
+                    text,
+                    is_correct
+                ) VALUES (?, ?, ?, ?)
+            """, (
+                question_id,
+                c["label"],
+                c["text"],
+                1 if c["is_correct"] else 0
+            ))
+
+    conn.commit()
+    conn.close()
+
+    return redirect("/library")
+
+
+
+
+       
+
+
+
+    # SAVE OUTPUTS
+    ts = int(time.time())
+
+    # Save parse debug log
+    log_filename = f"parse_log_{ts}.txt"
+    with open(os.path.join(DATA_FOLDER, log_filename), "w", encoding="utf-8") as f:
+        f.write("\n".join(PARSE_LOG))
+
+        # =========================
+    # HANDLE LOGO (Supports preview temp logo)
     # =========================
     logo_filename = None
 
-    # 1) If a logo was uploaded here directly (paste flow)
+    # 1️⃣ If a logo was uploaded here directly (upload flow)
     logo_file = request.files.get("quiz_logo")
     if logo_file and logo_file.filename:
         ext = os.path.splitext(logo_file.filename)[1].lower()
         if ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
             logo_filename = f"logo_{ts}{ext}"
             logo_file.save(os.path.join(LOGO_FOLDER, logo_filename))
+
+    # 2️⃣ If coming from PREVIEW and a temp logo exists
     else:
-        # 2) If coming from PREVIEW and a temp logo exists
         temp_logo_name = request.form.get("temp_logo_name")
         if temp_logo_name:
             old_path = os.path.join(LOGO_FOLDER, temp_logo_name)
@@ -1672,47 +1713,7 @@ def process_paste():
                 os.rename(old_path, new_path)
 
     # =========================
-    # SAVE TO DB (quiz + questions + choices)
-    # =========================
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("INSERT INTO quizzes (title) VALUES (?)", (quiz_title,))
-    quiz_id = cur.lastrowid
-
-    for q in quiz_data:
-        number = q.get("number")
-        q_text = q.get("question") or q.get("text") or ""
-        q_choices = q.get("choices", [])
-
-        cur.execute(
-            """
-            INSERT INTO questions (quiz_id, number, text)
-            VALUES (?, ?, ?)
-            """,
-            (quiz_id, number, q_text),
-        )
-        question_id = cur.lastrowid
-
-        for c in q_choices:
-            cur.execute(
-                """
-                INSERT INTO choices (question_id, label, text, is_correct)
-                VALUES (?, ?, ?, ?)
-                """,
-                (
-                    question_id,
-                    c.get("label"),
-                    c.get("text"),
-                    1 if c.get("is_correct") else 0,
-                ),
-            )
-
-    conn.commit()
-    conn.close()
-
-    # =========================
-    # SAVE JSON + HTML quiz (kept for UI compatibility)
+    # SAVE JSON + HTML quiz
     # =========================
     json_name = f"quiz_{ts}.json"
     html_name = f"quiz_{ts}.html"
@@ -1729,35 +1730,108 @@ def process_paste():
         logo_filename
     )
 
+
     add_quiz_to_registry(html_name, quiz_title, logo_filename)
 
-    return redirect("/library")
+    return render_template_string("""
+    <html>
+    <head>
+        <title>Quiz Built</title>
+        <link rel="stylesheet" href="/style.css">
+    </head>
+
+    <body>
+
+    <script>
+    fetch("/config/portal.json")
+    .then(r => r.json())
+    .then(cfg => {
+        if (cfg.background_image) {
+            document.documentElement.style.setProperty(
+                "--portal-bg",
+                `url(${cfg.background_image})`
+            );
+        }
+    });
+    </script>
+
+
+    <div class="container">
+
+        <h1 class="hero-title">
+            ✅ Quiz Successfully Built
+        </h1>
+
+        <div class="card">
+            <p><b>{{quiz_title}}</b> has been created in your library.</p>
+
+            <button onclick="location.href='/quizzes/{{html_name}}'">
+                ▶ Open Quiz
+            </button>
+
+            <button onclick="location.href='/library'">
+                📚 Return To Quiz Library
+            </button>
+
+            <button onclick="location.href='/data/{{log_filename}}'">
+                📥 Download Parse Log
+            </button>
+
+            <br><br>
+            <button onclick="location.href='/'">
+                🏠 Return To Portal</button>
+        </div>
+
+    </div>
+    </body>
+    </html>
+    """, quiz_title=quiz_title, html_name=html_name, log_filename=log_filename)
 
 
 
+
+# =========================
+# PROCESS UPLOAD
+# =========================
 @app.route("/process", methods=["POST"])
 def process_file():
-    cleanup_temp_logos()  # 🧹 clean abandoned logos
-    file = request.files.get("file")
+    file = request.files["file"]
+
+    if not file or not file.filename.lower().endswith(".txt"):
+        return "Only .txt files are supported.", 400
+
     quiz_title = request.form.get("quiz_title", "Generated Quiz")
-    quiz_logo = request.files.get("quiz_logo")
 
-    if not file:
-        return "No file uploaded", 400
-
-    # Save uploaded text file
-    filename = file.filename
-    path = os.path.join(UPLOAD_FOLDER, filename)
+    path = os.path.join(UPLOAD_FOLDER, "latest.txt")
     file.save(path)
 
-    # =========================
-    # PARSE QUIZ
-    # =========================
-    quiz_data = parse_questions(path)
+    # Handle optional logo
+    logo_file = request.files.get("quiz_logo")
+    logo_filename = None
+    if logo_file and logo_file.filename:
+        ext = os.path.splitext(logo_file.filename)[1].lower()
+        if ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
+            ts = int(time.time())
+            logo_filename = f"logo_{ts}{ext}"
+            logo_file.save(os.path.join(LOGO_FOLDER, logo_filename))
 
-    # Always save a parse log (success or failure)
-    ts = int(time.time())
-    log_filename = f"parse_log_{ts}.txt"
+    # =========================
+    # READ FILE CONTENT
+    # =========================
+    with open(path, "r", encoding="utf-8", errors="ignore") as f:
+        text = f.read()
+
+    # =========================
+    # PARSE QUIZ (PASS TEXT!)
+    # =========================
+    quiz_data = parse_questions(text)
+
+    print("UPLOAD MODE FINAL PARSE COUNT:", 
+          0 if quiz_data is None else len(quiz_data))
+
+    # Always save parse log
+    ts_fail = int(time.time())
+    log_filename = f"parse_log_{ts_fail}.txt"
     with open(os.path.join(DATA_FOLDER, log_filename), "w", encoding="utf-8") as f:
         f.write("\n".join(PARSE_LOG))
 
@@ -1769,6 +1843,7 @@ def process_file():
             <link rel="stylesheet" href="/style.css">
         </head>
         <body>
+                                    
         <script>
         fetch("/config/portal.json")
         .then(r => r.json())
@@ -1782,27 +1857,22 @@ def process_file():
         });
         </script>
 
+
+
         <div class="container">
             <h1 class="hero-title">⚠️ Could Not Parse Any Questions</h1>
-
             <div class="card">
-                <p>No valid questions were parsed. Please check the formatting.</p>
-                <p>You can download the parser log for troubleshooting:</p>
+                <p>No valid questions were parsed.</p>
+                <p>You can download the parser log:</p>
 
                 <button onclick="location.href='/data/{{log_filename}}'">
                     📥 Download Parse Log
                 </button>
 
                 <br><br>
-
                 <button onclick="location.href='/upload'">
                     ⬅ Back To Upload Page
                 </button>
-
-                <button onclick="location.href='/paste'">
-                    📋 Try Paste Mode Instead
-                </button>
-
                 <button onclick="location.href='/'">
                     🏠 Return To Portal
                 </button>
@@ -1812,61 +1882,9 @@ def process_file():
         </html>
         """, log_filename=log_filename), 400
 
-    print("UPLOAD MODE FINAL PARSE COUNT:", len(quiz_data))
 
-    # =========================
-    # HANDLE LOGO
-    # =========================
-    logo_filename = None
-    if quiz_logo and quiz_logo.filename:
-        ext = os.path.splitext(quiz_logo.filename)[1].lower()
-        if ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
-            logo_filename = f"logo_{ts}{ext}"
-            quiz_logo.save(os.path.join(LOGO_FOLDER, logo_filename))
 
-    # =========================
-    # SAVE TO DB (quiz + questions + choices)  ✅
-    # =========================
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("INSERT INTO quizzes (title) VALUES (?)", (quiz_title,))
-    quiz_id = cur.lastrowid
-
-    for q in quiz_data:
-        number = q.get("number")
-        q_text = q.get("question") or q.get("text") or ""
-        q_choices = q.get("choices", [])
-
-        cur.execute(
-            """
-            INSERT INTO questions (quiz_id, number, text)
-            VALUES (?, ?, ?)
-            """,
-            (quiz_id, number, q_text),
-        )
-        question_id = cur.lastrowid
-
-        for c in q_choices:
-            cur.execute(
-                """
-                INSERT INTO choices (question_id, label, text, is_correct)
-                VALUES (?, ?, ?, ?)
-                """,
-                (
-                    question_id,
-                    c.get("label"),
-                    c.get("text"),
-                    1 if c.get("is_correct") else 0,
-                ),
-            )
-
-    conn.commit()
-    conn.close()
-
-    # =========================
-    # SAVE JSON + HTML quiz (kept for UI compatibility)
-    # =========================
+    ts = int(time.time())
     json_name = f"quiz_{ts}.json"
     html_name = f"quiz_{ts}.html"
 
@@ -1887,7 +1905,9 @@ def process_file():
     return redirect("/library")
 
 
-
+# =========================
+# SETTINGS PAGE
+# =========================
 @app.route("/settings")
 def settings_page():
     cfg = load_portal_config()
@@ -2461,97 +2481,62 @@ def export_anki_quiz_tsv(quiz_id):
 
 @app.route("/export/anki/missed", methods=["POST"])
 def export_anki_missed_tsv():
-    data = request.get_json(force=True) or {}
+    data = request.get_json(force=True)
 
     attempt_id = data.get("attempt_id")
-    # The UI has historically sent "question_numbers"; we now prefer attempt_question_numbers
-    attempt_qnums = data.get("attempt_question_numbers") or data.get("question_numbers") or []
+    attempt_numbers = data.get("question_numbers", [])
 
-    if not attempt_id or not attempt_qnums:
-        return {"error": "Missing attempt_id or attempt_question_numbers"}, 400
-
-    # Ensure ints (SQLite will still compare strings, but keep consistent)
-    attempt_qnums = [int(x) for x in attempt_qnums]
+    if not attempt_id or not attempt_numbers:
+        return {"error": "Missing attempt_id or question_numbers"}, 400
 
     conn = get_db()
     cur = conn.cursor()
 
-    q_marks = ",".join("?" for _ in attempt_qnums)
+    q_marks = ",".join("?" for _ in attempt_numbers)
 
-    # Build ordered choices + ordered correct choices via subqueries
     cur.execute(
-        f"""
+        """
         SELECT
             mq.attempt_question_number,
-            q.number AS question_number,
             q.text AS question_text,
-            (
-                SELECT GROUP_CONCAT(x, CHAR(10))
-                FROM (
-                    SELECT c2.label || '. ' || c2.text AS x
-                    FROM choices c2
-                    WHERE c2.question_id = q.id
-                    ORDER BY c2.label
-                )
-            ) AS choices_text,
-            (
-                SELECT GROUP_CONCAT(c3.label, ', ')
-                FROM choices c3
-                WHERE c3.question_id = q.id
-                  AND c3.is_correct = 1
-                ORDER BY c3.label
-            ) AS correct_letters,
-            (
-                SELECT GROUP_CONCAT(x, CHAR(10))
-                FROM (
-                    SELECT c4.label || '. ' || c4.text AS x
-                    FROM choices c4
-                    WHERE c4.question_id = q.id
-                      AND c4.is_correct = 1
-                    ORDER BY c4.label
-                )
-            ) AS correct_text,
-            qu.title AS quiz_title
+            GROUP_CONCAT(
+                c.label || '. ' || c.text,
+                CHAR(10)
+            ) AS all_choices,
+            mq.correct_text,
+            qz.title AS quiz_title
         FROM missed_questions mq
-        JOIN questions q
-            ON q.id = mq.question_id
         JOIN attempts a
             ON a.id = mq.attempt_id
-        JOIN quizzes qu
-            ON qu.id = a.quiz_id
+        JOIN quizzes qz
+            ON qz.id = a.quiz_id
+        JOIN questions q
+            ON q.id = mq.question_id
+        JOIN choices c
+            ON c.question_id = q.id
         WHERE mq.attempt_id = ?
-          AND mq.attempt_question_number IN ({q_marks})
+        GROUP BY q.id
         ORDER BY mq.attempt_question_number
         """,
-        [attempt_id, *attempt_qnums],
+        (attempt_id,)
     )
+
+
+
 
     rows = cur.fetchall()
     print("ANKI MISSED EXPORT ROW COUNT:", len(rows))
     conn.close()
 
-    # TSV header (Anki default importer expects these exact column names)
     lines = ["Front\tBack\tTags"]
 
     for r in rows:
-        # ---------- FRONT ----------
-        # Question + all choices
-        front_parts = [r["question_text"] or ""]
-        if r["choices_text"]:
-            front_parts.append("")
-            front_parts.append(r["choices_text"])
-        front = "\n".join(front_parts).replace("\t", " ")
+        front = (
+            f"{r['question_text']}\n\n{r['all_choices']}"
+        ).replace("\t", " ")
 
-        # ---------- BACK ----------
-        # Only the correct answer(s) on back (letters + the correct text)
-        back_parts = []
-        if r["correct_letters"]:
-            back_parts.append(f"Correct: {r['correct_letters']}")
-        if r["correct_text"]:
-            back_parts.append(r["correct_text"])
-        back = "\n".join(back_parts).replace("\t", " ")
+        back = (r["correct_text"] or "").replace("\t", " ")
 
-        # ---------- TAGS ----------
         quiz_tag = (r["quiz_title"] or "autoquiz").replace(" ", "_")
         tags = f"{quiz_tag} missed"
 
@@ -2569,6 +2554,212 @@ def export_anki_missed_tsv():
 
 
 
+
+
+
+
+
+
+
+# =========================================================
+# DEPRECATED — DO NOT USE
+#
+# Old Anki export using genanki (.apkg)
+# Replaced by TSV-based exports:
+#   - /export/anki/quiz/<quiz_id>
+#   - /export/anki/missed
+#
+# Kept temporarily for reference only.
+# =========================================================
+
+
+
+# # =========================
+# # EXPORT SELECTED MISSED QUESTIONS TO ANKI
+# # =========================
+# @app.route("/export/anki", methods=["POST"])
+# def export_anki():
+#     import genanki
+#     import sqlite3
+#     import tempfile
+#     import time
+#     import os
+#     from flask import request, send_file
+
+#     data = request.get_json(force=True)
+
+#     attempt_id = data.get("attempt_id")
+#     question_numbers = data.get("question_numbers", [])
+
+#     data = request.get_json(silent=True) or {}
+#     print("RAW EXPORT PAYLOAD:", data)
+
+#     attempt_id = data.get("attempt_id")
+#     question_numbers = data.get("question_numbers")
+
+#     print("PARSED PAYLOAD:", attempt_id, question_numbers)
+
+
+#     print("EXPORT ANKI HIT:", attempt_id, question_numbers)
+
+#     if not attempt_id or not question_numbers:
+#         return {"error": "Missing attempt_id or question_numbers"}, 400
+
+#     # -------------------------
+#     # LOAD QUESTIONS + ALL CHOICES (AUTHORITATIVE)
+#     # -------------------------
+#     q_marks = ",".join("?" for _ in question_numbers)
+
+#     cur.execute(
+#         f"""
+#         SELECT
+#             mq.question_number     AS question_number,
+#             q.text                 AS question_text,
+#             c.label                AS choice_label,
+#             c.text                 AS choice_text,
+#             c.is_correct           AS is_correct
+#         FROM missed_questions mq
+#         JOIN attempts a
+#             ON mq.attempt_id = a.id
+#         JOIN questions q
+#             ON q.quiz_id = a.quiz_id
+#         AND q.number = mq.question_number
+#         JOIN choices c
+#             ON c.question_id = q.id
+#         WHERE mq.attempt_id = ?
+#         AND mq.question_number IN ({q_marks})
+#         ORDER BY mq.question_number, c.label
+#         """,
+#         [attempt_id, *question_numbers]
+#     )
+
+#     rows = cur.fetchall()
+#     conn.close()
+
+#     if not rows:
+#         return {"error": "No matching questions found"}, 404
+
+
+
+#     # -------------------------
+#     # CREATE ANKI MODEL (MCQ)
+#     # -------------------------
+#     model = genanki.Model(
+#         model_id=1607392319,
+#         name="AutoQuiz MCQ Model",
+#         fields=[
+#             {"name": "Question"},
+#             {"name": "Choices"},
+#             {"name": "Answer"},
+#         ],
+#         templates=[
+#             {
+#                 "name": "MCQ Card",
+#                 "qfmt": """
+#                     <div style="font-size:18px;">
+#                         {{Question}}
+#                     </div>
+#                     <hr>
+#                     <div style="margin-top:10px;">
+#                         {{Choices}}
+#                     </div>
+#                 """,
+#                 "afmt": """
+#                     {{FrontSide}}
+#                     <hr>
+#                     <div style="color:#00aa00; font-weight:bold;">
+#                         Correct Answer:
+#                     </div>
+#                     <div>
+#                         {{Answer}}
+#                     </div>
+#                 """,
+#             }
+#         ],
+#     )
+
+
+#     # -------------------------
+#     # CREATE DECK (EXAM-STYLE)
+#     # -------------------------
+#     deck = genanki.Deck(
+#         int(time.time()),
+#         "AutoQuiz – Missed Questions"
+#     )
+
+#     current_qnum = None
+#     question_text = ""
+#     choices_html = ""
+#     correct_answer = ""
+
+#     for r in rows:
+#         qnum = r["question_number"]
+
+#         # New question → finalize previous card
+#         if current_qnum is not None and qnum != current_qnum:
+#             deck.add_note(
+#                 genanki.Note(
+#                     model=model,
+#                     fields=[
+#                         question_text,
+#                         choices_html,
+#                         correct_answer or "(No correct answer flagged)",
+#                     ],
+#                 )
+#             )
+#             choices_html = ""
+#             correct_answer = ""
+
+#         current_qnum = qnum
+#         question_text = r["question_text"]
+
+#         label = r["choice_label"]
+#         text = r["choice_text"]
+
+#         choices_html += f"{label}. {text}<br>"
+
+#         if r["is_correct"]:
+#             correct_answer = f"{label}. {text}"
+
+#     # ✅ Final question (CRITICAL)
+#     if current_qnum is not None:
+#         deck.add_note(
+#             genanki.Note(
+#                 model=model,
+#                 fields=[
+#                     question_text,
+#                     choices_html,
+#                     correct_answer or "(No correct answer flagged)",
+#                 ],
+#             )
+#         )
+
+
+
+#         # -------------------------
+#         # WRITE APKG (SAFE)
+#         # -------------------------
+#         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".apkg")
+#     genanki.Package(deck).write_to_file(tmp.name)
+
+#     return send_file(
+#         tmp.name,
+#         as_attachment=True,
+#         download_name="autoquiz_missed_questions.apkg",
+#         mimetype="application/octet-stream",
+#     )
+
+
+
+
+
+
+
+
+
+# =========================
+# API: MISSED QUESTIONS BY ATTEMPT
+# =========================
 @app.route("/api/missed_questions")
 def api_missed_questions():
     import sqlite3
