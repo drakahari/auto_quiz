@@ -123,3 +123,27 @@ CREATE TABLE IF NOT EXISTS schema_meta (
 
 INSERT OR IGNORE INTO schema_meta (id, version)
 VALUES (1, 1);
+
+
+-- ============================
+-- CANONICAL QUESTIONS TABLE
+-- ============================
+CREATE TABLE IF NOT EXISTS questions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    -- Which quiz this question belongs to
+    quiz_id INTEGER NOT NULL,
+
+    -- Original question number from the quiz source (for display only)
+    question_number INTEGER,
+
+    -- Canonical learning content
+    question_text TEXT NOT NULL,
+    correct_letters TEXT,
+    correct_text TEXT,
+
+    -- Ensure one canonical question per quiz + source number + text
+    UNIQUE (quiz_id, question_number, question_text),
+
+    FOREIGN KEY (quiz_id) REFERENCES quizzes(id)
+);

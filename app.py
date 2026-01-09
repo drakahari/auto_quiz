@@ -2275,10 +2275,33 @@ def record_attempt():
         missed = data.get("missedDetails", [])
 
         for m in missed:
+            # Reconstruct minimal canonical question object
+            q = {
+                "number": m.get("number"),
+                "question": m.get("question"),
+                "correct": m.get("correctLetters", []),
+                "choices": []
+            }
+
+            # Rebuild choices ONLY for correct answers (enough for canonical storage)
+            for text in m.get("correctText", []):
+                # text format: "B — RAID 1"
+                if "—" in text:
+                    letter, choice_text = text.split("—", 1)
+                    q["choices"].append({
+                        "label": letter.strip(),
+                        "text": choice_text.strip()
+                    })
+
+            # Get canonical question_id
+            question_id = get_or_create_question(conn, quiz_id, q)
+
+            # Insert missed question with canonical reference
             cur.execute(
                 """
                 INSERT INTO missed_questions (
                     attempt_id,
+                    question_id,
                     question_number,
                     question_text,
                     correct_letters,
@@ -2286,10 +2309,11 @@ def record_attempt():
                     selected_letters,
                     selected_text
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     attempt_id,
+                    question_id,
                     m.get("number"),
                     m.get("question"),
                     ",".join(m.get("correctLetters", [])),
@@ -2298,6 +2322,7 @@ def record_attempt():
                     "\n".join(m.get("selectedText", []))
                 )
             )
+
 
 
         conn.commit()
@@ -3123,6 +3148,50 @@ fetch("/config/portal.json")
 # DATABASE CONFIG
 # =========================
 DB_PATH = os.path.join(BASE_DIR, "results.db")
+
+
+def get_or_create_question(conn, quiz_id, q):
+    """
+    Returns canonical question_id for a question.
+    Creates it if it does not already exist.
+    Matches the ACTUAL questions table schema.
+    """
+    cur = conn.cursor()
+
+    number = q.get("number")
+    text = q.get("question")
+
+    # Look up existing canonical question
+    cur.execute("""
+        SELECT id FROM questions
+        WHERE quiz_id = ?
+          AND number = ?
+          AND text = ?
+    """, (quiz_id, number, text))
+
+    row = cur.fetchone()
+    if row:
+        return row[0]
+
+    # Insert canonical question (schema-aligned)
+    cur.execute("""
+        INSERT INTO questions (
+            quiz_id,
+            number,
+            text
+        ) VALUES (?, ?, ?)
+    """, (
+        quiz_id,
+        number,
+        text
+    ))
+
+    conn.commit()
+    return cur.lastrowid
+
+
+
+
 
 
 # =========================
