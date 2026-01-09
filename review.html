@@ -6,7 +6,11 @@
 <link rel="stylesheet" href="/style.css">
 
 <style>
-.review-container { max-width: 980px; margin: auto; }
+.review-container {
+    max-width: 980px;
+    margin: auto;
+}
+
 .info-box {
     background: rgba(0,0,0,.75);
     border: 1px solid rgba(255,255,255,.3);
@@ -14,6 +18,7 @@
     border-radius: 8px;
     margin-bottom: 14px;
 }
+
 .reviewCard {
     background: rgba(0,0,0,.85);
     padding: 12px;
@@ -21,37 +26,58 @@
     border-radius: 8px;
     border-left: 8px solid #ff4d4d;
 }
-.correctBox { color: #00ff80; margin-top: 6px; }
-.userBox { color: #ff6b6b; margin-top: 6px; }
-.ankiRow { display: flex; gap: 10px; margin-bottom: 8px; }
+
+.correctBox {
+    color: #00ff80;
+    margin-top: 6px;
+}
+
+.userBox {
+    color: #ff6b6b;
+    margin-top: 6px;
+}
+
+.ankiRow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+small { color:#ccc; }
 </style>
 </head>
 
 <body>
 
+<!-- Dynamic Background -->
 <script>
 fetch("/config/portal.json")
   .then(r => r.json())
   .then(cfg => {
       if (cfg.background_image) {
-          document.documentElement.style.setProperty("--portal-bg", `url(${cfg.background_image})`);
+          document.documentElement.style.setProperty(
+              "--portal-bg",
+              `url(${cfg.background_image})`
+          );
       }
   });
 </script>
 
 <div class="container review-container">
 
-<h1 class="hero-title">🔁 Review Missed Questions</h1>
-<div id="info" class="info-box">Loading…</div>
-<div id="reviewArea"></div>
+    <h1 class="hero-title">🔁 Review Missed Questions</h1>
 
-<div style="margin-top:20px;">
-    <button onclick="exportSelectedToAnki()">🧠 Export Selected to Anki</button>
-</div>
+    <div id="info" class="info-box">Loading…</div>
+    <div id="reviewArea"></div>
 
-<br>
-<button onclick="location.href='/'">⬅ Back to Portal</button>
-<button onclick="location.href='/history.html'">📜 Back to History</button>
+    <div style="margin-top:20px;">
+        <button onclick="exportSelectedToAnki()">🧠 Export Selected to Anki</button>
+    </div>
+
+    <br>
+    <button onclick="location.href='/'">⬅ Back to Portal</button>
+    <button onclick="location.href='/history.html'">📜 Back to History</button>
 
 </div>
 
@@ -59,81 +85,135 @@ fetch("/config/portal.json")
 async function loadReview() {
     const info = document.getElementById("info");
     const box  = document.getElementById("reviewArea");
-    const attemptId = new URLSearchParams(window.location.search).get("attempt");
+
+    const params = new URLSearchParams(window.location.search);
+    const attemptId = params.get("attempt");
 
     if (!attemptId) {
         info.innerHTML = "❌ No attempt specified.";
         return;
     }
 
-    const metaRes = await fetch("/api/attempts");
-    const meta = await metaRes.json();
-    const attempt = (meta.attempts || []).find(a => a.id == attemptId);
+    try {
+        /* =============================
+           LOAD ATTEMPT METADATA
+        ============================== */
+        const res = await fetch("/api/attempts");
+        const data = await res.json();
+        const attempt = (data.attempts || []).find(a => a.id === attemptId);
 
-    info.innerHTML = `
-        <b>Quiz:</b> ${attempt.quiz_title}<br>
-        <b>Score:</b> ${attempt.score}/${attempt.total} (${attempt.percent}%)<br>
-        <b>Date:</b> ${attempt.completed_at}<br>
-        <b>Mode:</b> ${attempt.mode}
-    `;
+        if (!attempt) {
+            info.innerHTML = "❌ Attempt not found.";
+            return;
+        }
 
-    const res = await fetch(`/api/missed_questions?attempt=${attemptId}`);
-    const missed = await res.json();
+        info.innerHTML = `
+            <b>Quiz:</b> ${attempt.quiz_title}<br>
+            <b>Score:</b> ${attempt.score}/${attempt.total} (${attempt.percent}%)<br>
+            <b>Date:</b> ${attempt.completed_at}<br>
+            <b>Mode:</b> ${attempt.mode}
+        `;
 
-    if (!missed.length) {
-        box.innerHTML = "<p>🎉 No missed questions!</p>";
+        /* =============================
+           LOAD MISSED QUESTIONS (DB)
+        ============================== */
+        const missRes = await fetch(`/api/missed_questions?attempt=${attemptId}`);
+        const missed = await missRes.json();
+
+        if (!Array.isArray(missed) || missed.length === 0) {
+            box.innerHTML = "<p>🎉 No missed questions!</p>";
+            return;
+        }
+
+        let html = "";
+
+        missed.forEach(m => {
+            html += `
+            <div class="reviewCard">
+
+                <div class="ankiRow">
+                    <input type="checkbox"
+                           class="anki-select"
+                           data-qnum="${m.question_number}">
+                    <span>Add to Anki deck</span>
+                </div>
+
+                <h3>Question ${m.question_number}</h3>
+
+                <div>${m.question_text}</div>
+
+                <div class="correctBox">
+                    <b>Correct Answer</b><br>
+                    ${m.correct_text || m.correct_letters}
+                </div>
+
+                <div class="userBox">
+                    <b>Your Answer</b><br>
+                    ${m.selected_text || m.selected_letters || "<i>(No answer recorded)</i>"}
+                </div>
+
+            </div>`;
+        });
+
+        box.innerHTML = html;
+
+    } catch (err) {
+        console.error(err);
+        info.innerHTML = "⚠️ Failed to load review data.";
+    }
+}
+
+/* =============================
+   EXPORT TO ANKI (LOCKED)
+============================= */
+function exportSelectedToAnki() {
+    const params = new URLSearchParams(window.location.search);
+    const attemptId = params.get("attempt");
+
+    const selected = Array.from(
+        document.querySelectorAll(".anki-select:checked")
+    ).map(cb => Number(cb.dataset.qnum));
+
+    if (!attemptId) {
+        alert("Missing attempt ID.");
         return;
     }
 
-    box.innerHTML = missed.map(m => `
-        <div class="reviewCard">
-            <div class="ankiRow">
-                <input type="checkbox" class="anki-select" value="${m.id}">
-                <span>Add to Anki deck</span>
-            </div>
-
-            <h3>Question ${m.question_number}</h3>
-            <div>${m.question_text}</div>
-
-            <div class="correctBox">
-                <b>Correct Answer</b><br>
-                ${m.correct_text || m.correct_letters}
-            </div>
-
-            <div class="userBox">
-                <b>Your Answer</b><br>
-                ${m.selected_text || m.selected_letters}
-            </div>
-        </div>
-    `).join("");
-}
-
-function exportSelectedToAnki() {
-    const selected = [...document.querySelectorAll(".anki-select:checked")]
-        .map(cb => Number(cb.value));
-
     if (!selected.length) {
-        alert("Select at least one question.");
+        alert("Please select at least one missed question.");
         return;
     }
 
     fetch("/export/anki", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ missed_ids: selected })
+        body: JSON.stringify({
+            attempt_id: attemptId,
+            question_numbers: selected
+        })
     })
-    .then(res => res.blob())
+    .then(res => {
+        if (!res.ok) throw new Error("Export failed");
+        return res.blob();
+    })
     .then(blob => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
         a.download = "autoquiz_missed_questions.apkg";
+        document.body.appendChild(a);
         a.click();
+        a.remove();
         URL.revokeObjectURL(url);
+    })
+    .catch(err => {
+        console.error("Anki export error:", err);
+        alert("Failed to generate Anki deck.");
     });
 }
 
 loadReview();
 </script>
+
 </body>
 </html>
