@@ -1751,9 +1751,27 @@ def process_file():
     file.save(path)
 
     # =========================
-    # PARSE QUIZ
+    # READ FILE CONTENT (CRITICAL FIX)
     # =========================
-    quiz_data = parse_questions(path)
+    with open(path, "r", encoding="utf-8", errors="ignore") as f:
+        raw_text = f.read().strip()
+
+    if not raw_text:
+        return "Uploaded file is empty.", 400
+
+    # Normalize ALL newline styles (MATCH PASTE MODE)
+    clean_text = (
+        raw_text
+        .replace("\\r\\n", "\n")
+        .replace("\\n", "\n")
+        .replace("\r\n", "\n")
+        .replace("\r", "\n")
+    )
+
+    # =========================
+    # PARSE QUIZ (SAME AS PASTE MODE)
+    # =========================
+    quiz_data = parse_questions(clean_text)
 
     # Always save a parse log (success or failure)
     ts = int(time.time())
@@ -1815,6 +1833,17 @@ def process_file():
     print("UPLOAD MODE FINAL PARSE COUNT:", len(quiz_data))
 
     # =========================
+    # PARSE DIAGNOSTICS (TEMP)
+    # =========================
+    for i, q in enumerate(quiz_data, 1):
+        choices = q.get("choices", [])
+        has_correct = any(c.get("is_correct") for c in choices)
+
+        if not choices or not has_correct:
+            print(f"[PARSE WARNING] Q{i} missing choices or correct answer")
+
+
+    # =========================
     # HANDLE LOGO
     # =========================
     logo_filename = None
@@ -1825,7 +1854,7 @@ def process_file():
             quiz_logo.save(os.path.join(LOGO_FOLDER, logo_filename))
 
     # =========================
-    # SAVE TO DB (quiz + questions + choices)  ✅
+    # SAVE TO DB (quiz + questions + choices)
     # =========================
     conn = get_db()
     cur = conn.cursor()
@@ -1865,7 +1894,7 @@ def process_file():
     conn.close()
 
     # =========================
-    # SAVE JSON + HTML quiz (kept for UI compatibility)
+    # SAVE JSON + HTML quiz (UI compatibility)
     # =========================
     json_name = f"quiz_{ts}.json"
     html_name = f"quiz_{ts}.html"
@@ -1885,6 +1914,7 @@ def process_file():
     add_quiz_to_registry(html_name, quiz_title, logo_filename)
 
     return redirect("/library")
+
 
 
 
@@ -2399,6 +2429,97 @@ def api_attempts():
     return jsonify({"attempts": attempts})
 
 
+# =====================================================
+# ANKI EXPORT HELPERS
+# =====================================================
+
+import genanki
+import random
+import os
+import tempfile
+
+
+def export_quiz_to_apkg(deck_name, deck_rows):
+    """
+    deck_rows = [
+        {
+            "question_text": str,
+            "choices": [str, str, ...],
+            "correct_text": str
+        }
+    ]
+    """
+
+    model = genanki.Model(
+        1607392319,
+        "AutoQuiz Model",
+        fields=[
+            {"name": "Front"},
+            {"name": "Back"},
+        ],
+        templates=[
+            {
+                "name": "Card 1",
+                # Front shows ONLY the front
+                "qfmt": "{{Front}}",
+
+                # Back shows ONLY the answer (no repeated front)
+                "afmt": "<hr id='answer'>{{Back}}",
+            },
+        ],
+    )
+
+    deck = genanki.Deck(
+        random.randrange(1 << 30, 1 << 31),
+        deck_name,
+    )
+
+    for row in deck_rows:
+        # ---------- FRONT ----------
+        front_lines = []
+
+        question = (row.get("question_text") or "").strip()
+        if question:
+            front_lines.append(question)
+
+        choices = row.get("choices") or []
+        if choices:
+            front_lines.append("")  # blank line between question and choices
+            for c in choices:
+                front_lines.append(c.strip())
+
+        front = "<br>".join(front_lines)
+
+        # ---------- BACK ----------
+        back_lines = []
+
+        correct = (row.get("correct_text") or "").strip()
+        if correct:
+            back_lines.append("<b>Correct Answer</b>")
+            back_lines.append(correct)
+
+        back = "<br>".join(back_lines)
+
+        note = genanki.Note(
+            model=model,
+            fields=[front, back],
+        )
+
+        deck.add_note(note)
+
+    fd, path = tempfile.mkstemp(suffix=".apkg")
+    os.close(fd)
+
+    genanki.Package(deck).write_to_file(path)
+
+    return path
+
+
+
+
+
+
+
 def export_anki_tsv_for_quiz(quiz_id: int) -> str:
     conn = get_db()
     cur = conn.cursor()
@@ -2415,7 +2536,11 @@ def export_anki_tsv_for_quiz(quiz_id: int) -> str:
             GROUP_CONCAT(
                 CASE WHEN c.is_correct = 1 THEN c.label END,
                 ', '
-            ) AS correct_letters
+            ) AS correct_letters,
+            GROUP_CONCAT(
+                CASE WHEN c.is_correct = 1 THEN c.label || '. ' || c.text END,
+                CHAR(10)
+            ) AS correct_text
         FROM questions q
         JOIN quizzes qu ON qu.id = q.quiz_id
         JOIN choices c ON c.question_id = q.id
@@ -2431,25 +2556,41 @@ def export_anki_tsv_for_quiz(quiz_id: int) -> str:
 
     for r in rows:
         # ---------- FRONT ----------
-        front = f"{r['question_text']}\n\n{r['choices'] or ''}".strip()
-        front = front.replace("\t", " ")
+        front = (
+            f"<b>{r['question_text']}</b><br><br>"
+            + "<br>".join((r["choices"] or "").split("\n"))
+        ).replace("\t", " ")
 
         # ---------- BACK ----------
-        correct = (r["correct_letters"] or "").strip()
-        back = f"Correct Answer(s): {correct}"
-        back = back.replace("\t", " ")
+        back = (
+            f"<b>Correct answer:</b> {r['correct_letters']}<br><br>"
+            + "<br>".join((r["correct_text"] or "").split("\n"))
+        ).replace("\t", " ")
 
         # ---------- TAGS ----------
-        quiz_tag = (r["quiz_title"] or f"quiz_{quiz_id}").replace(" ", "_")
-        tags = f"{quiz_tag} autoquiz"
+        quiz_tag = (r["quiz_title"] or "autoquiz").replace(" ", "_")
+        tags = quiz_tag
 
         lines.append(f"{front}\t{back}\t{tags}")
 
     return "\n".join(lines)
 
+
+from flask import Response, request, send_file
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+# =====================================================
+# EXPORT FULL QUIZ → TSV (DIRECT DOWNLOAD)
+# =====================================================
 @app.route("/export/anki/quiz/<int:quiz_id>")
 def export_anki_quiz_tsv(quiz_id):
     tsv = export_anki_tsv_for_quiz(quiz_id)
+
+    logger.info("[ANKI-TSV] Export quiz TSV | quiz_id=%s | bytes=%s",
+                quiz_id, len(tsv.encode("utf-8")))
 
     return Response(
         tsv,
@@ -2459,18 +2600,20 @@ def export_anki_quiz_tsv(quiz_id):
         }
     )
 
-@app.route("/export/anki/missed", methods=["POST"])
-def export_anki_missed_tsv():
+
+# =====================================================
+# EXPORT MISSED QUESTIONS → GENANKI (.apkg)
+# =====================================================
+@app.route("/export/anki", methods=["POST"])
+def export_anki_genanki():
     data = request.get_json(force=True) or {}
 
     attempt_id = data.get("attempt_id")
-    # The UI has historically sent "question_numbers"; we now prefer attempt_question_numbers
     attempt_qnums = data.get("attempt_question_numbers") or data.get("question_numbers") or []
 
     if not attempt_id or not attempt_qnums:
-        return {"error": "Missing attempt_id or attempt_question_numbers"}, 400
+        return {"error": "Missing attempt_id or question numbers"}, 400
 
-    # Ensure ints (SQLite will still compare strings, but keep consistent)
     attempt_qnums = [int(x) for x in attempt_qnums]
 
     conn = get_db()
@@ -2478,7 +2621,108 @@ def export_anki_missed_tsv():
 
     q_marks = ",".join("?" for _ in attempt_qnums)
 
-    # Build ordered choices + ordered correct choices via subqueries
+    # IMPORTANT:
+    # This query returns ONE row per missed question
+    cur.execute(
+        f"""
+        SELECT
+            mq.attempt_question_number,
+            q.text AS question_text,
+
+            (
+                SELECT GROUP_CONCAT(c2.label || '. ' || c2.text, CHAR(10))
+                FROM choices c2
+                WHERE c2.question_id = q.id
+                ORDER BY c2.label
+            ) AS choices_text,
+
+            (
+                SELECT GROUP_CONCAT(c3.label || '. ' || c3.text, CHAR(10))
+                FROM choices c3
+                WHERE c3.question_id = q.id
+                  AND c3.is_correct = 1
+                ORDER BY c3.label
+            ) AS correct_text,
+
+            qu.title AS quiz_title
+
+        FROM missed_questions mq
+        JOIN questions q ON q.id = mq.question_id
+        JOIN attempts a ON a.id = mq.attempt_id
+        JOIN quizzes qu ON qu.id = a.quiz_id
+
+        WHERE mq.attempt_id = ?
+          AND mq.attempt_question_number IN ({q_marks})
+
+        GROUP BY mq.attempt_question_number
+        ORDER BY mq.attempt_question_number
+        """,
+        [attempt_id, *attempt_qnums]
+    )
+
+    rows = cur.fetchall()
+    conn.close()
+
+    if not rows:
+        return {"error": "No missed questions found"}, 404
+
+    logger.info("[ANKI-GENANKI] Rows fetched: %s | attempt_id=%s",
+                len(rows), attempt_id)
+
+    # -----------------------------
+    # Transform rows for genanki
+    # -----------------------------
+    deck_rows = []
+
+    for r in rows:
+        qtext = (r["question_text"] or "").strip()
+        choices_raw = (r["choices_text"] or "").strip()
+        correct = (r["correct_text"] or "").strip()
+
+        choices = [c.strip() for c in choices_raw.split("\n") if c.strip()]
+
+        deck_rows.append({
+            "question_text": qtext,
+            "choices": choices,
+            "correct_text": correct,
+        })
+
+    deck_name = rows[0]["quiz_title"] or "AutoQuiz Missed Questions"
+
+    apkg_path = export_quiz_to_apkg(deck_name, deck_rows)
+
+    logger.info("[ANKI-GENANKI] APKG generated | deck='%s' | cards=%s",
+                deck_name, len(deck_rows))
+
+    return send_file(
+        apkg_path,
+        as_attachment=True,
+        download_name="autoquiz_missed_questions.apkg",
+        mimetype="application/octet-stream"
+    )
+
+
+
+# =====================================================
+# EXPORT MISSED QUESTIONS → TSV (ANKI IMPORT)
+# =====================================================
+@app.route("/export/anki/missed", methods=["POST"])
+def export_anki_missed_tsv():
+    data = request.get_json(force=True) or {}
+
+    attempt_id = data.get("attempt_id")
+    attempt_qnums = data.get("attempt_question_numbers") or data.get("question_numbers") or []
+
+    if not attempt_id or not attempt_qnums:
+        return {"error": "Missing attempt_id or attempt_question_numbers"}, 400
+
+    attempt_qnums = [int(x) for x in attempt_qnums]
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    q_marks = ",".join("?" for _ in attempt_qnums)
+
     cur.execute(
         f"""
         SELECT
@@ -2513,12 +2757,9 @@ def export_anki_missed_tsv():
             ) AS correct_text,
             qu.title AS quiz_title
         FROM missed_questions mq
-        JOIN questions q
-            ON q.id = mq.question_id
-        JOIN attempts a
-            ON a.id = mq.attempt_id
-        JOIN quizzes qu
-            ON qu.id = a.quiz_id
+        JOIN questions q ON q.id = mq.question_id
+        JOIN attempts a ON a.id = mq.attempt_id
+        JOIN quizzes qu ON qu.id = a.quiz_id
         WHERE mq.attempt_id = ?
           AND mq.attempt_question_number IN ({q_marks})
         ORDER BY mq.attempt_question_number
@@ -2527,28 +2768,32 @@ def export_anki_missed_tsv():
     )
 
     rows = cur.fetchall()
-    print("ANKI MISSED EXPORT ROW COUNT:", len(rows))
     conn.close()
 
-    # TSV header (Anki default importer expects these exact column names)
+    logger.info("[ANKI-TSV] Missed TSV rows fetched: %s | attempt_id=%s",
+                len(rows), attempt_id)
+
+    # TSV header required by Anki
     lines = ["Front\tBack\tTags"]
 
-    for r in rows:
+    for idx, r in enumerate(rows, start=1):
+        if not r["question_text"]:
+            logger.warning("[ANKI-TSV] Empty question_text | row=%s", idx)
+
         # ---------- FRONT ----------
-        # Question + all choices
         front_parts = [r["question_text"] or ""]
         if r["choices_text"]:
-            front_parts.append("")
-            front_parts.append(r["choices_text"])
+            front_parts.extend(["", r["choices_text"]])
+
         front = "\n".join(front_parts).replace("\t", " ")
 
         # ---------- BACK ----------
-        # Only the correct answer(s) on back (letters + the correct text)
         back_parts = []
         if r["correct_letters"]:
             back_parts.append(f"Correct: {r['correct_letters']}")
         if r["correct_text"]:
             back_parts.append(r["correct_text"])
+
         back = "\n".join(back_parts).replace("\t", " ")
 
         # ---------- TAGS ----------
@@ -2557,7 +2802,14 @@ def export_anki_missed_tsv():
 
         lines.append(f"{front}\t{back}\t{tags}")
 
+        if idx == 1:
+            logger.debug("[ANKI-TSV] First card preview:\nFRONT:\n%s\nBACK:\n%s",
+                         front[:500], back[:500])
+
     tsv = "\n".join(lines)
+
+    logger.info("[ANKI-TSV] TSV generated | lines=%s | bytes=%s",
+                len(lines), len(tsv.encode("utf-8")))
 
     return Response(
         tsv,
@@ -2566,6 +2818,7 @@ def export_anki_missed_tsv():
             "Content-Disposition": "attachment; filename=missed_questions_anki.tsv"
         }
     )
+
 
 
 

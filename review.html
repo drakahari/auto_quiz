@@ -72,7 +72,8 @@ fetch("/config/portal.json")
     <div id="reviewArea"></div>
 
     <div style="margin-top:20px;">
-        <button onclick="exportSelectedToAnki()">🧠 Export Selected to Anki</button>
+        <button onclick="exportSelectedToAnki()">🧠 Export Selected to Anki (TSV)</button>
+        <button onclick="exportMissedAnkiApkg()">📦 Export Missed to Anki (APKG)</button>
     </div>
 
     <br>
@@ -95,13 +96,11 @@ async function loadReview() {
     }
 
     try {
-        /* =============================
-           LOAD ATTEMPT METADATA
-        ============================== */
         const res = await fetch("/api/attempts");
         const data = await res.json();
-        const attempt = (data.attempts || []).find(a => String(a.id) === String(attemptId));
-
+        const attempt = (data.attempts || []).find(
+            a => String(a.id) === String(attemptId)
+        );
 
         if (!attempt) {
             info.innerHTML = "❌ Attempt not found.";
@@ -115,9 +114,6 @@ async function loadReview() {
             <b>Mode:</b> ${attempt.mode}
         `;
 
-        /* =============================
-           LOAD MISSED QUESTIONS (DB)
-        ============================== */
         const missRes = await fetch(`/api/missed_questions?attempt=${attemptId}`);
         const missed = await missRes.json();
 
@@ -128,11 +124,9 @@ async function loadReview() {
 
         let html = "";
 
-        missed.forEach((m, index) => {
-
+        missed.forEach(m => {
             html += `
             <div class="reviewCard">
-
                 <div class="ankiRow">
                     <input type="checkbox"
                            class="anki-select"
@@ -141,8 +135,6 @@ async function loadReview() {
                 </div>
 
                 <h3>Question ${m.attempt_question_number}</h3>
-
-
 
                 <div>${m.question_text}</div>
 
@@ -155,7 +147,6 @@ async function loadReview() {
                     <b>Your Answer</b><br>
                     ${m.selected_text || m.selected_letters || "<i>(No answer recorded)</i>"}
                 </div>
-
             </div>`;
         });
 
@@ -167,9 +158,9 @@ async function loadReview() {
     }
 }
 
-/* =============================
-   EXPORT TO ANKI (LOCKED)
-============================= */
+/* =====================================================
+   EXPORT SELECTED → TSV (Fallback / Debug)
+===================================================== */
 function exportSelectedToAnki() {
     const params = new URLSearchParams(window.location.search);
     const attemptId = params.get("attempt");
@@ -204,17 +195,66 @@ function exportSelectedToAnki() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = "autoquiz_missed_questions.apkg";
+        a.download = "missed_questions_anki.tsv";
         document.body.appendChild(a);
         a.click();
         a.remove();
         URL.revokeObjectURL(url);
     })
     .catch(err => {
-        console.error("Anki export error:", err);
-        alert("Failed to generate Anki deck.");
+        console.error("TSV export error:", err);
+        alert("Failed to generate TSV.");
     });
 }
+
+/* =====================================================
+   EXPORT ALL MISSED → APKG (PRIMARY)
+===================================================== */
+function exportMissedAnkiApkg() {
+    const params = new URLSearchParams(window.location.search);
+    const attemptId = params.get("attempt");
+
+    if (!attemptId) {
+        alert("Missing attempt ID.");
+        return;
+    }
+
+    // ✅ ONLY checked questions
+    const selected = Array.from(
+        document.querySelectorAll(".anki-select:checked")
+    ).map(cb => Number(cb.dataset.qnum));
+
+    if (!selected.length) {
+        alert("Please select at least one missed question.");
+        return;
+    }
+
+    fetch("/export/anki", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            attempt_id: attemptId,
+            attempt_question_numbers: selected
+        })
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("APKG export failed");
+        return res.blob();
+    })
+    .then(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "missed_questions.apkg";
+        a.click();
+        URL.revokeObjectURL(url);
+    })
+    .catch(err => {
+        console.error("APKG export error:", err);
+        alert("Failed to generate APKG.");
+    });
+}
+
 
 loadReview();
 </script>
