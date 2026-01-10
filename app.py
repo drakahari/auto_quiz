@@ -2231,47 +2231,52 @@ def save_settings():
 
 
 
+# =====================================================
+# RECORD QUIZ ATTEMPT (FIXED: ID-BASED, NOT TITLE-BASED)
+# =====================================================
 @app.route("/record_attempt", methods=["POST"])
 def record_attempt():
     data = request.json
     print("📩 Incoming Attempt Payload:", json.dumps(data, indent=2))
 
-    quiz_title = data.get("quizTitle")
+    # -----------------------------
+    # REQUIRED FIELDS
+    # -----------------------------
+    attempt_id = data.get("attemptId")
+    quiz_id = data.get("quizId")          # 🔑 FIX: authoritative identity
+    quiz_title = data.get("quizTitle")    # display only (optional)
+
     score = data.get("score")
     total = data.get("total")
     percent = data.get("percent")
-    attempt_id = data.get("attemptId")
 
-    # CamelCase coming from JS
+    # CamelCase from JS
     started_at = data.get("startedAt")
     completed_at = data.get("completedAt")
     time_remaining = data.get("timeRemaining")
     mode = data.get("mode", "Exam")
 
-    print("Saving attempt to DB:", quiz_title, percent)
+    if not quiz_id:
+        return {"error": "Missing quizId in attempt payload"}, 400
+
+    print(f"Saving attempt: quiz_id={quiz_id} title={quiz_title} percent={percent}")
 
     conn = get_db()
     cur = conn.cursor()
 
     try:
-        # 1️⃣ Ensure quiz exists
-        cur.execute(
-            "INSERT OR IGNORE INTO quizzes (title) VALUES (?)",
-            (quiz_title,)
-        )
-
-        # 2️⃣ Lookup quiz_id
-        cur.execute(
-            "SELECT id FROM quizzes WHERE title = ? LIMIT 1",
-            (quiz_title,)
-        )
+        # -----------------------------
+        # VERIFY QUIZ EXISTS (BY ID)
+        # -----------------------------
+        cur.execute("SELECT id FROM quizzes WHERE id = ?", (quiz_id,))
         row = cur.fetchone()
 
         if not row:
-            raise Exception("Quiz lookup failed")
-        quiz_id = row["id"]
+            raise Exception(f"Quiz ID {quiz_id} does not exist")
 
-        # 3️⃣ Insert Attempt
+        # -----------------------------
+        # INSERT ATTEMPT (NO TITLE LOOKUPS)
+        # -----------------------------
         cur.execute(
             """
             INSERT INTO attempts (
@@ -2296,40 +2301,40 @@ def record_attempt():
                 total,
                 percent,
                 time_remaining,
-                mode
+                mode,
             )
         )
 
-        # 4️⃣ Store missed questions (if any)
+        # -----------------------------
+        # STORE MISSED QUESTIONS (UNCHANGED LOGIC)
+        # -----------------------------
         missed = data.get("missedDetails", [])
 
         for m in missed:
-            # Reconstruct minimal canonical question object
             q = {
                 "number": m.get("number"),
                 "question": m.get("question"),
                 "correct": m.get("correctLetters", []),
-                "choices": []
+                "choices": [],
             }
 
-            # Rebuild choices ONLY for correct answers (enough for canonical storage)
+            # Rebuild minimal choices from correct answers
             for text in m.get("correctText", []):
-                # text format: "B — RAID 1"
+                # Example: "B — RAID 1"
                 if "—" in text:
                     letter, choice_text = text.split("—", 1)
                     q["choices"].append({
                         "label": letter.strip(),
-                        "text": choice_text.strip()
+                        "text": choice_text.strip(),
                     })
 
-            # Canonical question identity (already working)
+            # Canonical question resolution (already proven correct)
             question_id = get_or_create_question(conn, quiz_id, q)
 
-            # 🔑 THIS IS THE IMPORTANT NEW LINE
-            # This is the question number as shown during the quiz attempt
-            attempt_question_number = m.get("attemptQuestionNumber", m.get("number"))
+            attempt_question_number = m.get(
+                "attemptQuestionNumber", m.get("number")
+            )
 
-            # Insert missed question with canonical + attempt display number
             cur.execute(
                 """
                 INSERT INTO missed_questions (
@@ -2354,12 +2359,9 @@ def record_attempt():
                     ",".join(m.get("correctLetters", [])),
                     "\n".join(m.get("correctText", [])),
                     ",".join(m.get("selectedLetters", [])),
-                    "\n".join(m.get("selectedText", []))
+                    "\n".join(m.get("selectedText", [])),
                 )
             )
-
-
-
 
         conn.commit()
         conn.close()
@@ -2369,7 +2371,8 @@ def record_attempt():
         conn.rollback()
         conn.close()
         print("DB ERROR:", e)
-        return {"status": "db_error"}, 500
+        return {"status": "db_error", "detail": str(e)}, 500
+
 
 
 
@@ -3271,6 +3274,12 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
 <meta charset="UTF-8">
 <title>{quiz_title}</title>
 <link rel="stylesheet" href="/style.css">
+
+<!-- 🔑 Canonical quiz identity for script.js + DB -->
+<script>
+  window.quiz_title = "{quiz_title}";
+</script>
+
 </head>
 
 <body>
@@ -3364,11 +3373,8 @@ fetch("/config/portal.json")
         <button onclick="location.href='/'">🏠 Return To Portal</button>
         <button onclick="location.href='/library'">📚 Return To Quiz Library</button>
 
+<!-- 🔹 Tell script.js which JSON file to load -->
 <script>
-  /* Make title available to script.js + DB saving */
-  window.quiz_title = "{quiz_title}";
-
-  /* This tells script.js which JSON file to load */
   const QUIZ_FILE = "/data/{jsonfile}";
 </script>
 
@@ -3377,8 +3383,10 @@ fetch("/config/portal.json")
 </body>
 </html>
 """
+
     with open(outpath, "w", encoding="utf-8") as f:
         f.write(html)
+
 
 
 
