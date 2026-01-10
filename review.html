@@ -70,9 +70,17 @@ fetch("/config/portal.json")
 
     <div id="info" class="info-box">Loading…</div>
     <div id="reviewArea"></div>
+    <div style="margin: 14px 0;">
+    <label style="cursor:pointer;">
+        <input type="checkbox" id="ankiSelectAll" onclick="toggleSelectAllAnki(this)">
+        <b>Select all missed questions for Anki</b>
+    </label>
+    </div>
 
     <div style="margin-top:20px;">
+        <!-- DEBUG / FALLBACK ONLY
         <button onclick="exportSelectedToAnki()">🧠 Export Selected to Anki (TSV)</button>
+        -->
         <button onclick="exportMissedAnkiApkg()">📦 Export Missed to Anki (APKG)</button>
     </div>
 
@@ -130,7 +138,8 @@ async function loadReview() {
                 <div class="ankiRow">
                     <input type="checkbox"
                            class="anki-select"
-                           data-qnum="${m.attempt_question_number}">
+                           data-qnum="${m.attempt_question_number}"
+                           onchange="syncSelectAllAnki()">
                     <span>Add to Anki deck</span>
                 </div>
 
@@ -206,6 +215,28 @@ function exportSelectedToAnki() {
         alert("Failed to generate TSV.");
     });
 }
+
+
+function toggleSelectAllAnki(master) {
+    const checkboxes = document.querySelectorAll(".anki-select");
+    checkboxes.forEach(cb => {
+        cb.checked = master.checked;
+    });
+}
+
+function syncSelectAllAnki() {
+    const boxes = document.querySelectorAll(".anki-select");
+    const checked = document.querySelectorAll(".anki-select:checked");
+
+    const master = document.getElementById("ankiSelectAll");
+    if (!master) return;
+
+    master.checked = boxes.length > 0 && boxes.length === checked.length;
+}
+
+
+
+
 
 /* =====================================================
    EXPORT ALL MISSED → APKG (PRIMARY)
