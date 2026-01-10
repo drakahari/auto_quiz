@@ -2232,50 +2232,68 @@ def save_settings():
 
 
 # =====================================================
-# RECORD QUIZ ATTEMPT (FIXED: ID-BASED, NOT TITLE-BASED)
+# RECORD QUIZ ATTEMPT (ID-FIRST, SAFE TITLE FALLBACK)
 # =====================================================
 @app.route("/record_attempt", methods=["POST"])
 def record_attempt():
-    data = request.json
+    data = request.get_json(force=True) or {}
     print("📩 Incoming Attempt Payload:", json.dumps(data, indent=2))
 
     # -----------------------------
     # REQUIRED FIELDS
     # -----------------------------
     attempt_id = data.get("attemptId")
-    quiz_id = data.get("quizId")          # 🔑 FIX: authoritative identity
-    quiz_title = data.get("quizTitle")    # display only (optional)
+    quiz_id = data.get("quizId")           # preferred
+    quiz_title = data.get("quizTitle")     # fallback only
 
-    score = data.get("score")
-    total = data.get("total")
-    percent = data.get("percent")
+    score = data.get("score", 0)
+    total = data.get("total", 0)
+    percent = data.get("percent", 0)
 
-    # CamelCase from JS
     started_at = data.get("startedAt")
     completed_at = data.get("completedAt")
     time_remaining = data.get("timeRemaining")
     mode = data.get("mode", "Exam")
 
-    if not quiz_id:
-        return {"error": "Missing quizId in attempt payload"}, 400
-
-    print(f"Saving attempt: quiz_id={quiz_id} title={quiz_title} percent={percent}")
+    if not attempt_id:
+        return {"error": "Missing attemptId"}, 400
 
     conn = get_db()
     cur = conn.cursor()
 
     try:
         # -----------------------------
-        # VERIFY QUIZ EXISTS (BY ID)
+        # RESOLVE QUIZ ID (AUTHORITATIVE)
         # -----------------------------
-        cur.execute("SELECT id FROM quizzes WHERE id = ?", (quiz_id,))
-        row = cur.fetchone()
+        if quiz_id:
+            cur.execute("SELECT id FROM quizzes WHERE id = ?", (quiz_id,))
+            row = cur.fetchone()
+            if not row:
+                raise Exception(f"Quiz ID {quiz_id} does not exist")
+        else:
+            if not quiz_title:
+                raise Exception("Missing quizId and quizTitle")
 
-        if not row:
-            raise Exception(f"Quiz ID {quiz_id} does not exist")
+            # Safe fallback: most recent quiz with this title
+            cur.execute(
+                """
+                SELECT id
+                FROM quizzes
+                WHERE title = ?
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (quiz_title,)
+            )
+            row = cur.fetchone()
+            if not row:
+                raise Exception(f"No quiz found for title '{quiz_title}'")
+            quiz_id = row["id"]
+
+        print(f"Saving attempt: attempt_id={attempt_id} quiz_id={quiz_id}")
 
         # -----------------------------
-        # INSERT ATTEMPT (NO TITLE LOOKUPS)
+        # INSERT ATTEMPT
         # -----------------------------
         cur.execute(
             """
@@ -2306,7 +2324,7 @@ def record_attempt():
         )
 
         # -----------------------------
-        # STORE MISSED QUESTIONS (UNCHANGED LOGIC)
+        # STORE MISSED QUESTIONS
         # -----------------------------
         missed = data.get("missedDetails", [])
 
@@ -2318,9 +2336,8 @@ def record_attempt():
                 "choices": [],
             }
 
-            # Rebuild minimal choices from correct answers
+            # Build minimal correct choices
             for text in m.get("correctText", []):
-                # Example: "B — RAID 1"
                 if "—" in text:
                     letter, choice_text = text.split("—", 1)
                     q["choices"].append({
@@ -2328,7 +2345,6 @@ def record_attempt():
                         "text": choice_text.strip(),
                     })
 
-            # Canonical question resolution (already proven correct)
             question_id = get_or_create_question(conn, quiz_id, q)
 
             attempt_question_number = m.get(
@@ -2364,14 +2380,16 @@ def record_attempt():
             )
 
         conn.commit()
-        conn.close()
         return {"status": "ok"}
 
     except Exception as e:
         conn.rollback()
-        conn.close()
         print("DB ERROR:", e)
         return {"status": "db_error", "detail": str(e)}, 500
+
+    finally:
+        conn.close()
+
 
 
 
