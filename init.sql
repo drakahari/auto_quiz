@@ -5,8 +5,13 @@ PRAGMA foreign_keys = ON;
 ===================================================== */
 CREATE TABLE IF NOT EXISTS quizzes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    -- Human-readable name (NOT unique)
     title TEXT NOT NULL,
-    source_file TEXT,
+
+    -- Canonical identity (filename or source identifier)
+    source_file TEXT NOT NULL UNIQUE,
+
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -15,11 +20,21 @@ CREATE TABLE IF NOT EXISTS quizzes (
 ===================================================== */
 CREATE TABLE IF NOT EXISTS questions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    quiz_id INTEGER NOT NULL,
-    number INTEGER NOT NULL,
-    text TEXT NOT NULL,
 
-    FOREIGN KEY (quiz_id) REFERENCES quizzes(id)
+    quiz_id INTEGER NOT NULL,
+
+    -- Original question number from the source quiz
+    question_number INTEGER NOT NULL,
+
+    question_text TEXT NOT NULL,
+    correct_letters TEXT,
+    correct_text TEXT,
+
+    -- Prevent accidental duplicate imports of the same question
+    UNIQUE (quiz_id, question_number, question_text),
+
+    FOREIGN KEY (quiz_id)
+        REFERENCES quizzes(id)
         ON DELETE CASCADE
 );
 
@@ -28,23 +43,25 @@ CREATE TABLE IF NOT EXISTS questions (
 ===================================================== */
 CREATE TABLE IF NOT EXISTS choices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+
     question_id INTEGER NOT NULL,
     label TEXT NOT NULL,          -- "A", "B", "C", etc.
     text TEXT NOT NULL,
     is_correct INTEGER NOT NULL DEFAULT 0,
 
-    FOREIGN KEY (question_id) REFERENCES questions(id)
+    FOREIGN KEY (question_id)
+        REFERENCES questions(id)
         ON DELETE CASCADE
 );
 
 /* =====================================================
-   ATTEMPTS (When a user completes an exam)
+   ATTEMPTS (One quiz run — Study or Exam)
 ===================================================== */
 CREATE TABLE IF NOT EXISTS attempts (
-    id TEXT PRIMARY KEY,          -- Use your existing UUID
+    id TEXT PRIMARY KEY,          -- UUID / timestamp-based ID
     quiz_id INTEGER NOT NULL,
 
-    user_name TEXT,               -- Optional / future
+    user_name TEXT,
     started_at DATETIME,
     completed_at DATETIME,
 
@@ -54,7 +71,8 @@ CREATE TABLE IF NOT EXISTS attempts (
     time_remaining INTEGER,
     mode TEXT NOT NULL,           -- "Exam" or "Study"
 
-    FOREIGN KEY (quiz_id) REFERENCES quizzes(id)
+    FOREIGN KEY (quiz_id)
+        REFERENCES quizzes(id)
         ON DELETE CASCADE
 );
 
@@ -63,39 +81,43 @@ CREATE TABLE IF NOT EXISTS attempts (
 ===================================================== */
 CREATE TABLE IF NOT EXISTS attempt_answers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+
     attempt_id TEXT NOT NULL,
     question_id INTEGER NOT NULL,
 
     selected_labels TEXT,         -- "A" or "A,C"
     was_correct INTEGER NOT NULL,
 
-    FOREIGN KEY (attempt_id) REFERENCES attempts(id)
+    FOREIGN KEY (attempt_id)
+        REFERENCES attempts(id)
         ON DELETE CASCADE,
 
-    FOREIGN KEY (question_id) REFERENCES questions(id)
+    FOREIGN KEY (question_id)
+        REFERENCES questions(id)
         ON DELETE CASCADE
 );
 
 /* =====================================================
-   OPTIONAL: MISSED QUESTIONS TABLE
-   (Convenience table — everything here could be derived,
-    but storing it makes analytics easier)
+   MISSED QUESTIONS (Analytics convenience table)
 ===================================================== */
 CREATE TABLE IF NOT EXISTS missed_questions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+
     attempt_id TEXT NOT NULL,
     question_id INTEGER NOT NULL,
-    correct_labels TEXT NOT NULL, -- "B", "A,D", etc.
+    correct_letters TEXT NOT NULL,
 
-    FOREIGN KEY (attempt_id) REFERENCES attempts(id)
+    FOREIGN KEY (attempt_id)
+        REFERENCES attempts(id)
         ON DELETE CASCADE,
 
-    FOREIGN KEY (question_id) REFERENCES questions(id)
+    FOREIGN KEY (question_id)
+        REFERENCES questions(id)
         ON DELETE CASCADE
 );
 
 /* =====================================================
-   INDEXES (Performance Boost)
+   INDEXES (Performance)
 ===================================================== */
 CREATE INDEX IF NOT EXISTS idx_questions_quiz
     ON questions (quiz_id);
@@ -113,7 +135,7 @@ CREATE INDEX IF NOT EXISTS idx_answers_question
     ON attempt_answers (question_id);
 
 /* =====================================================
-   META INFO (Future migrations / versioning)
+   SCHEMA META (Version tracking)
 ===================================================== */
 CREATE TABLE IF NOT EXISTS schema_meta (
     id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -123,27 +145,3 @@ CREATE TABLE IF NOT EXISTS schema_meta (
 
 INSERT OR IGNORE INTO schema_meta (id, version)
 VALUES (1, 1);
-
-
--- ============================
--- CANONICAL QUESTIONS TABLE
--- ============================
-CREATE TABLE IF NOT EXISTS questions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-
-    -- Which quiz this question belongs to
-    quiz_id INTEGER NOT NULL,
-
-    -- Original question number from the quiz source (for display only)
-    question_number INTEGER,
-
-    -- Canonical learning content
-    question_text TEXT NOT NULL,
-    correct_letters TEXT,
-    correct_text TEXT,
-
-    -- Ensure one canonical question per quiz + source number + text
-    UNIQUE (quiz_id, question_number, question_text),
-
-    FOREIGN KEY (quiz_id) REFERENCES quizzes(id)
-);
