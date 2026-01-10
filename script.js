@@ -496,10 +496,23 @@ function submitQuiz(force = false) {
         // Correct Answers
         correctLetters: q.correct,
         correctText: q.correct.map(letter => {
-            const idx = letter.toUpperCase().charCodeAt(0) - 65;
-            return `${letter} — ${q.choices[idx].text}`;
+            const choice = q.choices.find(
+                c => c.label.toUpperCase() === letter.toUpperCase()
+            );
 
+            if (!choice) {
+                console.error(
+                    "SCORING ERROR: Missing choice for letter",
+                    letter,
+                    "Question:",
+                    q
+                );
+                return `${letter} — [Missing choice]`;
+            }
+
+            return `${letter} — ${choice.text}`;
         }),
+
 
         // What the user actually selected
         selectedIndexes: ans,

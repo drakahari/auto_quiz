@@ -2415,6 +2415,22 @@ def record_attempt():
                         "text": choice_text.strip(),
                     })
 
+            print("🧪 MISSED QUESTION RAW:", json.dumps(m, indent=2))
+            print(
+                "🧪 USING number=",
+                m.get("number"),
+                "attemptQuestionNumber=",
+                m.get("attemptQuestionNumber")
+            )
+
+            # 🔴 DEBUG GUARD — TEMPORARY
+            if m.get("attemptQuestionNumber") is None:
+                raise Exception(
+                    f"[DEBUG] Missing attemptQuestionNumber for question_number={m.get('number')}"
+                )
+            
+
+            
             question_id = get_or_create_question(conn, quiz_id, q)
 
             attempt_question_number = m.get(
