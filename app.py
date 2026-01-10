@@ -176,20 +176,52 @@ def static_proxy(path):
 
 
 # =========================
-# DELETE QUIZ
+# DELETE QUIZ (CANONICAL)
 # =========================
-@app.route("/delete_quiz/<html_name>", methods=["POST"])
-def delete_quiz(html_name):
+@app.route("/delete_quiz/<int:quiz_id>", methods=["POST"])
+def delete_quiz(quiz_id):
+    conn = get_db()
+
+    # 🔒 Ensure FK cascades are enforced for this connection
+    conn.execute("PRAGMA foreign_keys = ON")
+
+    # ----------------------------------
+    # Look up quiz metadata BEFORE delete
+    # ----------------------------------
+    row = conn.execute(
+        "SELECT title, source_file FROM quizzes WHERE id = ?",
+        (quiz_id,)
+    ).fetchone()
+
+    if not row:
+        conn.close()
+        return redirect("/library")
+
+    source_file = row["source_file"]
+
+    # ----------------------------------
+    # DELETE FROM DATABASE (AUTHORITATIVE)
+    # ----------------------------------
+    conn.execute("DELETE FROM quizzes WHERE id = ?", (quiz_id,))
+    conn.commit()
+    conn.close()
+
+    # ----------------------------------
+    # CLEAN UP REGISTRY + FILES
+    # ----------------------------------
     registry = load_registry()
     updated = []
+
     json_file_to_delete = None
     logo_to_delete = None
+    html_file_to_delete = None
 
     for q in registry:
-        if q["html"] == html_name:
+        if q.get("html") == source_file:
+            html_file_to_delete = q.get("html")
             try:
-                json_file_to_delete = q["html"].replace(".html", ".json")
-            except:
+                json_file_to_delete = q.get("html", "").replace(".html", ".json")
+            except Exception:
                 pass
             logo_to_delete = q.get("logo")
             continue
@@ -197,14 +229,18 @@ def delete_quiz(html_name):
 
     save_registry(updated)
 
-    html_path = os.path.join(QUIZ_FOLDER, html_name)
-    if os.path.exists(html_path):
-        os.remove(html_path)
+    # ----------------------------------
+    # DELETE FILES (BEST EFFORT)
+    # ----------------------------------
+    if html_file_to_delete:
+        hp = os.path.join(QUIZ_FOLDER, html_file_to_delete)
+        if os.path.exists(hp):
+            os.remove(hp)
 
     if json_file_to_delete:
-        json_path = os.path.join(DATA_FOLDER, json_file_to_delete)
-        if os.path.exists(json_path):
-            os.remove(json_path)
+        jp = os.path.join(DATA_FOLDER, json_file_to_delete)
+        if os.path.exists(jp):
+            os.remove(jp)
 
     if logo_to_delete:
         lp = os.path.join(LOGO_FOLDER, logo_to_delete)
@@ -212,6 +248,7 @@ def delete_quiz(html_name):
             os.remove(lp)
 
     return redirect("/library")
+
 
 
 # =========================
@@ -243,39 +280,70 @@ def save_order():
 # =========================
 @app.route("/library")
 def quiz_library():
-    quizzes = load_registry()
+    registry = load_registry()
     portal_title = get_portal_title()
 
+    conn = get_db()
+    conn.execute("PRAGMA foreign_keys = ON")
+
+    quizzes = []
+
+    for q in registry:
+        merged = dict(q)
+
+        # Try to resolve DB quiz ID
+        row = conn.execute(
+            """
+            SELECT id FROM quizzes
+            WHERE source_file = ?
+               OR title = ?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (q.get("html"), q.get("title"))
+        ).fetchone()
+
+        if not row:
+            # No DB row → skip delete capability entirely
+            # (quiz still renders, but delete is harmless)
+            continue
+
+        merged["id"] = row["id"]
+        quizzes.append(merged)
+
+    conn.close()
+
     return render_template_string("""
-    <html>
-    <head>
-        <title>Quiz Library</title>
-        <link rel="stylesheet" href="/style.css">
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Quiz Library</title>
+    <link rel="stylesheet" href="/style.css">
 
-        <!-- Drag + Drop Library -->
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <!-- Drag + Drop Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
 
-        <!-- Background Loader -->
-        <script>
-        fetch("/config/portal.json")
-          .then(r => r.json())
-          .then(cfg => {
-              if (cfg.background_image) {
-                  document.documentElement.style.setProperty(
-                      "--portal-bg",
-                      `url(${cfg.background_image})`
-                  );
-              }
-          });
-        </script>
-    </head>
+    <!-- Background Loader -->
+    <script>
+    fetch("/config/portal.json")
+      .then(r => r.json())
+      .then(cfg => {
+          if (cfg.background_image) {
+              document.documentElement.style.setProperty(
+                  "--portal-bg",
+                  `url(${cfg.background_image})`
+              );
+          }
+      });
+    </script>
+</head>
 
 <body>
 
 <div class="container">
 
     <h1 class="hero-title">
-        {{portal_title}}<br>
+        {{ portal_title }}<br>
         <span style="font-size:22px;opacity:.85">📚 Quiz Library</span>
     </h1>
 
@@ -285,74 +353,75 @@ def quiz_library():
             <h2>Drag to Reorder</h2>
 
             <div id="quizList">
-
             {% for q in quizzes %}
-            <div class="quiz-card"
-                 data-id="{{q['html']}}"
-                 style="
-                    padding:14px;
-                    margin:10px;
-                    background:rgba(0,0,0,.6);
-                    border-radius:8px;
-                    display:flex;
-                    justify-content:space-between;
-                    gap:20px;
-                    cursor:grab;
-                 ">
+                <div class="quiz-card"
+                     data-id="{{ q['html'] }}"
+                     style="
+                        padding:14px;
+                        margin:10px;
+                        background:rgba(0,0,0,.6);
+                        border-radius:8px;
+                        display:flex;
+                        justify-content:space-between;
+                        gap:20px;
+                        cursor:grab;
+                     ">
 
-                <div style="flex:1;">
-                    <h3 style="
-                        margin-top:0;
-                        margin-bottom:6px;
-                        font-size:24px;
-                        font-weight:900;
-                        letter-spacing:.5px;">
-                        {{q['title']}}
-                    </h3>
+                    <div style="flex:1;">
+                        <h3 style="
+                            margin-top:0;
+                            margin-bottom:6px;
+                            font-size:24px;
+                            font-weight:900;
+                            letter-spacing:.5px;">
+                            {{ q['title'] }}
+                        </h3>
 
-                    <div style="margin-top:10px;">
-                        <button onclick="location.href='/quizzes/{{q['html']}}'"
-                                style="padding:8px 14px; border-radius:6px;">
-                            ▶ Open Quiz
-                        </button>
+                        <div style="margin-top:10px;">
+                            <button onclick="location.href='/quizzes/{{ q['html'] }}'"
+                                    style="padding:8px 14px; border-radius:6px;">
+                                ▶ Open Quiz
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="
+                        width:150px;
+                        display:flex;
+                        flex-direction:column;
+                        justify-content:space-between;
+                        align-items:center;
+                    ">
+
+                        {% if q.get('logo') %}
+                        <img src="/static/logos/{{ q['logo'] }}"
+                             style="max-height:90px; width:auto;">
+                        {% else %}
+                        <div style="height:90px;"></div>
+                        {% endif %}
+
+                        <form method="POST"
+                              action="/delete_quiz/{{ q['id'] }}"
+                              onsubmit="return confirm('Delete this quiz permanently?');"
+                              style="margin-top:12px; width:100%; text-align:center;">
+
+                            <button type="submit"
+                                    style="
+                                        width:100%;
+                                        background:#7a0000;
+                                        color:white;
+                                        border:none;
+                                        padding:7px 0;
+                                        font-size:13px;
+                                        border-radius:6px;
+                                        cursor:pointer;
+                                    ">
+                                🗑 Delete
+                            </button>
+                        </form>
+
                     </div>
                 </div>
-
-                <div style="
-                    width:150px;
-                    display:flex;
-                    flex-direction:column;
-                    justify-content:space-between;
-                    align-items:center;
-                ">
-
-                    {% if q.get('logo') %}
-                    <img src="/static/logos/{{q['logo']}}"
-                         style="max-height:90px; width:auto;">
-                    {% else %}
-                    <div style="height:90px;"></div>
-                    {% endif %}
-
-                    <form method="POST"
-                          action="/delete_quiz/{{q['html']}}"
-                          onsubmit="return confirm('Delete this quiz permanently?');"
-                          style="margin-top:12px; width:100%; text-align:center;">
-
-                        <button type="submit" style="
-                            width:100%;
-                            background:#7a0000;
-                            color:white;
-                            border:none;
-                            padding:7px 0;
-                            font-size:13px;
-                            border-radius:6px;
-                            cursor:pointer;">
-                            🗑 Delete
-                        </button>
-                    </form>
-
-                </div>
-            </div>
             {% endfor %}
             </div>
 
@@ -368,7 +437,6 @@ def quiz_library():
     </div>
 
 </div>
-
 
 <script>
 const list = document.getElementById("quizList");
@@ -394,6 +462,8 @@ if (list) {
 </body>
 </html>
     """, quizzes=quizzes, portal_title=portal_title)
+
+
 
 
 
@@ -3483,6 +3553,7 @@ def get_or_create_question(conn, quiz_id, q):
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")  # 👈 FINAL FIX
     return conn
 
 
