@@ -1,0 +1,17 @@
+# PyInstaller artifacts
+dist/
+build/
+*.spec
+
+# Virtual environments
+venv/
+__pycache__/
+
+# Local runtime data
+*.db
+*.sqlite
+*.log
+
+# OS junk
+.DS_Store
+Thumbs.db
