@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Regex Cleanup Help — Quiz Paste Guide</title>
+
+<style>
+    body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #0f172a;
+        color: #e5e7eb;
+        margin: 0;
+        padding: 0;
+        line-height: 1.6;
+    }
+
+    .container {
+        max-width: 900px;
+        margin: auto;
+        padding: 32px 20px 60px;
+    }
+
+    h1, h2, h3 {
+        color: #f8fafc;
+        line-height: 1.3;
+    }
+
+    h1 { font-size: 2.1em; }
+    h2 {
+        margin-top: 40px;
+        border-bottom: 1px solid #334155;
+        padding-bottom: 6px;
+    }
+
+    p { color: #cbd5f5; }
+
+    pre {
+        background: #020617;
+        color: #e2e8f0;
+        border-radius: 6px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        padding: 12px;
+        overflow-x: auto;
+        border: 1px solid #1e293b;
+        margin: 0;
+        white-space: pre-wrap;
+    }
+
+    .rule-block {
+        position: relative;
+        margin: 14px 0;
+    }
+
+    .copy-btn {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        background: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 0.85em;
+        cursor: pointer;
+    }
+
+    .copy-btn:hover {
+        background: #1d4ed8;
+    }
+
+    .copy-btn.copied {
+        background: #16a34a;
+    }
+
+    .example {
+        background: #020617;
+        border-left: 4px solid #38bdf8;
+        padding: 12px;
+        margin: 12px 0;
+        border-radius: 6px;
+    }
+
+    .tip {
+        background: #022c22;
+        border-left: 4px solid #4ade80;
+        padding: 12px;
+        margin: 16px 0;
+        border-radius: 6px;
+        color: #bbf7d0;
+    }
+
+    .warning {
+        background: #1f2933;
+        border-left: 4px solid #f87171;
+        padding: 12px;
+        margin: 16px 0;
+        border-radius: 6px;
+        color: #fecaca;
+    }
+
+    footer {
+        margin-top: 60px;
+        padding-top: 20px;
+        border-top: 1px solid #334155;
+        font-size: 0.9em;
+        color: #94a3b8;
+    }
+</style>
+
+<script>
+function copyRule(button) {
+    const pre = button.nextElementSibling;
+    const text = pre.textContent.trimEnd();
+
+    // Preferred: modern clipboard API (HTTPS / localhost)
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text)
+            .then(() => showCopied(button))
+            .catch(() => fallbackCopy(text, button));
+    } else {
+        // Fallback: works on HTTP, LAN IPs, older browsers
+        fallbackCopy(text, button);
+    }
+}
+
+function fallbackCopy(text, button) {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+
+    try {
+        document.execCommand("copy");
+        showCopied(button);
+    } catch (err) {
+        alert("Copy failed. Please select and copy manually.");
+    }
+
+    document.body.removeChild(textarea);
+}
+
+function showCopied(button) {
+    const original = button.textContent;
+    button.textContent = "Copied!";
+    button.classList.add("copied");
+
+    setTimeout(() => {
+        button.textContent = original;
+        button.classList.remove("copied");
+    }, 1400);
+}
+</script>
+</head>
+
+<body>
+<div class="container">
+
+<h1>Regex Cleanup Help</h1>
+<p>
+Copy-paste-ready regex rules for cleaning up PDF and exam text
+<strong>before parsing</strong>.
+</p>
+
+<div class="tip">
+<strong>Rule format:</strong><br>
+<code>SEARCH_PATTERN => REPLACEMENT</code><br>
+Leave replacement blank to delete text.
+</div>
+
+<h2>Common Problems & Fixes</h2>
+
+<h3>Remove circular bullets (❍ ○ ● ◦)</h3>
+<div class="rule-block">
+    <button class="copy-btn" onclick="copyRule(this)">Copy</button>
+    <pre>[❍◯○●◦]\s*=> </pre>
+</div>
+
+<h3>Fix wrapped question lines</h3>
+<div class="rule-block">
+    <button class="copy-btn" onclick="copyRule(this)">Copy</button>
+    <pre>(?<![.?])\n(?!\n) => </pre>
+</div>
+
+<h3>Replace smart quotes & dashes</h3>
+<div class="rule-block">
+    <button class="copy-btn" onclick="copyRule(this)">Copy</button>
+    <pre>[“”] => "
+[‘’] => '
+[–—] => -</pre>
+</div>
+
+<h3>Collapse excessive blank lines</h3>
+<div class="rule-block">
+    <button class="copy-btn" onclick="copyRule(this)">Copy</button>
+    <pre>\n{3,} => \n\n</pre>
+</div>
+
+<h2>Recommended Starter Preset</h2>
+<p>
+This preset fixes <strong>most real-world paste issues</strong>.
+</p>
+
+<div class="rule-block">
+    <button class="copy-btn" onclick="copyRule(this)">Copy All</button>
+    <pre>
+[❍◯○●◦]\s*=> 
+(?<![.?])\n(?!\n) => 
+[“”] => "
+[‘’] => '
+[–—] => -
+\n{3,} => \n\n
+    </pre>
+</div>
+
+<div class="warning">
+Rules are applied top → bottom.<br>
+Preview output before saving quizzes.
+</div>
+
+<footer>
+Regex Cleanup Guide — Static Help Page
+</footer>
+
+</div>
+</body>
+</html>

@@ -615,14 +615,35 @@ def paste_page():
                 <br><br>
 
                 <h3>Paste Questions + Answers</h3>
-                <p style="opacity:.8; font-size:12px">
-                    Supports formats like:<br>
+
+                <p style="opacity:.85; font-size:13px">
+                    <strong>Important:</strong> Each question <u>must include</u> a final answer line in one of the following formats
+                    for parsing to work correctly:
+                </p>
+
+                <div style="font-size:13px; margin-left:12px;">
+                    <code>Suggested Answer: B</code><br>
+                    <code>Correct Answer: D</code>
+                </div>
+
+                <p style="opacity:.75; font-size:12px; margin-top:8px">
+                    The answer letter (<code>A</code>, <code>B</code>, <code>C</code>, etc.) must match one of the listed choices.
+                </p>
+
+                <p style="opacity:.75; font-size:12px; margin-top:10px">
+                    <strong>Supported example:</strong><br>
                     1. Question text<br>
                     A. Answer<br>
                     B. Answer<br>
                     C. Answer<br>
                     Suggested Answer: B
                 </p>
+
+                <p style="opacity:.65; font-size:12px; margin-top:6px">
+                    ❌ Answers like <code>B</code> or <code>Answer: B</code> alone will <u>not</u> be detected.
+                </p>
+
+                
 
                 <textarea name="quiz_text"
                           required
@@ -651,7 +672,27 @@ Practice Only"
                 <!-- ========================= -->
                 {% if cfg.enable_regex_replace %}
 
-                <h3>Optional: Regex Replace Rules</h3>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h3 style="margin:0;">Optional: Regex Replace Rules</h3>
+
+                    <button type="button"
+                            onclick="window.open('/static/regex-help.html', '_blank')"
+                            title="Fix PDF bullets, wrapped lines, and exam paste issues"
+                            style="
+                                display:flex;
+                                align-items:center;
+                                gap:6px;
+                                font-size:13px;
+                                padding:4px 10px;
+                                cursor:pointer;
+                            ">
+                        <span style="font-size:16px;">❓</span> Regex Help
+                    </button>
+
+
+                </div>
+
+
                 <p style="opacity:.8; font-size:12px">
                     Runs BEFORE parsing. Format:<br>
                     REGEX => REPLACEMENT<br><br>

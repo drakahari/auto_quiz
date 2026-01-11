@@ -532,3 +532,21 @@ body.blurred .blur-wrapper {
 .history-card.good:hover { border-color: #00ff87; }
 .history-card.warn:hover { border-color: #ffe066; }
 .history-card.bad:hover  { border-color: #ff4d4d; }
+
+
+
+.mode-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.mode-badge-spacer {
+    width: 125px; /* match original logo width */
+    height: 1px;  /* invisible spacer */
+}
+
+.mode-center {
+    text-align: center;
+    flex: 0 0 auto;
+}
