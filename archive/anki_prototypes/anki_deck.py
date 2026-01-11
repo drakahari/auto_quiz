@@ -3,7 +3,7 @@ import random
 import os
 from datetime import datetime
 
-from anki_model import ANKI_MODEL
+from auto_quiz.archive.anki_prototypes.anki_model import ANKI_MODEL
 
 
 def build_anki_deck(
