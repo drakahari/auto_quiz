@@ -534,19 +534,33 @@ body.blurred .blur-wrapper {
 .history-card.bad:hover  { border-color: #ff4d4d; }
 
 
-
 .mode-banner {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.mode-badge-spacer {
-    width: 125px; /* match original logo width */
-    height: 1px;  /* invisible spacer */
+    position: relative;
+    width: 100%;
 }
 
 .mode-center {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
     text-align: center;
-    flex: 0 0 auto;
+}
+
+/* ===============================
+   Preview Paste – Diff Highlighting
+   =============================== */
+
+.diff-removed {
+    color: #ff4c4c;        /* red */
+    font-weight: bold;
+}
+
+.diff-added {
+    color: #4cff4c;        /* green */
+    font-weight: bold;
+}
+
+.diff-unchanged {
+    color: #aaa;
+    font-style: italic;
 }

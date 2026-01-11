@@ -1432,7 +1432,7 @@ def preview_paste():
         <h2>Original Text</h2>
         <pre id="origBox" style="background:black;padding:10px;border-radius:8px;white-space:pre-wrap;">{{original}}</pre>
 
-        <h2>Text To Be Parsed</h2>
+        <h2>Text To Be Parsed: (passed to quiz)</h2>
         <pre id="cleanBox" style="background:#102020;padding:10px;border-radius:8px;white-space:pre-wrap;">{{cleaned}}</pre>
 
         <br>
@@ -1495,46 +1495,70 @@ def preview_paste():
                  style="background:#252525;padding:10px;border-radius:8px;white-space:pre-wrap;"></pre>
 
             <p style="opacity:.7">
-                Green = added · Red = removed · Yellow = changed
+                <span style="color:#4cff4c;font-weight:bold;">Green</span> = added ·
+                <span style="color:#ff4c4c;font-weight:bold;">Red</span> = removed
             </p>
+
         </div>
 
         <script>
-        function toggleDiff() {
-            const panel = document.getElementById("diffPanel");
-            const show = panel.style.display === "none";
-            if (show) runDiff();
-            panel.style.display = show ? "block" : "none";
+function toggleDiff() {
+    const panel = document.getElementById("diffPanel");
+    const show = panel.style.display === "none";
+    if (show) runDiff();
+    panel.style.display = show ? "block" : "none";
+}
+
+function normalizeKey(s) {
+    return (s || "")
+        .replace(/\\r/g, "")
+        .replace(/[\\u200B\\u200C\\u200D\\u2060]/g, "")
+        .replace(/\\uFEFF/g, "")
+        .replace(/\\u00A0/g, " ")
+        .replace(/\\s+/g, " ")
+        .trim();
+}
+
+function runDiff() {
+    const origLines = document.getElementById("origBox").innerText
+        .split("\\n")
+        .map(normalizeKey)
+        .filter(Boolean);
+
+    const cleanLines = document.getElementById("cleanBox").innerText
+        .split("\\n")
+        .map(normalizeKey)
+        .filter(Boolean);
+
+    let out = "";
+
+    // REMOVED
+    for (const line of origLines) {
+        if (!cleanLines.includes(line)) {
+            out += "<span class='diff-removed'>[REMOVED] " + line + "</span><br>";
+
+
         }
+    }
 
-        function runDiff() {
-            const orig = document.getElementById("origBox").innerText.split("\\n");
-            const clean = document.getElementById("cleanBox").innerText.split("\\n");
+    // ADDED
+    for (const line of cleanLines) {
+        if (!origLines.includes(line)) {
+            out += "<span class='diff-added'>[ADDED] " + line + "</span><br>";
 
-            let out = "";
-            const max = Math.max(orig.length, clean.length);
 
-            for (let i = 0; i < max; i++) {
-                const o = orig[i] || "";
-                const c = clean[i] || "";
-
-                if (o === c) {
-                    out += o + "\\n";
-                } 
-                else if (!c) {
-                    out += "[REMOVED] " + o + "\\n";
-                }
-                else if (!o) {
-                    out += "[ADDED] " + c + "\\n";
-                }
-                else {
-                    out += "[CHANGED] " + o + "  →  " + c + "\\n";
-                }
-            }
-
-            document.getElementById("diffView").innerText = out;
         }
-        </script>
+    }
+
+    if (!out.trim()) {
+        out = "No structural differences detected.";
+    }
+
+    document.getElementById("diffView").innerHTML = out;
+}
+</script>
+
+
 
         {% if conf_details %}
         <h2>🧠 Confidence Analysis</h2>
@@ -1585,6 +1609,7 @@ def preview_paste():
 </body>
 </html>
 """,
+
         quiz_title=quiz_title,
         original=quiz_text,
         cleaned=clean_text,
