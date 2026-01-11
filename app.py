@@ -45,7 +45,9 @@ def get_app_data_dir(app_name: str = "QuizApp") -> str:
 # =========================
 BASE_DIR = resource_path("")
 IS_BUNDLED = hasattr(sys, "_MEIPASS")
-APP_DATA_DIR = get_app_data_dir("QuizApp") if IS_BUNDLED else BASE_DIR
+APP_DATA_DIR = get_app_data_dir("QuizApp")
+APP_DATA_DIR = get_app_data_dir("QuizApp")
+print("[BUILD CHECK] APP_DATA_DIR =", APP_DATA_DIR)
 
 
 UPLOAD_FOLDER = os.path.join(APP_DATA_DIR, "uploads")
@@ -85,8 +87,10 @@ REQUIRED_TABLES = {
 def ensure_db_initialized():
     """
     Ensure the SQLite database exists and has all required tables.
-    Safe to call on every startup.
+    Runs exactly once at import time.
     """
+    print(f"[DB] ensure_db_initialized using DB_PATH = {DB_PATH}")
+
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
@@ -104,6 +108,8 @@ def ensure_db_initialized():
         print(f"[DB] Missing tables detected: {missing_tables}")
 
         init_sql_path = resource_path(os.path.join("data", "init.sql"))
+        print(f"[DB] init.sql path = {init_sql_path}")
+
         with open(init_sql_path, "r", encoding="utf-8") as f:
             sql = f.read()
 
@@ -114,8 +120,13 @@ def ensure_db_initialized():
 
     conn.close()
 
-    
+
+# ✅ INITIALIZE DATABASE ONCE, AT IMPORT TIME
 ensure_db_initialized()
+
+
+
+
 
 
 
@@ -3653,7 +3664,7 @@ fetch("/config/portal.json")
 # =========================
 # DATABASE CONFIG
 # =========================
-DB_PATH = os.path.join(BASE_DIR, "results.db")
+
 
 
 def get_or_create_question(conn, quiz_id, q):
@@ -3723,10 +3734,12 @@ def get_or_create_question(conn, quiz_id, q):
 # DATABASE HELPERS
 # =========================
 def get_db():
+    print(f"[DB] get_db using DB_PATH = {DB_PATH}")
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")  # 👈 FINAL FIX
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
+
 
 
 def db_execute(query, params=()):
