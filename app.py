@@ -70,32 +70,50 @@ PORTAL_CONFIG = os.path.join(CONFIG_FOLDER, "portal.json")
 QUIZ_REGISTRY = os.path.join(CONFIG_FOLDER, "quizzes.json")
 DB_PATH = os.path.join(APP_DATA_DIR, "results.db")
 
+REQUIRED_TABLES = {
+    "quizzes",
+    "questions",
+    "choices",
+    "attempts",
+    "attempt_answers",
+    "missed_questions",
+    "schema_meta",
+}
+
+
+
 def ensure_db_initialized():
     """
     Ensure the SQLite database exists and has all required tables.
-    Safe to call multiple times.
+    Safe to call on every startup.
     """
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
-    # Check for a known table
+    # Fetch all existing table names
     cur.execute("""
         SELECT name FROM sqlite_master
-        WHERE type='table' AND name='quizzes'
+        WHERE type='table'
     """)
-    exists = cur.fetchone()
+    existing_tables = {row[0] for row in cur.fetchall()}
 
-    if not exists:
-        # Load init.sql (works in dev + PyInstaller)
+    # Determine which required tables are missing
+    missing_tables = REQUIRED_TABLES - existing_tables
+
+    if missing_tables:
+        print(f"[DB] Missing tables detected: {missing_tables}")
+
         init_sql_path = resource_path(os.path.join("data", "init.sql"))
-
         with open(init_sql_path, "r", encoding="utf-8") as f:
             sql = f.read()
 
         conn.executescript(sql)
         conn.commit()
 
+        print("[DB] Database schema initialized / updated")
+
     conn.close()
+
     
 ensure_db_initialized()
 
