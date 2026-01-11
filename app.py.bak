@@ -5,100 +5,28 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__, static_folder=".", static_url_path="")
 
-
-import sys
-
-def resource_path(relative_path: str) -> str:
-    """
-    Resolve paths correctly in dev and when bundled by PyInstaller.
-    """
-    if hasattr(sys, "_MEIPASS"):
-        return os.path.join(sys._MEIPASS, relative_path)
-    return os.path.join(os.path.abspath(os.path.dirname(__file__)), relative_path)
-
-
-def get_app_data_dir(app_name: str = "QuizApp") -> str:
-    """
-    Return a user-writable directory for runtime data.
-    """
-    override = os.getenv("QUIZAPP_DATA_DIR")
-    if override:
-        os.makedirs(override, exist_ok=True)
-        return override
-
-    if sys.platform == "win32":
-        base = os.getenv("APPDATA") or os.path.expanduser("~")
-    elif sys.platform == "darwin":
-        base = os.path.expanduser("~/Library/Application Support")
-    else:
-        base = os.getenv("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
-
-    path = os.path.join(base, app_name)
-    os.makedirs(path, exist_ok=True)
-    return path
-
-
-
-
 # =========================
 # PATH SETUP
 # =========================
-BASE_DIR = resource_path("")
-IS_BUNDLED = hasattr(sys, "_MEIPASS")
-APP_DATA_DIR = get_app_data_dir("QuizApp") if IS_BUNDLED else BASE_DIR
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
+DATA_FOLDER = os.path.join(BASE_DIR, "data")
+QUIZ_FOLDER = os.path.join(BASE_DIR, "quizzes")
+CONFIG_FOLDER = os.path.join(BASE_DIR, "config")
+LOGO_FOLDER = os.path.join(BASE_DIR, "static", "logos")
+BACKGROUND_FOLDER = os.path.join(BASE_DIR, "static", "bg")
 
-UPLOAD_FOLDER = os.path.join(APP_DATA_DIR, "uploads")
-DATA_FOLDER = os.path.join(APP_DATA_DIR, "data")
-QUIZ_FOLDER = os.path.join(APP_DATA_DIR, "quizzes")
-CONFIG_FOLDER = os.path.join(APP_DATA_DIR, "config")
-LOGO_FOLDER = os.path.join(APP_DATA_DIR, "static", "logos")
-BACKGROUND_FOLDER = os.path.join(APP_DATA_DIR, "static", "bg")
-
-for d in [
-    UPLOAD_FOLDER,
-    DATA_FOLDER,
-    QUIZ_FOLDER,
-    CONFIG_FOLDER,
-    BACKGROUND_FOLDER,
-    LOGO_FOLDER,
-]:
-    os.makedirs(d, exist_ok=True)
-
+os.makedirs(BACKGROUND_FOLDER, exist_ok=True)
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(DATA_FOLDER, exist_ok=True)
+os.makedirs(QUIZ_FOLDER, exist_ok=True)
+os.makedirs(CONFIG_FOLDER, exist_ok=True)
+os.makedirs(LOGO_FOLDER, exist_ok=True)
 
 PORTAL_CONFIG = os.path.join(CONFIG_FOLDER, "portal.json")
 QUIZ_REGISTRY = os.path.join(CONFIG_FOLDER, "quizzes.json")
-DB_PATH = os.path.join(APP_DATA_DIR, "results.db")
-
-def ensure_db_initialized():
-    """
-    Ensure the SQLite database exists and has all required tables.
-    Safe to call multiple times.
-    """
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-
-    # Check for a known table
-    cur.execute("""
-        SELECT name FROM sqlite_master
-        WHERE type='table' AND name='quizzes'
-    """)
-    exists = cur.fetchone()
-
-    if not exists:
-        # Load init.sql (works in dev + PyInstaller)
-        init_sql_path = resource_path(os.path.join("data", "init.sql"))
-
-        with open(init_sql_path, "r", encoding="utf-8") as f:
-            sql = f.read()
-
-        conn.executescript(sql)
-        conn.commit()
-
-    conn.close()
-    
-ensure_db_initialized()
-
+DB_PATH = os.path.join(BASE_DIR, "results.db")
 
 
 @app.route("/dynamic.css")
@@ -3850,10 +3778,4 @@ def history_db():
 # RUN
 # =========================
 if __name__ == "__main__":
-    app.run(
-        host="0.0.0.0",
-        port=9001,
-        debug=False,
-        use_reloader=False
-    )
-
+    app.run(host="0.0.0.0", port=9001)
