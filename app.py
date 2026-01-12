@@ -1,10 +1,7 @@
 from flask import Flask, send_from_directory, request, redirect, render_template_string, jsonify, Response
-import os, re, json, time, sqlite3
+import os, re, json, time, sqlite3, sys
 from werkzeug.utils import secure_filename
 
-
-
-import sys
 
 # =========================
 # APP DATA DIRECTORY
@@ -32,6 +29,17 @@ app = Flask(
 
 
 import sys
+
+DEBUG_LOGS = False
+
+def dprint(*args, **kwargs):
+    if DEBUG_LOGS:
+        print(*args, **kwargs)
+
+#dprint("DEBUG TEST — YOU SHOULD NOT SEE THIS")
+
+
+
 
 def resource_path(relative_path: str) -> str:
     """
@@ -125,7 +133,7 @@ def ensure_db_initialized():
     Ensure the SQLite database exists and has all required tables.
     Runs exactly once at import time.
     """
-    print(f"[DB] ensure_db_initialized using DB_PATH = {DB_PATH}")
+    dprint(f"[DB] ensure_db_initialized using DB_PATH = {DB_PATH}")
 
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
@@ -141,10 +149,10 @@ def ensure_db_initialized():
     missing_tables = REQUIRED_TABLES - existing_tables
 
     if missing_tables:
-        print(f"[DB] Missing tables detected: {missing_tables}")
+        dprint(f"[DB] Missing tables detected: {missing_tables}")
 
         init_sql_path = resource_path(os.path.join("data", "init.sql"))
-        print(f"[DB] init.sql path = {init_sql_path}")
+        dprint(f"[DB] init.sql path = {init_sql_path}")
 
         with open(init_sql_path, "r", encoding="utf-8") as f:
             sql = f.read()
@@ -169,18 +177,18 @@ def serve_portal_config():
     This is the single source of truth for UI settings
     (title, background image, feature toggles).
     """
-    print("\n[PORTAL CONFIG] ===== SERVING /config/portal.json =====")
-    print("[PORTAL CONFIG] Reading from:", PORTAL_CONFIG)
+    dprint("\n[PORTAL CONFIG] ===== SERVING /config/portal.json =====")
+    dprint("[PORTAL CONFIG] Reading from:", PORTAL_CONFIG)
 
     try:
         with open(PORTAL_CONFIG, "r", encoding="utf-8") as f:
             cfg = json.load(f)
-        print("[PORTAL CONFIG] Loaded config:", cfg)
+        dprint("[PORTAL CONFIG] Loaded config:", cfg)
     except Exception as e:
         print("[PORTAL CONFIG][ERROR] Failed to load config:", e)
         cfg = {}
 
-    print("[PORTAL CONFIG] ===== END SERVE =====\n")
+    dprint("[PORTAL CONFIG] ===== END SERVE =====\n")
     return jsonify(cfg)
 
 
@@ -511,8 +519,8 @@ def save_quiz_to_db(quiz_title, source_file, quiz_data):
 def quiz_library():
     registry = load_registry()   # ← MUST come first
 
-    print("[DEBUG] Using registry file:", QUIZ_REGISTRY)
-    print("[DEBUG] Registry contents:", registry)
+    dprint("[DEBUG] Using registry file:", QUIZ_REGISTRY)
+    dprint("[DEBUG] Registry contents:", registry)
 
     # =========================
     # DEBUG: Verify logo files exist on disk
@@ -521,7 +529,7 @@ def quiz_library():
         logo = q.get("logo")
         if logo:
             path = os.path.join(LOGO_FOLDER, logo)
-            print("[DEBUG] Logo check:", logo, "exists =", os.path.exists(path), "path =", path)
+            dprint("[DEBUG] Logo check:", logo, "exists =", os.path.exists(path), "path =", path)
 
     portal_title = get_portal_title()
 
@@ -2090,7 +2098,7 @@ def process_paste():
     # =========================
     # REGISTER QUIZ (AFTER html_name EXISTS)
     # =========================
-    print("[DEBUG] Registering quiz:",
+    dprint("[DEBUG] Registering quiz:",
         html_name,
         quiz_title,
         logo_filename)
@@ -2115,7 +2123,7 @@ def process_paste():
     if logo_filename:
         final_logo_path = os.path.join(LOGO_FOLDER, logo_filename)
         if not os.path.exists(final_logo_path):
-            print("[LOGO FIX] Prevented registering missing logo:", logo_filename)
+            dprint("[LOGO FIX] Prevented registering missing logo:", logo_filename)
             logo_filename = None
 
     #add_quiz_to_registry(html_name, quiz_title, logo_filename)
@@ -2239,7 +2247,7 @@ def process_file():
         has_correct = any(c.get("is_correct") for c in choices)
 
         if not choices or not has_correct:
-            print(f"[PARSE WARNING] Q{i} missing choices or correct answer")
+            dprint(f"[PARSE WARNING] Q{i} missing choices or correct answer")
 
 
     # =========================
@@ -2555,18 +2563,18 @@ def load_portal_config():
 def save_settings():
     cfg = load_portal_config()
 
-    print("\n[SETTINGS] ===== SAVE_SETTINGS CALLED =====")
-    print("[SETTINGS] Incoming form keys:", list(request.form.keys()))
-    print("[SETTINGS] Incoming file keys:", list(request.files.keys()))
-    print("[SETTINGS] PORTAL_CONFIG path:", PORTAL_CONFIG)
-    print("[SETTINGS] Existing config BEFORE update:", cfg)
+    dprint("\n[SETTINGS] ===== SAVE_SETTINGS CALLED =====")
+    dprint("[SETTINGS] Incoming form keys:", list(request.form.keys()))
+    dprint("[SETTINGS] Incoming file keys:", list(request.files.keys()))
+    dprint("[SETTINGS] PORTAL_CONFIG path:", PORTAL_CONFIG)
+    dprint("[SETTINGS] Existing config BEFORE update:", cfg)
 
     # =========================
     # Portal title
     # =========================
     title = request.form.get("portal_title", cfg.get("title", "Training Portal")).strip()
     cfg["title"] = title
-    print("[SETTINGS] Updated title:", title)
+    dprint("[SETTINGS] Updated title:", title)
 
     # =========================
     # Advanced toggles
@@ -2576,7 +2584,7 @@ def save_settings():
     cfg["auto_bom_clean"]         = ("auto_bom_clean" in request.form)
     cfg["enable_show_invisibles"] = ("enable_show_invisibles" in request.form)
 
-    print("[SETTINGS] Toggles:", {
+    dprint("[SETTINGS] Toggles:", {
         "show_confidence": cfg["show_confidence"],
         "enable_regex_replace": cfg["enable_regex_replace"],
         "auto_bom_clean": cfg["auto_bom_clean"],
@@ -2589,24 +2597,24 @@ def save_settings():
     file = request.files.get("background_image")
 
     if file:
-        print("[SETTINGS] Background file received:", file.filename)
+        dprint("[SETTINGS] Background file received:", file.filename)
 
     if file and file.filename.strip():
         filename = secure_filename(file.filename)
 
         # Ensure folder exists
         os.makedirs(BACKGROUND_FOLDER, exist_ok=True)
-        print("[SETTINGS] BACKGROUND_FOLDER:", BACKGROUND_FOLDER)
+        dprint("[SETTINGS] BACKGROUND_FOLDER:", BACKGROUND_FOLDER)
 
         save_path = os.path.join(BACKGROUND_FOLDER, filename)
         file.save(save_path)
 
         cfg["background_image"] = f"/static/bg/{filename}"
 
-        print("[SETTINGS] Background saved to:", save_path)
-        print("[SETTINGS] background_image set to:", cfg["background_image"])
+        dprint("[SETTINGS] Background saved to:", save_path)
+        dprint("[SETTINGS] background_image set to:", cfg["background_image"])
     else:
-        print("[SETTINGS] No background image uploaded this request")
+        dprint("[SETTINGS] No background image uploaded this request")
 
     # =========================
     # SAVE CONFIG
@@ -2614,12 +2622,12 @@ def save_settings():
     try:
         with open(PORTAL_CONFIG, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=4)
-        print("[SETTINGS] Config successfully written to disk")
+        dprint("[SETTINGS] Config successfully written to disk")
     except Exception as e:
         print("[SETTINGS][ERROR] Failed to write portal config:", e)
 
-    print("[SETTINGS] Final config AFTER update:", cfg)
-    print("[SETTINGS] ===== SAVE_SETTINGS COMPLETE =====\n")
+    dprint("[SETTINGS] Final config AFTER update:", cfg)
+    dprint("[SETTINGS] ===== SAVE_SETTINGS COMPLETE =====\n")
 
     return redirect("/settings")
 
@@ -2705,7 +2713,7 @@ def record_attempt():
         # INSERT MISSED QUESTIONS (FULL SNAPSHOT)
         # -----------------------------
         for m in data.get("missedDetails", []):
-            print("🧪 MISSED QUESTION RAW:", json.dumps(m, indent=2))
+            dprint("🧪 MISSED QUESTION RAW:", json.dumps(m, indent=2))
 
             attempt_qnum = m.get("attemptQuestionNumber", m.get("number"))
             if attempt_qnum is None:
@@ -2721,8 +2729,8 @@ def record_attempt():
 
             choices_text = "\n".join(choices_lines)
 
-            print("🧪 SNAPSHOT choices_text:")
-            print(choices_text if choices_text else "(no choices present)")
+            dprint("🧪 SNAPSHOT choices_text:")
+            dprint(choices_text if choices_text else "(no choices present)")
 
             cur.execute("""
                 INSERT INTO missed_questions (
@@ -3324,7 +3332,7 @@ PARSE_LOG = []
 def dbg(*msg):
     text = " ".join(str(m) for m in msg)
     if DEBUG_PARSE:
-        print("[PARSE]", text)
+        dprint("[PARSE]", text)
     PARSE_LOG.append(text)
 
 
@@ -3796,7 +3804,7 @@ def get_or_create_question(conn, quiz_id, q):
 # DATABASE HELPERS
 # =========================
 def get_db():
-    print(f"[DB] get_db using DB_PATH = {DB_PATH}")
+    dprint(f"[DB] get_db using DB_PATH = {DB_PATH}")
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
