@@ -3180,50 +3180,50 @@ def export_anki_missed_tsv():
 
 
 
-@app.route("/api/missed_questions")
-def api_missed_questions():
-    import sqlite3
-    from flask import request, jsonify
+# @app.route("/api/missed_questions")
+# def api_missed_questions():
+#     import sqlite3
+#     from flask import request, jsonify
 
-    attempt_id = request.args.get("attempt")
-    if not attempt_id:
-        return jsonify([])
+#     attempt_id = request.args.get("attempt")
+#     if not attempt_id:
+#         return jsonify([])
 
-    conn = sqlite3.connect("results.db")
-    conn.row_factory = sqlite3.Row
-    cur = conn.cursor()
+#     conn = sqlite3.connect("results.db")
+#     conn.row_factory = sqlite3.Row
+#     cur = conn.cursor()
 
-    cur.execute("""
-        SELECT
-            attempt_question_number,
-            id,
-            question_number,
-            question_text,
-            correct_text,
-            correct_letters,
-            selected_text,
-            selected_letters
-        FROM missed_questions
-        WHERE attempt_id = ?
-        ORDER BY attempt_question_number ASC
-    """, (attempt_id,))
+#     cur.execute("""
+#         SELECT
+#             attempt_question_number,
+#             id,
+#             question_number,
+#             question_text,
+#             correct_text,
+#             correct_letters,
+#             selected_text,
+#             selected_letters
+#         FROM missed_questions
+#         WHERE attempt_id = ?
+#         ORDER BY attempt_question_number ASC
+#     """, (attempt_id,))
 
-    rows = cur.fetchall()
-    conn.close()
+#     rows = cur.fetchall()
+#     conn.close()
 
-    return jsonify([
-        {
-            "id": r["id"],
-            "attempt_question_number": r["attempt_question_number"],  # 👈 REQUIRED
-            "question_number": r["question_number"],
-            "question_text": r["question_text"],
-            "correct_text": r["correct_text"],
-            "correct_letters": r["correct_letters"],
-            "selected_text": r["selected_text"],
-            "selected_letters": r["selected_letters"],
-        }
-        for r in rows
-    ])
+#     return jsonify([
+#         {
+#             "id": r["id"],
+#             "attempt_question_number": r["attempt_question_number"],  # 👈 REQUIRED
+#             "question_number": r["question_number"],
+#             "question_text": r["question_text"],
+#             "correct_text": r["correct_text"],
+#             "correct_letters": r["correct_letters"],
+#             "selected_text": r["selected_text"],
+#             "selected_letters": r["selected_letters"],
+#         }
+#         for r in rows
+#     ])
 
 
 
