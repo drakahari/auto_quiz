@@ -162,6 +162,26 @@ ensure_db_initialized()
 
 
 
+@app.route("/config/portal.json")
+def serve_portal_config():
+    """
+    Serve the portal configuration as JSON.
+    This is the single source of truth for UI settings
+    (title, background image, feature toggles).
+    """
+    print("\n[PORTAL CONFIG] ===== SERVING /config/portal.json =====")
+    print("[PORTAL CONFIG] Reading from:", PORTAL_CONFIG)
+
+    try:
+        with open(PORTAL_CONFIG, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        print("[PORTAL CONFIG] Loaded config:", cfg)
+    except Exception as e:
+        print("[PORTAL CONFIG][ERROR] Failed to load config:", e)
+        cfg = {}
+
+    print("[PORTAL CONFIG] ===== END SERVE =====\n")
+    return jsonify(cfg)
 
 
 
@@ -2535,39 +2555,74 @@ def load_portal_config():
 def save_settings():
     cfg = load_portal_config()
 
+    print("\n[SETTINGS] ===== SAVE_SETTINGS CALLED =====")
+    print("[SETTINGS] Incoming form keys:", list(request.form.keys()))
+    print("[SETTINGS] Incoming file keys:", list(request.files.keys()))
+    print("[SETTINGS] PORTAL_CONFIG path:", PORTAL_CONFIG)
+    print("[SETTINGS] Existing config BEFORE update:", cfg)
+
+    # =========================
     # Portal title
+    # =========================
     title = request.form.get("portal_title", cfg.get("title", "Training Portal")).strip()
     cfg["title"] = title
+    print("[SETTINGS] Updated title:", title)
 
+    # =========================
     # Advanced toggles
+    # =========================
     cfg["show_confidence"]        = ("show_confidence" in request.form)
     cfg["enable_regex_replace"]   = ("enable_regex_replace" in request.form)
     cfg["auto_bom_clean"]         = ("auto_bom_clean" in request.form)
     cfg["enable_show_invisibles"] = ("enable_show_invisibles" in request.form)
 
+    print("[SETTINGS] Toggles:", {
+        "show_confidence": cfg["show_confidence"],
+        "enable_regex_replace": cfg["enable_regex_replace"],
+        "auto_bom_clean": cfg["auto_bom_clean"],
+        "enable_show_invisibles": cfg["enable_show_invisibles"],
+    })
+
     # =========================
-    #  BACKGROUND IMAGE UPLOAD
+    # BACKGROUND IMAGE UPLOAD
     # =========================
     file = request.files.get("background_image")
+
+    if file:
+        print("[SETTINGS] Background file received:", file.filename)
 
     if file and file.filename.strip():
         filename = secure_filename(file.filename)
 
         # Ensure folder exists
         os.makedirs(BACKGROUND_FOLDER, exist_ok=True)
+        print("[SETTINGS] BACKGROUND_FOLDER:", BACKGROUND_FOLDER)
 
         save_path = os.path.join(BACKGROUND_FOLDER, filename)
         file.save(save_path)
 
-        # Store URL for UI use
         cfg["background_image"] = f"/static/bg/{filename}"
-        print("Saved new background:", cfg["background_image"])
 
-    # Save config JSON
-    with open(PORTAL_CONFIG, "w") as f:
-        json.dump(cfg, f, indent=4)
+        print("[SETTINGS] Background saved to:", save_path)
+        print("[SETTINGS] background_image set to:", cfg["background_image"])
+    else:
+        print("[SETTINGS] No background image uploaded this request")
+
+    # =========================
+    # SAVE CONFIG
+    # =========================
+    try:
+        with open(PORTAL_CONFIG, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=4)
+        print("[SETTINGS] Config successfully written to disk")
+    except Exception as e:
+        print("[SETTINGS][ERROR] Failed to write portal config:", e)
+
+    print("[SETTINGS] Final config AFTER update:", cfg)
+    print("[SETTINGS] ===== SAVE_SETTINGS COMPLETE =====\n")
 
     return redirect("/settings")
+
 
 
 

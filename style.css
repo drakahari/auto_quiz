@@ -3,6 +3,9 @@
 /* =======================
    GLOBAL SITE BACKGROUND
    ======================= */
+:root {
+    --portal-bg: none;
+}
 
 body {
     margin: 0;
@@ -15,7 +18,8 @@ body {
             rgba(255,255,255,0.35),
             rgba(0,0,0,0.65)
         ),
-        var(--portal-bg, url("/static/fiber.jpg"));
+        var(--portal-bg);
+
 
     background-position: center;
     background-size: cover;
