@@ -17,7 +17,7 @@ def resource_path(relative_path: str) -> str:
     return os.path.join(os.path.abspath(os.path.dirname(__file__)), relative_path)
 
 
-def get_app_data_dir(app_name: str = "QuizApp") -> str:
+def get_app_data_dir(app_name: str = "DLMS") -> str:
     """
     Return a user-writable directory for runtime data.
     """
@@ -45,9 +45,12 @@ def get_app_data_dir(app_name: str = "QuizApp") -> str:
 # =========================
 BASE_DIR = resource_path("")
 IS_BUNDLED = hasattr(sys, "_MEIPASS")
-APP_DATA_DIR = get_app_data_dir("QuizApp")
-APP_DATA_DIR = get_app_data_dir("QuizApp")
+
+APP_NAME = "DLMS"
+APP_DATA_DIR = get_app_data_dir(APP_NAME)
+
 print("[BUILD CHECK] APP_DATA_DIR =", APP_DATA_DIR)
+
 
 
 UPLOAD_FOLDER = os.path.join(APP_DATA_DIR, "uploads")
