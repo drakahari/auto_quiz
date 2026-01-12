@@ -3180,50 +3180,14 @@ def export_anki_missed_tsv():
 
 
 
+# Legacy endpoint intentionally disabled.
+# Review data is now served exclusively via /api/attempts.
+# Kept as a placeholder to prevent accidental reintroduction.
+
 # @app.route("/api/missed_questions")
 # def api_missed_questions():
-#     import sqlite3
-#     from flask import request, jsonify
+#     return {"error": "Deprecated endpoint. Use /api/attempts."}, 410
 
-#     attempt_id = request.args.get("attempt")
-#     if not attempt_id:
-#         return jsonify([])
-
-#     conn = sqlite3.connect("results.db")
-#     conn.row_factory = sqlite3.Row
-#     cur = conn.cursor()
-
-#     cur.execute("""
-#         SELECT
-#             attempt_question_number,
-#             id,
-#             question_number,
-#             question_text,
-#             correct_text,
-#             correct_letters,
-#             selected_text,
-#             selected_letters
-#         FROM missed_questions
-#         WHERE attempt_id = ?
-#         ORDER BY attempt_question_number ASC
-#     """, (attempt_id,))
-
-#     rows = cur.fetchall()
-#     conn.close()
-
-#     return jsonify([
-#         {
-#             "id": r["id"],
-#             "attempt_question_number": r["attempt_question_number"],  # 👈 REQUIRED
-#             "question_number": r["question_number"],
-#             "question_text": r["question_text"],
-#             "correct_text": r["correct_text"],
-#             "correct_letters": r["correct_letters"],
-#             "selected_text": r["selected_text"],
-#             "selected_letters": r["selected_letters"],
-#         }
-#         for r in rows
-#     ])
 
 
 
