@@ -122,13 +122,13 @@ async function loadReview() {
             <b>Mode:</b> ${attempt.mode}
         `;
 
-        const missRes = await fetch(`/api/missed_questions?attempt=${attemptId}`);
-        const missed = await missRes.json();
+        const missed = attempt.missedQuestions || [];
 
-        if (!Array.isArray(missed) || missed.length === 0) {
+        if (missed.length === 0) {
             box.innerHTML = "<p>🎉 No missed questions!</p>";
             return;
         }
+
 
         let html = "";
 
@@ -137,27 +137,32 @@ async function loadReview() {
             <div class="reviewCard">
                 <div class="ankiRow">
                     <input type="checkbox"
-                           class="anki-select"
-                           data-qnum="${m.attempt_question_number}"
-                           onchange="syncSelectAllAnki()">
+                        class="anki-select"
+                        data-qnum="${m.number}"
+                        onchange="syncSelectAllAnki()">
                     <span>Add to Anki deck</span>
                 </div>
 
-                <h3>Question ${m.attempt_question_number}</h3>
+                <h3>Question ${m.number}</h3>
 
-                <div>${m.question_text}</div>
+                <div>${m.question}</div>
 
                 <div class="correctBox">
                     <b>Correct Answer</b><br>
-                    ${m.correct_text || m.correct_letters}
+                    ${(m.correctText && m.correctText.length)
+                        ? m.correctText.join("<br>")
+                        : "(No correct answer recorded)"}
                 </div>
 
                 <div class="userBox">
                     <b>Your Answer</b><br>
-                    ${m.selected_text || m.selected_letters || "<i>(No answer recorded)</i>"}
+                    ${(m.selectedText && m.selectedText.length)
+                        ? m.selectedText.join("<br>")
+                        : "<i>(No answer recorded)</i>"}
                 </div>
             </div>`;
         });
+
 
         box.innerHTML = html;
 

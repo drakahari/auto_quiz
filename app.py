@@ -2616,12 +2616,9 @@ def record_attempt():
     data = request.get_json(force=True) or {}
     print("📩 Incoming Attempt Payload:", json.dumps(data, indent=2))
 
-    # -----------------------------
-    # REQUIRED FIELDS
-    # -----------------------------
     attempt_id = data.get("attemptId")
-    quiz_id = data.get("quizId")           # preferred
-    quiz_title = data.get("quizTitle")     # fallback only
+    quiz_id = data.get("quizId")
+    quiz_title = data.get("quizTitle")
 
     score = data.get("score", 0)
     total = data.get("total", 0)
@@ -2640,28 +2637,23 @@ def record_attempt():
 
     try:
         # -----------------------------
-        # RESOLVE QUIZ ID (AUTHORITATIVE)
+        # RESOLVE QUIZ ID
         # -----------------------------
         if quiz_id:
             cur.execute("SELECT id FROM quizzes WHERE id = ?", (quiz_id,))
-            row = cur.fetchone()
-            if not row:
+            if not cur.fetchone():
                 raise Exception(f"Quiz ID {quiz_id} does not exist")
         else:
             if not quiz_title:
                 raise Exception("Missing quizId and quizTitle")
 
-            # Safe fallback: most recent quiz with this title
-            cur.execute(
-                """
+            cur.execute("""
                 SELECT id
                 FROM quizzes
                 WHERE title = ?
                 ORDER BY id DESC
                 LIMIT 1
-                """,
-                (quiz_title,)
-            )
+            """, (quiz_title,))
             row = cur.fetchone()
             if not row:
                 raise Exception(f"No quiz found for title '{quiz_title}'")
@@ -2672,105 +2664,52 @@ def record_attempt():
         # -----------------------------
         # INSERT ATTEMPT
         # -----------------------------
-        cur.execute(
-            """
+        cur.execute("""
             INSERT INTO attempts (
-                id,
-                quiz_id,
-                started_at,
-                completed_at,
-                score,
-                total,
-                percent,
-                time_remaining,
-                mode
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                attempt_id,
-                quiz_id,
-                started_at,
-                completed_at,
-                score,
-                total,
-                percent,
-                time_remaining,
-                mode,
-            )
-        )
+                id, quiz_id, started_at, completed_at,
+                score, total, percent, time_remaining, mode
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            attempt_id,
+            quiz_id,
+            started_at,
+            completed_at,
+            score,
+            total,
+            percent,
+            time_remaining,
+            mode,
+        ))
 
         # -----------------------------
-        # STORE MISSED QUESTIONS
+        # INSERT MISSED QUESTIONS (SNAPSHOT)
         # -----------------------------
-        missed = data.get("missedDetails", [])
-
-        for m in missed:
-            q = {
-                "number": m.get("number"),
-                "question": m.get("question"),
-                "correct": m.get("correctLetters", []),
-                "choices": [],
-            }
-
-            # Build minimal correct choices
-            for text in m.get("correctText", []):
-                if "—" in text:
-                    letter, choice_text = text.split("—", 1)
-                    q["choices"].append({
-                        "label": letter.strip(),
-                        "text": choice_text.strip(),
-                    })
-
+        for m in data.get("missedDetails", []):
             print("🧪 MISSED QUESTION RAW:", json.dumps(m, indent=2))
-            print(
-                "🧪 USING number=",
-                m.get("number"),
-                "attemptQuestionNumber=",
-                m.get("attemptQuestionNumber")
-            )
 
-            # 🔴 DEBUG GUARD — TEMPORARY
-            if m.get("attemptQuestionNumber") is None:
-                raise Exception(
-                    f"[DEBUG] Missing attemptQuestionNumber for question_number={m.get('number')}"
-                )
-            
+            attempt_qnum = m.get("attemptQuestionNumber", m.get("number"))
+            if attempt_qnum is None:
+                raise Exception(f"Missing attemptQuestionNumber: {m}")
 
-            
-            question_id = get_or_create_question(conn, quiz_id, q)
-
-            attempt_question_number = m.get(
-                "attemptQuestionNumber", m.get("number")
-            )
-
-            cur.execute(
-                """
+            cur.execute("""
                 INSERT INTO missed_questions (
                     attempt_id,
-                    question_id,
-                    attempt_question_number,
-                    question_number,
-                    question_text,
                     correct_letters,
-                    correct_text,
+                    question_text,
                     selected_letters,
-                    selected_text
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    attempt_id,
-                    question_id,
-                    attempt_question_number,
-                    m.get("number"),
-                    m.get("question"),
-                    ",".join(m.get("correctLetters", [])),
-                    "\n".join(m.get("correctText", [])),
-                    ",".join(m.get("selectedLetters", [])),
-                    "\n".join(m.get("selectedText", [])),
-                )
-            )
+                    selected_text,
+                    correct_text,
+                    attempt_question_number
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                attempt_id,
+                ",".join(m.get("correctLetters", [])),
+                m.get("question"),
+                ",".join(m.get("selectedLetters", [])),
+                "\n".join(m.get("selectedText", [])),
+                "\n".join(m.get("correctText", [])),
+                attempt_qnum
+            ))
 
         conn.commit()
         return {"status": "ok"}
@@ -2782,6 +2721,7 @@ def record_attempt():
 
     finally:
         conn.close()
+
 
 
 
@@ -2815,7 +2755,7 @@ def api_attempts():
     for attempt in attempts:
         cur.execute("""
             SELECT
-                question_number,
+                attempt_question_number,
                 question_text,
                 correct_letters,
                 correct_text,
@@ -2823,21 +2763,25 @@ def api_attempts():
                 selected_text
             FROM missed_questions
             WHERE attempt_id = ?
+            ORDER BY attempt_question_number
         """, (attempt["id"],))
 
         mq = cur.fetchall()
 
+
         attempt["missedQuestions"] = [
-            {
-                "number": m["question_number"],
-                "question": m["question_text"],
-                "correctLetters": (m["correct_letters"] or "").split(","),
-                "correctText": (m["correct_text"] or "").split("\n"),
-                "selectedLetters": (m["selected_letters"] or "").split(","),
-                "selectedText": (m["selected_text"] or "").split("\n")
-            }
-            for m in mq
-        ]
+        {
+            "number": m["attempt_question_number"],
+            "question": m["question_text"],
+            "correctLetters": (m["correct_letters"] or "").split(","),
+            "correctText": (m["correct_text"] or "").split("\n"),
+            "selectedLetters": (m["selected_letters"] or "").split(","),
+            "selectedText": (m["selected_text"] or "").split("\n"),
+        }
+        for m in mq
+    ]
+
+
 
     conn.close()
     return jsonify({"attempts": attempts})
