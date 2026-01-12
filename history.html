@@ -230,32 +230,10 @@ async function loadDbHistory() {
 --------------------------------------------------- */
 let QUIZ_NAME_MAP = {};
 
-fetch('/config/quizzes.json')
-    .then(r => r.json())
-    .then(list => {
-        list.forEach(q => {
-            if (!q.title || !q.html) return;
+// quizzes.json deprecated — database is now the source of truth
+loadDbHistory();
+renderHistory();
 
-            const html = q.html;
-            const base = html.replace(".html","");
-            const json = base + ".json";
-
-            QUIZ_NAME_MAP[html] = q.title;
-            QUIZ_NAME_MAP["/data/" + html] = q.title;
-            QUIZ_NAME_MAP[json] = q.title;
-            QUIZ_NAME_MAP["/data/" + json] = q.title;
-        });
-
-        loadLogo();
-        loadDbHistory();
-        renderHistory();
-    })
-    .catch(() => {
-        console.warn("Could not load quizzes.json — titles fallback to filenames");
-        loadLogo();
-        loadDbHistory();
-        renderHistory();
-    });
 
 
 /* =========================
@@ -440,20 +418,11 @@ function clearHistory() {
 }
 
 function loadLogo() {
-    fetch('/config/quizzes.json')
-        .then(r => r.json())
-        .then(reg => {
-            if (!reg.length) return;
-            const latest = reg[reg.length - 1];
-            if (!latest.logo) return;
-
-            document.getElementById("leftLogo").src = "/static/logos/" + latest.logo;
-            document.getElementById("rightLogo").src = "/static/logos/" + latest.logo;
-            document.getElementById("leftLogo").style.visibility = "visible";
-            document.getElementById("rightLogo").style.visibility = "visible";
-        })
-        .catch(()=>{});
+    // Deprecated:
+    // Logos are no longer loaded from quizzes.json.
+    // This function intentionally does nothing.
 }
+
 
 function highlightTargetAttempt() {
     const params = new URLSearchParams(window.location.search);
