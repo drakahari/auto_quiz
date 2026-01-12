@@ -2832,15 +2832,15 @@ import genanki
 import random
 import os
 import tempfile
+import html
 
 
 def export_quiz_to_apkg(deck_name, deck_rows):
     """
     deck_rows = [
         {
-            "question_text": str,
-            "choices": [str, str, ...],
-            "correct_text": str
+            "front": str,
+            "back": str
         }
     ]
     """
@@ -2855,10 +2855,7 @@ def export_quiz_to_apkg(deck_name, deck_rows):
         templates=[
             {
                 "name": "Card 1",
-                # Front shows ONLY the front
                 "qfmt": "{{Front}}",
-
-                # Back shows ONLY the answer (no repeated front)
                 "afmt": "<hr id='answer'>{{Back}}",
             },
         ],
@@ -2870,8 +2867,13 @@ def export_quiz_to_apkg(deck_name, deck_rows):
     )
 
     for row in deck_rows:
-        front = (row.get("front") or "").replace("\n", "<br>")
-        back = (row.get("back") or "").replace("\n", "<br>")
+        # Escape FIRST (prevents invalid HTML warnings)
+        front = html.escape(row.get("front") or "")
+        back = html.escape(row.get("back") or "")
+
+        # THEN restore intended formatting
+        front = front.replace("\n", "<br>")
+        back = back.replace("\n", "<br>")
 
         note = genanki.Note(
             model=model,
@@ -2880,13 +2882,13 @@ def export_quiz_to_apkg(deck_name, deck_rows):
 
         deck.add_note(note)
 
-
     fd, path = tempfile.mkstemp(suffix=".apkg")
     os.close(fd)
 
     genanki.Package(deck).write_to_file(path)
 
     return path
+
 
 
 
