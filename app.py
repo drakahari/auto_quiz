@@ -37,6 +37,7 @@ def dprint(*args, **kwargs):
         print(*args, **kwargs)
 
 #dprint("DEBUG TEST — YOU SHOULD NOT SEE THIS")
+print("[DEBUG] Flask static folder =", app.static_folder)
 
 
 
@@ -453,7 +454,7 @@ def save_order():
 # =========================
 # QUIZ DB SAVE HELPER (UPLOAD + PASTE)
 # =========================
-def save_quiz_to_db(quiz_title, source_file, quiz_data):
+def save_quiz_to_db(quiz_title, source_file, quiz_data, logo_filename=None):
     conn = get_db()
     cur = conn.cursor()
 
@@ -1172,14 +1173,14 @@ def quick_structural_scan(text):
 # =========================
 @app.route("/preview_paste", methods=["POST"])
 def preview_paste():
-    #cleanup_temp_logos()   # 🧹 auto-clean old temp logos
+    #cleanup_temp_logos()   # 🧹 optional cleanup (leave commented)
 
     quiz_text = request.form.get("quiz_text", "").strip()
     quiz_title = request.form.get("quiz_title", "Generated Quiz From Paste")
     strip_rules_raw = request.form.get("strip_text", "").strip()
 
     # =========================
-    # TEMPORARY LOGO HANDLING
+    # TEMPORARY LOGO HANDLING (PASTE PREVIEW)
     # =========================
     logo_file = request.files.get("quiz_logo")
     temp_logo_name = None
@@ -1187,8 +1188,13 @@ def preview_paste():
     if logo_file and logo_file.filename:
         ext = os.path.splitext(logo_file.filename)[1].lower()
         if ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
-            temp_logo_name = f"temp_{int(time.time())}{ext}"
-            logo_file.save(os.path.join(LOGO_FOLDER, temp_logo_name))
+            ts = int(time.time())
+            temp_logo_name = f"temp_{ts}{ext}"
+
+            os.makedirs(STATIC_LOGO_FOLDER, exist_ok=True)
+            logo_file.save(os.path.join(STATIC_LOGO_FOLDER, temp_logo_name))
+
+            print(f"[LOGO PREVIEW] Saved temp logo → {temp_logo_name}")
 
     if not quiz_text:
         return "No text provided.", 400
@@ -1842,17 +1848,13 @@ function runDiff() {
 
         <!-- IMPORTANT: Send CLEANED text forward -->
         <form action="/process_paste" method="POST">
-            <input type="hidden" name="quiz_title" value="{{quiz_title}}">
+            <input type="hidden" name="quiz_title" value="{{ quiz_title }}">
             <input type="hidden" name="temp_logo_name" value="{{ temp_logo_name }}">
-            <textarea name="quiz_text" style="display:none;">{{cleaned}}</textarea>
-
-
-            {% if temp_logo_name %}
-                <input type="hidden" name="temp_logo_name" value="{{temp_logo_name}}">
-            {% endif %}
+            <textarea name="quiz_text" style="display:none;">{{ cleaned }}</textarea>
 
             <button type="submit">✅ Yes, Build My Quiz</button>
         </form>
+
 
         <br>
         <button onclick="history.back()">⬅ Go Back & Edit</button>
@@ -2047,18 +2049,19 @@ def process_paste():
 
     # Case 1: Finalize temp logo from preview
     if temp_logo_name:
-        src = os.path.join(LOGO_FOLDER, temp_logo_name)
+        src = os.path.join(STATIC_LOGO_FOLDER, temp_logo_name)
 
         if os.path.exists(src):
             ext = os.path.splitext(temp_logo_name)[1].lower()
             logo_filename = f"logo_{ts}{ext}"
 
-            dst = os.path.join(STATIC_LOGO_FOLDER, logo_filename)
+            os.makedirs(os.path.join(app.static_folder, "logos"), exist_ok=True)
+            dst = os.path.join(app.static_folder, "logos", logo_filename)
             os.rename(src, dst)
 
             print(f"[LOGO] Finalized logo → {dst}")
         else:
-            print(f"[LOGO WARNING] Temp logo missing:", src)
+            print("[LOGO WARNING] Temp logo missing:", src)
 
     # Case 2: Direct upload (no preview)
     elif logo_file and logo_file.filename:
@@ -2072,17 +2075,24 @@ def process_paste():
 
     # SAFETY CHECK
     if logo_filename:
-        final_path = os.path.join(STATIC_LOGO_FOLDER, logo_filename)
+        final_path = os.path.join(app.static_folder, "logos", logo_filename)
         if not os.path.exists(final_path):
             print("[LOGO ERROR] Logo filename set but file missing:", final_path)
             logo_filename = None
 
 
-    
+    # =========================
+    # SAVE QUIZ
+    # =========================
+    source_file = f"quiz_{ts}.html"
 
+    save_quiz_to_db(
+        quiz_title,
+        source_file,
+        quiz_data,
+        logo_filename
+    )
 
-
-    save_quiz_to_db(quiz_title, source_file, quiz_data)
 
 
 
