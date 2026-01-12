@@ -493,6 +493,12 @@ function submitQuiz(force = false) {
         number: q.number || (i + 1),
         question: q.question,
 
+        // 🔑 FULL SNAPSHOT OF ALL CHOICES (THIS IS THE FIX)
+        choices: q.choices.map(c => ({
+            label: c.label,
+            text: c.text
+        })),
+
         // Correct Answers
         correctLetters: q.correct,
         correctText: q.correct.map(letter => {
@@ -513,15 +519,14 @@ function submitQuiz(force = false) {
             return `${letter} — ${choice.text}`;
         }),
 
-
         // What the user actually selected
         selectedIndexes: ans,
         selectedLetters: ans.map(idx => String.fromCharCode(65 + idx)),
         selectedText: ans.map(idx =>
             `${String.fromCharCode(65 + idx)} — ${q.choices[idx].text}`
-)
-
+        )
     });
+
 }
 
         }

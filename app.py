@@ -2682,7 +2682,7 @@ def record_attempt():
         ))
 
         # -----------------------------
-        # INSERT MISSED QUESTIONS (SNAPSHOT)
+        # INSERT MISSED QUESTIONS (FULL SNAPSHOT)
         # -----------------------------
         for m in data.get("missedDetails", []):
             print("🧪 MISSED QUESTION RAW:", json.dumps(m, indent=2))
@@ -2691,20 +2691,35 @@ def record_attempt():
             if attempt_qnum is None:
                 raise Exception(f"Missing attemptQuestionNumber: {m}")
 
+            # ---- FULL CHOICES SNAPSHOT ----
+            choices_lines = []
+            for c in m.get("choices", []):
+                label = c.get("label")
+                text = c.get("text")
+                if label and text:
+                    choices_lines.append(f"{label} — {text}")
+
+            choices_text = "\n".join(choices_lines)
+
+            print("🧪 SNAPSHOT choices_text:")
+            print(choices_text if choices_text else "(no choices present)")
+
             cur.execute("""
                 INSERT INTO missed_questions (
                     attempt_id,
                     correct_letters,
                     question_text,
+                    choices_text,
                     selected_letters,
                     selected_text,
                     correct_text,
                     attempt_question_number
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 attempt_id,
                 ",".join(m.get("correctLetters", [])),
                 m.get("question"),
+                choices_text,
                 ",".join(m.get("selectedLetters", [])),
                 "\n".join(m.get("selectedText", [])),
                 "\n".join(m.get("correctText", [])),
@@ -2721,6 +2736,8 @@ def record_attempt():
 
     finally:
         conn.close()
+
+
 
 
 
@@ -2833,30 +2850,8 @@ def export_quiz_to_apkg(deck_name, deck_rows):
     )
 
     for row in deck_rows:
-        # ---------- FRONT ----------
-        front_lines = []
-
-        question = (row.get("question_text") or "").strip()
-        if question:
-            front_lines.append(question)
-
-        choices = row.get("choices") or []
-        if choices:
-            front_lines.append("")  # blank line between question and choices
-            for c in choices:
-                front_lines.append(c.strip())
-
-        front = "<br>".join(front_lines)
-
-        # ---------- BACK ----------
-        back_lines = []
-
-        correct = (row.get("correct_text") or "").strip()
-        if correct:
-            back_lines.append("<b>Correct Answer</b>")
-            back_lines.append(correct)
-
-        back = "<br>".join(back_lines)
+        front = (row.get("front") or "").replace("\n", "<br>")
+        back = (row.get("back") or "").replace("\n", "<br>")
 
         note = genanki.Note(
             model=model,
@@ -2864,6 +2859,7 @@ def export_quiz_to_apkg(deck_name, deck_rows):
         )
 
         deck.add_note(note)
+
 
     fd, path = tempfile.mkstemp(suffix=".apkg")
     os.close(fd)
@@ -2973,46 +2969,25 @@ def export_anki_genanki():
         return {"error": "Missing attempt_id or question numbers"}, 400
 
     attempt_qnums = [int(x) for x in attempt_qnums]
+    q_marks = ",".join("?" for _ in attempt_qnums)
 
     conn = get_db()
     cur = conn.cursor()
 
-    q_marks = ",".join("?" for _ in attempt_qnums)
-
-    # IMPORTANT:
-    # This query returns ONE row per missed question
+    # 🔑 IMPORTANT: use SNAPSHOT DATA ONLY
     cur.execute(
         f"""
         SELECT
             mq.attempt_question_number,
-            q.text AS question_text,
-
-            (
-                SELECT GROUP_CONCAT(c2.label || '. ' || c2.text, CHAR(10))
-                FROM choices c2
-                WHERE c2.question_id = q.id
-                ORDER BY c2.label
-            ) AS choices_text,
-
-            (
-                SELECT GROUP_CONCAT(c3.label || '. ' || c3.text, CHAR(10))
-                FROM choices c3
-                WHERE c3.question_id = q.id
-                  AND c3.is_correct = 1
-                ORDER BY c3.label
-            ) AS correct_text,
-
+            mq.question_text,
+            mq.choices_text,
+            mq.correct_text,
             qu.title AS quiz_title
-
         FROM missed_questions mq
-        JOIN questions q ON q.id = mq.question_id
         JOIN attempts a ON a.id = mq.attempt_id
         JOIN quizzes qu ON qu.id = a.quiz_id
-
         WHERE mq.attempt_id = ?
           AND mq.attempt_question_number IN ({q_marks})
-
-        GROUP BY mq.attempt_question_number
         ORDER BY mq.attempt_question_number
         """,
         [attempt_id, *attempt_qnums]
@@ -3024,8 +2999,7 @@ def export_anki_genanki():
     if not rows:
         return {"error": "No missed questions found"}, 404
 
-    logger.info("[ANKI-GENANKI] Rows fetched: %s | attempt_id=%s",
-                len(rows), attempt_id)
+    print(f"[ANKI] exporting {len(rows)} missed questions")
 
     # -----------------------------
     # Transform rows for genanki
@@ -3033,31 +3007,39 @@ def export_anki_genanki():
     deck_rows = []
 
     for r in rows:
-        qtext = (r["question_text"] or "").strip()
-        choices_raw = (r["choices_text"] or "").strip()
-        correct = (r["correct_text"] or "").strip()
+        question = (r["question_text"] or "").strip()
+        choices_text = (r["choices_text"] or "").strip()
+        correct_text = (r["correct_text"] or "").strip()
 
-        choices = [c.strip() for c in choices_raw.split("\n") if c.strip()]
+        # FRONT = question + ALL choices
+        front_parts = [question]
+        if choices_text:
+            front_parts.append("")
+            front_parts.append(choices_text)
+
+        front = "\n".join(front_parts)
+
+        # BACK = correct answer(s) only
+        back = "Correct Answer\n" + correct_text
 
         deck_rows.append({
-            "question_text": qtext,
-            "choices": choices,
-            "correct_text": correct,
+            "front": front,
+            "back": back
         })
 
-    deck_name = rows[0]["quiz_title"] or "AutoQuiz Missed Questions"
+    deck_name = rows[0]["quiz_title"] or "DLMS Missed Questions"
 
     apkg_path = export_quiz_to_apkg(deck_name, deck_rows)
-
-    logger.info("[ANKI-GENANKI] APKG generated | deck='%s' | cards=%s",
-                deck_name, len(deck_rows))
 
     return send_file(
         apkg_path,
         as_attachment=True,
-        download_name="autoquiz_missed_questions.apkg",
+        download_name="dlms_missed_questions.apkg",
         mimetype="application/octet-stream"
     )
+
+
+
 
 
 
