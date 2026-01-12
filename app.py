@@ -273,15 +273,24 @@ def save_registry(registry):
         json.dump(registry, f, indent=4)
 
 
-def add_quiz_to_registry(html_name, quiz_title, logo_filename):
+def add_quiz_to_registry(html, title, logo):
     registry = load_registry()
+
+    # 🔁 remove existing quiz with same title
+    registry = [
+        q for q in registry
+        if q.get("title") != title
+    ]
+
     registry.append({
-        "html": html_name,
-        "title": quiz_title,
-        "logo": logo_filename,
+        "html": html,
+        "title": title,
+        "logo": logo,
         "timestamp": int(time.time())
     })
+
     save_registry(registry)
+
 
 
 # =========================
@@ -411,6 +420,68 @@ def save_order():
     save_registry(new_list)
 
     return {"status": "ok"}
+
+
+# =========================
+# QUIZ DB SAVE HELPER (UPLOAD + PASTE)
+# =========================
+def save_quiz_to_db(quiz_title, source_file, quiz_data):
+    conn = get_db()
+    cur = conn.cursor()
+
+    # Replace existing quiz with same source_file
+    cur.execute(
+        "DELETE FROM quizzes WHERE source_file = ?",
+        (source_file,)
+    )
+
+    # Insert quiz
+    cur.execute(
+        """
+        INSERT INTO quizzes (title, source_file)
+        VALUES (?, ?)
+        """,
+        (quiz_title, source_file),
+    )
+    quiz_id = cur.lastrowid
+
+    # Insert questions + choices
+    for q in quiz_data:
+        question_number = q.get("number")
+        question_text = q.get("question") or q.get("text") or ""
+        q_choices = q.get("choices", [])
+
+        cur.execute(
+            """
+            INSERT INTO questions (
+                quiz_id,
+                question_number,
+                question_text
+            )
+            VALUES (?, ?, ?)
+            """,
+            (quiz_id, question_number, question_text),
+        )
+        question_id = cur.lastrowid
+
+        for c in q_choices:
+            cur.execute(
+                """
+                INSERT INTO choices (question_id, label, text, is_correct)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    question_id,
+                    c.get("label"),
+                    c.get("text"),
+                    1 if c.get("is_correct") else 0,
+                ),
+            )
+
+    conn.commit()
+    conn.close()
+
+
 
 
 # =========================
@@ -1983,64 +2054,8 @@ def process_paste():
 
 
 
-    # =========================
-    # SAVE TO DB (quiz + questions + choices)
-    # =========================
-    conn = get_db()
-    cur = conn.cursor()
+    save_quiz_to_db(quiz_title, source_file, quiz_data)
 
-    # ---- determine source_file (required by schema) ----
-    if "file" in request.files and request.files["file"].filename:
-        source_file = request.files["file"].filename
-    else:
-        source_file = f"manual_paste_{ts}"
-
-
-    # ---- insert quiz ----
-    cur.execute(
-        """
-        INSERT INTO quizzes (title, source_file)
-        VALUES (?, ?)
-        """,
-        (quiz_title, source_file),
-    )
-    quiz_id = cur.lastrowid
-
-    # ---- insert questions + choices ----
-    for q in quiz_data:
-        question_number = q.get("number")
-        question_text = q.get("question") or q.get("text") or ""
-        q_choices = q.get("choices", [])
-
-        cur.execute(
-            """
-            INSERT INTO questions (
-                quiz_id,
-                question_number,
-                question_text
-            )
-            VALUES (?, ?, ?)
-            """,
-            (quiz_id, question_number, question_text),
-        )
-        question_id = cur.lastrowid
-
-        for c in q_choices:
-            cur.execute(
-                """
-                INSERT INTO choices (question_id, label, text, is_correct)
-                VALUES (?, ?, ?, ?)
-                """,
-                (
-                    question_id,
-                    c.get("label"),
-                    c.get("text"),
-                    1 if c.get("is_correct") else 0,
-                ),
-            )
-
-    conn.commit()
-    conn.close()
 
 
    # =========================
@@ -2096,13 +2111,23 @@ def process_file():
     quiz_title = request.form.get("quiz_title", "Generated Quiz")
     quiz_logo = request.files.get("quiz_logo")
 
+    logo_filename = None  # ✅ ensure always defined
+    source_file = None    # ✅ canonical quiz identifier
+
     if not file:
         return "No file uploaded", 400
 
-    # Save uploaded text file
-    filename = file.filename
-    path = os.path.join(UPLOAD_FOLDER, filename)
+    # ---- determine source_file (required by schema) ----
+    if file.filename:
+        source_file = file.filename
+    else:
+        source_file = f"manual_paste_{int(time.time())}"
+
+    # ---- save uploaded text file ----
+    path = os.path.join(UPLOAD_FOLDER, source_file)
     file.save(path)
+
+
 
     # =========================
     # READ FILE CONTENT (CRITICAL FIX)
@@ -2200,75 +2225,15 @@ def process_file():
     # =========================
     # HANDLE LOGO
     # =========================
-    #logo_filename = None
-    #if quiz_logo and quiz_logo.filename:
-        #ext = os.path.splitext(quiz_logo.filename)[1].lower()
-        #if ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
-            #logo_filename = f"logo_{ts}{ext}"
-            #quiz_logo.save(os.path.join(LOGO_FOLDER, logo_filename))
+    logo_filename = None
+    if quiz_logo and quiz_logo.filename:
+        ext = os.path.splitext(quiz_logo.filename)[1].lower()
+        if ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
+            logo_filename = f"logo_{ts}{ext}"
+            quiz_logo.save(os.path.join(LOGO_FOLDER, logo_filename))
 
-    # =========================
-    # SAVE TO DB (quiz + questions + choices)
-    # =========================
-    conn = get_db()
-    cur = conn.cursor()
+    save_quiz_to_db(quiz_title, source_file, quiz_data)
 
-    # ---- determine source_file (required by schema) ----
-    if "file" in request.files and request.files["file"].filename:
-        source_file = request.files["file"].filename
-    else:
-        source_file = f"manual_paste_{ts}"
-
-
-    # ---- insert quiz (FIXED) ----
-    cur.execute(
-        """
-        INSERT INTO quizzes (title, source_file)
-        VALUES (?, ?)
-        """,
-        (quiz_title, source_file),
-    )
-    quiz_id = cur.lastrowid
-
-    # ---- insert questions + choices ----
-    for q in quiz_data:
-        number = q.get("number")
-        q_text = q.get("question") or q.get("text") or ""
-        q_choices = q.get("choices", [])
-
-        question_number = q.get("number")
-        question_text = q.get("question") or q.get("text") or ""
-
-        cur.execute(
-            """
-            INSERT INTO questions (
-                quiz_id,
-                question_number,
-                question_text
-            )
-            VALUES (?, ?, ?)
-            """,
-            (quiz_id, question_number, question_text),
-        )
-
-        question_id = cur.lastrowid
-
-        for c in q_choices:
-            cur.execute(
-                """
-                INSERT INTO choices (question_id, label, text, is_correct)
-                VALUES (?, ?, ?, ?)
-                """,
-                (
-                    question_id,
-                    c.get("label"),
-                    c.get("text"),
-                    1 if c.get("is_correct") else 0,
-                ),
-            )
-
-    conn.commit()
-    conn.close()
 
     # =========================
     # SAVE JSON + HTML quiz (UI compatibility)
