@@ -3,7 +3,32 @@ import os, re, json, time, sqlite3
 from werkzeug.utils import secure_filename
 
 
-app = Flask(__name__, static_folder=".", static_url_path="")
+
+import sys
+
+# =========================
+# APP DATA DIRECTORY
+# =========================
+if getattr(sys, "frozen", False):
+    # PyInstaller / EXE
+    APP_DATA_DIR = os.path.join(
+        os.environ.get("APPDATA", os.path.expanduser("~")),
+        "DLMS"
+    )
+else:
+    # Dev / Linux / normal python
+    APP_DATA_DIR = os.path.expanduser("~/.local/share/DLMS")
+
+
+
+
+
+app = Flask(
+    __name__,
+    static_folder=os.path.join(APP_DATA_DIR, "static"),
+    static_url_path="/static"
+)
+
 
 
 import sys
@@ -57,7 +82,13 @@ UPLOAD_FOLDER = os.path.join(APP_DATA_DIR, "uploads")
 DATA_FOLDER = os.path.join(APP_DATA_DIR, "data")
 QUIZ_FOLDER = os.path.join(APP_DATA_DIR, "quizzes")
 CONFIG_FOLDER = os.path.join(APP_DATA_DIR, "config")
+
+# App-data logos (used for temp storage / preview)
 LOGO_FOLDER = os.path.join(APP_DATA_DIR, "static", "logos")
+
+# Flask-served logos (what the browser loads)
+STATIC_LOGO_FOLDER = os.path.join(app.root_path, "static", "logos")
+
 BACKGROUND_FOLDER = os.path.join(APP_DATA_DIR, "static", "bg")
 
 for d in [
@@ -67,8 +98,10 @@ for d in [
     CONFIG_FOLDER,
     BACKGROUND_FOLDER,
     LOGO_FOLDER,
+    STATIC_LOGO_FOLDER,
 ]:
     os.makedirs(d, exist_ok=True)
+
 
 
 PORTAL_CONFIG = os.path.join(CONFIG_FOLDER, "portal.json")
@@ -171,6 +204,7 @@ def cleanup_temp_logos(max_age_minutes=30):
         except Exception as e:
             print(f"[CLEANUP ERROR] {fname}: {e}")
 
+cleanup_temp_logos()
 
 
 # =========================
@@ -384,8 +418,22 @@ def save_order():
 # =========================
 @app.route("/library")
 def quiz_library():
-    registry = load_registry()
+    registry = load_registry()   # ← MUST come first
+
+    print("[DEBUG] Using registry file:", QUIZ_REGISTRY)
+    print("[DEBUG] Registry contents:", registry)
+
+    # =========================
+    # DEBUG: Verify logo files exist on disk
+    # =========================
+    for q in registry:
+        logo = q.get("logo")
+        if logo:
+            path = os.path.join(LOGO_FOLDER, logo)
+            print("[DEBUG] Logo check:", logo, "exists =", os.path.exists(path), "path =", path)
+
     portal_title = get_portal_title()
+
 
     conn = get_db()
     conn.execute("PRAGMA foreign_keys = ON")
@@ -497,7 +545,7 @@ def quiz_library():
                         align-items:center;
                     ">
 
-                        {% if q.get('logo') %}
+                        {% if q['logo'] %}
                         <img src="/static/logos/{{ q['logo'] }}"
                              style="max-height:90px; width:auto;">
                         {% else %}
@@ -1025,7 +1073,7 @@ def quick_structural_scan(text):
 # =========================
 @app.route("/preview_paste", methods=["POST"])
 def preview_paste():
-    cleanup_temp_logos()   # 🧹 auto-clean old temp logos
+    #cleanup_temp_logos()   # 🧹 auto-clean old temp logos
 
     quiz_text = request.form.get("quiz_text", "").strip()
     quiz_title = request.form.get("quiz_title", "Generated Quiz From Paste")
@@ -1696,7 +1744,9 @@ function runDiff() {
         <!-- IMPORTANT: Send CLEANED text forward -->
         <form action="/process_paste" method="POST">
             <input type="hidden" name="quiz_title" value="{{quiz_title}}">
+            <input type="hidden" name="temp_logo_name" value="{{ temp_logo_name }}">
             <textarea name="quiz_text" style="display:none;">{{cleaned}}</textarea>
+
 
             {% if temp_logo_name %}
                 <input type="hidden" name="temp_logo_name" value="{{temp_logo_name}}">
@@ -1770,7 +1820,7 @@ def download_cleaned():
 # =========================
 @app.route("/process_paste", methods=["POST"])
 def process_paste():
-    cleanup_temp_logos()   # 🧹 clean abandoned logos again
+    #cleanup_temp_logos()   # 🧹 clean abandoned logos again
 
     quiz_text = request.form.get("quiz_text", "").strip()
     quiz_title = request.form.get("quiz_title", "Generated Quiz From Paste")
@@ -1889,27 +1939,49 @@ def process_paste():
         """, log_filename=log_filename), 400
 
     # =========================
-    # HANDLE LOGO (supports preview temp logo)
+    # HANDLE LOGO (FINAL, SINGLE SOURCE OF TRUTH)
     # =========================
     logo_filename = None
 
-    # 1) If a logo was uploaded here directly (paste flow)
     logo_file = request.files.get("quiz_logo")
-    if logo_file and logo_file.filename:
+    temp_logo_name = request.form.get("temp_logo_name")
+
+    # Case 1: Finalize temp logo from preview
+    if temp_logo_name:
+        src = os.path.join(LOGO_FOLDER, temp_logo_name)
+
+        if os.path.exists(src):
+            ext = os.path.splitext(temp_logo_name)[1].lower()
+            logo_filename = f"logo_{ts}{ext}"
+
+            dst = os.path.join(STATIC_LOGO_FOLDER, logo_filename)
+            os.rename(src, dst)
+
+            print(f"[LOGO] Finalized logo → {dst}")
+        else:
+            print(f"[LOGO WARNING] Temp logo missing:", src)
+
+    # Case 2: Direct upload (no preview)
+    elif logo_file and logo_file.filename:
         ext = os.path.splitext(logo_file.filename)[1].lower()
         if ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
             logo_filename = f"logo_{ts}{ext}"
-            logo_file.save(os.path.join(LOGO_FOLDER, logo_filename))
-    else:
-        # 2) If coming from PREVIEW and a temp logo exists
-        temp_logo_name = request.form.get("temp_logo_name")
-        if temp_logo_name:
-            old_path = os.path.join(LOGO_FOLDER, temp_logo_name)
-            if os.path.exists(old_path):
-                ext = os.path.splitext(temp_logo_name)[1].lower()
-                logo_filename = f"logo_{ts}{ext}"
-                new_path = os.path.join(LOGO_FOLDER, logo_filename)
-                os.rename(old_path, new_path)
+            dst = os.path.join(STATIC_LOGO_FOLDER, logo_filename)
+            logo_file.save(dst)
+
+            print(f"[LOGO] Uploaded logo → {dst}")
+
+    # SAFETY CHECK
+    if logo_filename:
+        final_path = os.path.join(STATIC_LOGO_FOLDER, logo_filename)
+        if not os.path.exists(final_path):
+            print("[LOGO ERROR] Logo filename set but file missing:", final_path)
+            logo_filename = None
+
+
+    
+
+
 
     # =========================
     # SAVE TO DB (quiz + questions + choices)
@@ -1917,20 +1989,39 @@ def process_paste():
     conn = get_db()
     cur = conn.cursor()
 
-    cur.execute("INSERT INTO quizzes (title) VALUES (?)", (quiz_title,))
+    # ---- determine source_file (required by schema) ----
+    if "file" in request.files and request.files["file"].filename:
+        source_file = request.files["file"].filename
+    else:
+        source_file = f"manual_paste_{ts}"
+
+
+    # ---- insert quiz ----
+    cur.execute(
+        """
+        INSERT INTO quizzes (title, source_file)
+        VALUES (?, ?)
+        """,
+        (quiz_title, source_file),
+    )
     quiz_id = cur.lastrowid
 
+    # ---- insert questions + choices ----
     for q in quiz_data:
-        number = q.get("number")
-        q_text = q.get("question") or q.get("text") or ""
+        question_number = q.get("number")
+        question_text = q.get("question") or q.get("text") or ""
         q_choices = q.get("choices", [])
 
         cur.execute(
             """
-            INSERT INTO questions (quiz_id, number, text)
+            INSERT INTO questions (
+                quiz_id,
+                question_number,
+                question_text
+            )
             VALUES (?, ?, ?)
             """,
-            (quiz_id, number, q_text),
+            (quiz_id, question_number, question_text),
         )
         question_id = cur.lastrowid
 
@@ -1951,7 +2042,8 @@ def process_paste():
     conn.commit()
     conn.close()
 
-    # =========================
+
+   # =========================
     # SAVE JSON + HTML quiz (kept for UI compatibility)
     # =========================
     json_name = f"quiz_{ts}.json"
@@ -1959,6 +2051,21 @@ def process_paste():
 
     with open(os.path.join(DATA_FOLDER, json_name), "w", encoding="utf-8") as f:
         json.dump(quiz_data, f, indent=4)
+
+    # =========================
+    # REGISTER QUIZ (AFTER html_name EXISTS)
+    # =========================
+    print("[DEBUG] Registering quiz:",
+        html_name,
+        quiz_title,
+        logo_filename)
+
+    add_quiz_to_registry(
+        html_name,
+        quiz_title,
+        logo_filename
+    )
+
 
     build_quiz_html(
         html_name,
@@ -1969,7 +2076,14 @@ def process_paste():
         logo_filename
     )
 
-    add_quiz_to_registry(html_name, quiz_title, logo_filename)
+    # FINAL SAFETY: only register logo if file actually exists
+    if logo_filename:
+        final_logo_path = os.path.join(LOGO_FOLDER, logo_filename)
+        if not os.path.exists(final_logo_path):
+            print("[LOGO FIX] Prevented registering missing logo:", logo_filename)
+            logo_filename = None
+
+    #add_quiz_to_registry(html_name, quiz_title, logo_filename)
 
     return redirect("/library")
 
@@ -1977,7 +2091,7 @@ def process_paste():
 
 @app.route("/process", methods=["POST"])
 def process_file():
-    cleanup_temp_logos()  # 🧹 clean abandoned logos
+    #cleanup_temp_logos()  # 🧹 clean abandoned logos
     file = request.files.get("file")
     quiz_title = request.form.get("quiz_title", "Generated Quiz")
     quiz_logo = request.files.get("quiz_logo")
@@ -2086,12 +2200,12 @@ def process_file():
     # =========================
     # HANDLE LOGO
     # =========================
-    logo_filename = None
-    if quiz_logo and quiz_logo.filename:
-        ext = os.path.splitext(quiz_logo.filename)[1].lower()
-        if ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
-            logo_filename = f"logo_{ts}{ext}"
-            quiz_logo.save(os.path.join(LOGO_FOLDER, logo_filename))
+    #logo_filename = None
+    #if quiz_logo and quiz_logo.filename:
+        #ext = os.path.splitext(quiz_logo.filename)[1].lower()
+        #if ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
+            #logo_filename = f"logo_{ts}{ext}"
+            #quiz_logo.save(os.path.join(LOGO_FOLDER, logo_filename))
 
     # =========================
     # SAVE TO DB (quiz + questions + choices)
@@ -2099,21 +2213,44 @@ def process_file():
     conn = get_db()
     cur = conn.cursor()
 
-    cur.execute("INSERT INTO quizzes (title) VALUES (?)", (quiz_title,))
+    # ---- determine source_file (required by schema) ----
+    if "file" in request.files and request.files["file"].filename:
+        source_file = request.files["file"].filename
+    else:
+        source_file = f"manual_paste_{ts}"
+
+
+    # ---- insert quiz (FIXED) ----
+    cur.execute(
+        """
+        INSERT INTO quizzes (title, source_file)
+        VALUES (?, ?)
+        """,
+        (quiz_title, source_file),
+    )
     quiz_id = cur.lastrowid
 
+    # ---- insert questions + choices ----
     for q in quiz_data:
         number = q.get("number")
         q_text = q.get("question") or q.get("text") or ""
         q_choices = q.get("choices", [])
 
+        question_number = q.get("number")
+        question_text = q.get("question") or q.get("text") or ""
+
         cur.execute(
             """
-            INSERT INTO questions (quiz_id, number, text)
+            INSERT INTO questions (
+                quiz_id,
+                question_number,
+                question_text
+            )
             VALUES (?, ?, ?)
             """,
-            (quiz_id, number, q_text),
+            (quiz_id, question_number, question_text),
         )
+
         question_id = cur.lastrowid
 
         for c in q_choices:
@@ -3681,13 +3818,23 @@ def get_or_create_question(conn, quiz_id, q):
     number = q.get("number")
     text = q.get("question")
 
-    # Look up existing canonical question
-    cur.execute("""
-        SELECT id FROM questions
-        WHERE quiz_id = ?
-          AND number = ?
-          AND text = ?
-    """, (quiz_id, number, text))
+   # Look up / define canonical question values
+    question_number = q.get("number")
+    question_text = q.get("question") or q.get("text") or ""
+
+    cur.execute(
+        """
+        INSERT INTO questions (
+            quiz_id,
+            question_number,
+            question_text
+        )
+        VALUES (?, ?, ?)
+        """,
+        (quiz_id, question_number, question_text),
+    )
+
+
 
     row = cur.fetchone()
     if row:
