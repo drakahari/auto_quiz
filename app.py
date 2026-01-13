@@ -53,14 +53,17 @@ STATIC_ROOT = get_static_root()
 # =========================
 # FLASK APP
 # =========================
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
 app = Flask(
     __name__,
-    static_folder=STATIC_ROOT,
+    static_folder=os.path.join(BASE_DIR, "static"),
     static_url_path="/static"
 )
 
 print("[DEBUG] Flask static folder =", app.static_folder)
 print("[BUILD CHECK] APP_DATA_DIR =", APP_DATA_DIR)
+
 
 
 
@@ -212,9 +215,9 @@ ensure_db_initialized()
 # =========================
 # SERVE RUNTIME LOGOS
 # =========================
-@app.route("/static/logos/<path:filename>")
-def serve_runtime_logos(filename):
-    return send_from_directory(LOGO_FOLDER, filename)
+#@app.route("/static/logos/<path:filename>")
+#def serve_runtime_logos(filename):
+    #return send_from_directory(LOGO_FOLDER, filename)
 
 
 
@@ -402,9 +405,9 @@ def serve_quiz(filename):
     return send_from_directory(QUIZ_FOLDER, filename)
 
 
-@app.route("/<path:path>")
-def static_proxy(path):
-    return send_from_directory(".", path)
+#@app.route("/<path:path>")
+#def static_proxy(path):
+    #return send_from_directory(".", path)
 
 
 # =========================
@@ -1247,11 +1250,14 @@ def preview_paste():
             ts = int(time.time())
             temp_logo_name = f"temp_{ts}{ext}"
 
-            os.makedirs(LOGO_FOLDER, exist_ok=True)
-            dst = os.path.join(LOGO_FOLDER, temp_logo_name)
-            logo_file.save(dst)
+            temp_dir = os.path.join(app.static_folder, "logos", "_temp")
+            os.makedirs(temp_dir, exist_ok=True)
 
-            print(f"[LOGO PREVIEW] Saved temp logo → {dst}")
+            temp_path = os.path.join(temp_dir, temp_logo_name)
+            logo_file.save(temp_path)
+
+            print(f"[LOGO PREVIEW] Saved temp logo → {temp_path}")
+
 
 
     if not quiz_text:
@@ -2105,20 +2111,25 @@ def process_paste():
     logo_file = request.files.get("quiz_logo")
     temp_logo_name = request.form.get("temp_logo_name")
 
-    # Case 1: Finalize temp logo from preview (PASTE FLOW)
+    # Case 1: Finalize temp logo from preview
     if temp_logo_name:
-        src = os.path.join(LOGO_FOLDER, temp_logo_name)
+        temp_dir = os.path.join(app.static_folder, "logos", "_temp")
+        src = os.path.join(temp_dir, temp_logo_name)
 
         if os.path.exists(src):
             ext = os.path.splitext(temp_logo_name)[1].lower()
             logo_filename = f"logo_{ts}{ext}"
 
-            dst = os.path.join(LOGO_FOLDER, logo_filename)
+            final_dir = os.path.join(app.static_folder, "logos")
+            os.makedirs(final_dir, exist_ok=True)
+
+            dst = os.path.join(final_dir, logo_filename)
             os.rename(src, dst)
 
             print(f"[LOGO] Finalized logo → {dst}")
         else:
             print("[LOGO WARNING] Temp logo missing:", src)
+
 
 
     # Case 2: Direct upload (no preview)
