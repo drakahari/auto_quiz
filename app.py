@@ -2337,9 +2337,23 @@ def process_file():
         ext = os.path.splitext(quiz_logo.filename)[1].lower()
         if ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
             logo_filename = f"logo_{ts}{ext}"
-            quiz_logo.save(os.path.join(LOGO_FOLDER, logo_filename))
 
-    save_quiz_to_db(quiz_title, source_file, quiz_data)
+            # Always save upload logos into Flask-served static folder
+            static_logo_dir = os.path.join(app.static_folder, "logos")
+            os.makedirs(static_logo_dir, exist_ok=True)
+
+            dst = os.path.join(static_logo_dir, logo_filename)
+            quiz_logo.save(dst)
+
+            print(f"[LOGO] Uploaded logo → {dst}")
+
+            # Safety check (prevents silent broken images)
+            if not os.path.exists(dst):
+                print("[LOGO ERROR] Upload logo missing after save:", dst)
+                logo_filename = None
+
+    save_quiz_to_db(quiz_title, source_file, quiz_data, logo_filename)
+
 
 
     # =========================
