@@ -13,6 +13,59 @@ def resource_path(relative_path: str) -> str:
         return os.path.join(sys._MEIPASS, relative_path)
     return os.path.join(os.path.abspath(os.path.dirname(__file__)), relative_path)
 
+
+def purge_legacy_quizzes():
+    """
+    Permanently delete quizzes that lack a stored DB id (legacy test data).
+    """
+    registry = load_registry()
+    kept = []
+
+    conn = get_db()
+    conn.execute("PRAGMA foreign_keys = ON")
+
+    for q in registry:
+        if q.get("id") is None:
+            print("[PURGE] Removing legacy quiz:", q.get("title"))
+
+            # 🔥 DB cleanup (authoritative)
+            conn.execute(
+                "DELETE FROM quizzes WHERE source_file = ? OR title = ?",
+                (q.get("html"), q.get("title"))
+            )
+
+            # File cleanup
+            html = q.get("html")
+            logo = q.get("logo")
+
+            if html:
+                hp = os.path.join(QUIZ_FOLDER, html)
+                jp = os.path.join(DATA_FOLDER, html.replace(".html", ".json"))
+
+                if os.path.exists(hp):
+                    os.remove(hp)
+                if os.path.exists(jp):
+                    os.remove(jp)
+
+            if logo:
+                lp = os.path.join(LOGO_FOLDER, logo)
+                if os.path.exists(lp):
+                    os.remove(lp)
+
+        else:
+            kept.append(q)
+
+    conn.commit()
+    conn.close()
+
+    save_registry(kept)
+    print(f"[PURGE] Completed. Remaining quizzes: {len(kept)}")
+
+
+
+
+
+
 # =========================
 # APP DATA DIRECTORY
 # =========================
@@ -502,80 +555,67 @@ def serve_quiz(filename):
 
 
 # =========================
-# DELETE QUIZ (CANONICAL)
+# DELETE QUIZ (AUTHORITATIVE)
 # =========================
 @app.route("/delete_quiz/<int:quiz_id>", methods=["POST"])
 def delete_quiz(quiz_id):
+    print("[DELETE] Requested quiz_id:", quiz_id)
+
+    # -------------------------
+    # Load registry FIRST
+    # -------------------------
+    registry = load_registry()
+    kept = []
+
+    html_file = None
+    json_file = None
+    logo_file = None
+
+    for q in registry:
+        if q.get("id") == quiz_id:
+            print("[DELETE] Removing registry entry:", q)
+
+            html_file = q.get("html")
+            if html_file:
+                json_file = html_file.replace(".html", ".json")
+
+            logo_file = q.get("logo")
+            continue
+
+        kept.append(q)
+
+    save_registry(kept)
+
+    # -------------------------
+    # Delete DB rows (authoritative)
+    # -------------------------
     conn = get_db()
-
-    # 🔒 Ensure FK cascades are enforced for this connection
     conn.execute("PRAGMA foreign_keys = ON")
-
-    # ----------------------------------
-    # Look up quiz metadata BEFORE delete
-    # ----------------------------------
-    row = conn.execute(
-        "SELECT title, source_file FROM quizzes WHERE id = ?",
-        (quiz_id,)
-    ).fetchone()
-
-    if not row:
-        conn.close()
-        return redirect("/library")
-
-    source_file = row["source_file"]
-
-    # ----------------------------------
-    # DELETE FROM DATABASE (AUTHORITATIVE)
-    # ----------------------------------
     conn.execute("DELETE FROM quizzes WHERE id = ?", (quiz_id,))
     conn.commit()
     conn.close()
 
-    # ----------------------------------
-    # CLEAN UP REGISTRY + FILES
-    # ----------------------------------
-    registry = load_registry()
-    updated = []
-
-    json_file_to_delete = None
-    logo_to_delete = None
-    html_file_to_delete = None
-
-    for q in registry:
-        if q.get("id") == quiz_id:
-            html_file_to_delete = q.get("html")
-            try:
-                json_file_to_delete = q.get("html", "").replace(".html", ".json")
-            except Exception:
-                pass
-            logo_to_delete = q.get("logo")
-            continue
-
-        updated.append(q)
-
-
-    save_registry(updated)
-
-    # ----------------------------------
-    # DELETE FILES (BEST EFFORT)
-    # ----------------------------------
-    if html_file_to_delete:
-        hp = os.path.join(QUIZ_FOLDER, html_file_to_delete)
+    # -------------------------
+    # Delete files (best effort)
+    # -------------------------
+    if html_file:
+        hp = os.path.join(QUIZ_FOLDER, html_file)
         if os.path.exists(hp):
             os.remove(hp)
 
-    if json_file_to_delete:
-        jp = os.path.join(DATA_FOLDER, json_file_to_delete)
+    if json_file:
+        jp = os.path.join(DATA_FOLDER, json_file)
         if os.path.exists(jp):
             os.remove(jp)
 
-    if logo_to_delete:
-        lp = os.path.join(LOGO_FOLDER, logo_to_delete)
+    if logo_file:
+        lp = os.path.join(LOGO_FOLDER, logo_file)
         if os.path.exists(lp):
             os.remove(lp)
 
+    print("[DELETE] Completed quiz_id:", quiz_id)
     return redirect("/library")
+
 
 
 
@@ -692,36 +732,9 @@ def quiz_library():
     portal_title = get_portal_title()
 
 
-    conn = get_db()
-    conn.execute("PRAGMA foreign_keys = ON")
+    # Registry is now authoritative
+    quizzes = list(registry)
 
-    quizzes = []
-
-    for q in registry:
-        merged = dict(q)
-
-        # Try to resolve DB quiz ID
-        row = conn.execute(
-            """
-            SELECT id FROM quizzes
-            WHERE source_file = ?
-               OR title = ?
-            ORDER BY id DESC
-            LIMIT 1
-            """,
-            (q.get("html"), q.get("title"))
-        ).fetchone()
-
-        if not row:
-            merged["id"] = None
-            quizzes.append(merged)
-            continue
-
-
-        merged["id"] = row["id"]
-        quizzes.append(merged)
-
-    conn.close()
 
     return render_template_string("""
 <!DOCTYPE html>
@@ -4094,14 +4107,18 @@ def history_db():
 
 
 
+
 # =========================
 # RUN
 # =========================
 if __name__ == "__main__":
+    #purge_legacy_quizzes()   # REMOVE after one run
+
     app.run(
         host="0.0.0.0",
         port=9001,
         debug=False,
         use_reloader=False
     )
+
 
