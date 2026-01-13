@@ -17,14 +17,26 @@ else:
     APP_DATA_DIR = os.path.expanduser("~/.local/share/DLMS")
 
 
+#app = Flask(
+    #__name__,
+    #static_folder=os.path.join(APP_DATA_DIR, "static"),
+    #static_url_path="/static"
+#)
 
-
+if getattr(sys, "frozen", False):
+    # PyInstaller bundle: serve static from bundled assets
+    STATIC_ROOT = resource_path("static")
+else:
+    # Dev mode: serve static from user-writable app data
+    STATIC_ROOT = os.path.join(APP_DATA_DIR, "static")
 
 app = Flask(
     __name__,
-    static_folder=os.path.join(APP_DATA_DIR, "static"),
+    static_folder=STATIC_ROOT,
     static_url_path="/static"
 )
+
+
 
 
 
