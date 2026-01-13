@@ -126,7 +126,7 @@ print("[BUILD CHECK] APP_DATA_DIR =", APP_DATA_DIR)
 
 import sys
 
-DEBUG_LOGS = True
+DEBUG_LOGS = False
 
 def dprint(*args, **kwargs):
     if DEBUG_LOGS:
@@ -2290,8 +2290,10 @@ def process_paste():
         os.path.join(QUIZ_FOLDER, html_name),
         get_portal_title(),
         quiz_title,
-        logo_filename
+        logo_filename,
+        quiz_id
     )
+
 
     # FINAL SAFETY: only register logo if file actually exists
     if logo_filename:
@@ -2458,8 +2460,10 @@ def process_file():
         os.path.join(QUIZ_FOLDER, html_name),
         get_portal_title(),
         quiz_title,
-        logo_filename
+        logo_filename,
+        quiz_id
     )
+
 
     add_quiz_to_registry(
     quiz_id,
@@ -2851,27 +2855,15 @@ def record_attempt():
 
     try:
         # -----------------------------
-        # RESOLVE QUIZ ID
+        # RESOLVE QUIZ ID (ID IS CANONICAL)
         # -----------------------------
-        if quiz_id:
-            cur.execute("SELECT id FROM quizzes WHERE id = ?", (quiz_id,))
-            if not cur.fetchone():
-                raise Exception(f"Quiz ID {quiz_id} does not exist")
-        else:
-            if not quiz_title:
-                raise Exception("Missing quizId and quizTitle")
+        if not quiz_id:
+            raise Exception("Missing quizId")
 
-            cur.execute("""
-                SELECT id
-                FROM quizzes
-                WHERE title = ?
-                ORDER BY id DESC
-                LIMIT 1
-            """, (quiz_title,))
-            row = cur.fetchone()
-            if not row:
-                raise Exception(f"No quiz found for title '{quiz_title}'")
-            quiz_id = row["id"]
+        cur.execute("SELECT id FROM quizzes WHERE id = ?", (quiz_id,))
+        if not cur.fetchone():
+            raise Exception(f"Quiz ID {quiz_id} does not exist")
+
 
         print(f"Saving attempt: attempt_id={attempt_id} quiz_id={quiz_id}")
 
@@ -3819,12 +3811,14 @@ def analyze_confidence(clean_text):
 # =========================
 # QUIZ HTML BUILDER
 # =========================
-def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_filename):
+
+def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_filename, quiz_id):
     # Optional logo for mode banner (left/right)
     if logo_filename:
         mode_logo = f'<img src="/static/logos/{logo_filename}" class="mode-badge">'
     else:
         mode_logo = ""
+
 
     html = f"""<!DOCTYPE html>
 <html>
@@ -3931,12 +3925,14 @@ fetch("/config/portal.json")
         <button onclick="location.href='/'">🏠 Return To Portal</button>
         <button onclick="location.href='/library'">📚 Return To Quiz Library</button>
 
-<!-- 🔹 Tell script.js which JSON file to load -->
+<!-- 🔹 Tell script.js which quiz + JSON file to load -->
 <script>
   const QUIZ_FILE = "/data/{jsonfile}";
+  window.QUIZ_ID = {quiz_id};
 </script>
 
 <script src="/static/script.js"></script>
+
 
 </body>
 </html>

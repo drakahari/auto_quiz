@@ -154,6 +154,11 @@ fetch("/config/portal.json")
     <div id="dbHistoryBox" class="quiz-group">
         <p>Loading history…</p>
     </div>
+    <div style="text-align:center; margin-top:20px;">
+        <button onclick="location.href='/'">🏠 Return to Portal</button>
+        <button onclick="location.href='/library'">📚 Return to Quiz Library</button>
+    </div>
+
 
     <!-- ============================= -->
     <!--   ATTEMPT REVIEW (MISSED)     -->
@@ -163,13 +168,13 @@ fetch("/config/portal.json")
     <hr>
 
     <!-- EXISTING LOCAL STORAGE HISTORY -->
-    <div id="historyOutput"></div>
+    <!-- <div id="historyOutput"></div>
 
     <button onclick="clearHistory()">🗑 Clear All Local Browser History</button>
     <br><br>
     <button onclick="location.href='/'">⬅ Back to Portal</button>
 
-</div>
+</div> -->
 
 <script>
 const HISTORY_KEY = "serverplus_history_v2";
@@ -338,6 +343,8 @@ function loadHistoryStore() {
    RENDER EXISTING HISTORY
 ========================= */
 function renderHistory() {
+    return; // 🔒 legacy localStorage history disabled
+
     const historyDiv = document.getElementById("historyOutput");
     historyDiv.innerHTML = "";
 

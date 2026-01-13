@@ -560,6 +560,7 @@ function submitQuiz(force = false) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             quizTitle: window.quiz_title || QUIZ_FILE || "Unknown Quiz",
+            quizId: window.QUIZ_ID,
 
             score: correct,
             total: total,
@@ -571,8 +572,9 @@ function submitQuiz(force = false) {
 
             mode: "Exam",
 
-            missedDetails: missed   // <-- ADD THIS LINE
+            missedDetails: missed
         })
+
     })
     .then(res => res.json().catch(() => ({})))
     .then(data => console.log("DB save response:", data))
