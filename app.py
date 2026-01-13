@@ -407,15 +407,8 @@ def dynamic_css():
 
 @app.route("/history")
 def history():
-    attempt_id = request.args.get("attempt")
+    return send_from_directory(app.static_folder, "history.html")
 
-    if not attempt_id:
-        return "Missing attempt ID", 400
-
-    return send_from_directory(
-        app.static_folder,
-        "history.html"
-    )
 
 @app.route("/history.html")
 def history_html_redirect():
@@ -424,12 +417,17 @@ def history_html_redirect():
         return redirect(f"/history?attempt={attempt}", code=301)
     return redirect("/history", code=301)
 
+@app.route("/review")
 @app.route("/review.html")
-def review_html_redirect():
-    attempt = request.args.get("attempt")
-    if attempt:
-        return redirect(f"/history?attempt={attempt}", code=301)
-    return redirect("/history", code=301)
+def review():
+    return send_from_directory(app.static_folder, "review.html")
+
+
+
+@app.route("/dashboard")
+@app.route("/dashboard.html")
+def dashboard():
+    return send_from_directory(app.static_folder, "dashboard.html")
 
 
 
@@ -3387,6 +3385,47 @@ def export_anki_missed_tsv():
 # @app.route("/api/missed_questions")
 # def api_missed_questions():
 #     return {"error": "Deprecated endpoint. Use /api/attempts."}, 410
+
+
+@app.route("/api/missed_questions")
+def api_missed_questions():
+    attempt_id = request.args.get("attempt")
+
+    if not attempt_id:
+        return {"error": "Missing attempt id"}, 400
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            attempt_question_number,
+            question_text,
+            correct_text,
+            correct_letters,
+            selected_text,
+            selected_letters
+        FROM missed_questions
+        WHERE attempt_id = ?
+        ORDER BY attempt_question_number
+    """, (attempt_id,))
+
+
+    rows = cur.fetchall()
+    conn.close()
+
+    return jsonify([
+        {
+            "attempt_question_number": r["attempt_question_number"],
+            "question_text": r["question_text"],
+            "correct_text": r["correct_text"],
+            "correct_letters": r["correct_letters"],
+            "selected_text": r["selected_text"],
+            "selected_letters": r["selected_letters"],
+        }
+        for r in rows
+    ])
+
 
 
 

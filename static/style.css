@@ -568,3 +568,13 @@ body.blurred .blur-wrapper {
     color: #aaa;
     font-style: italic;
 }
+
+
+a:hover {
+    color: #00ffaa;
+    text-decoration: underline;
+}
+
+a:active {
+    color: #00ffaa;
+}

@@ -130,7 +130,8 @@ fetch("/config/portal.json")
       }
   });
 </script>
-    <div class="container history-container">
+
+<div class="container history-container">
 
     <div class="mode-banner">
         <!-- left spacer -->
@@ -146,11 +147,6 @@ fetch("/config/portal.json")
 
 </div>
 
-
-
-
-
-
     <!-- ============================= -->
     <!--   NEW: PERSISTENT DB HISTORY  -->
     <!-- ============================= -->
@@ -158,6 +154,11 @@ fetch("/config/portal.json")
     <div id="dbHistoryBox" class="quiz-group">
         <p>Loading history…</p>
     </div>
+
+    <!-- ============================= -->
+    <!--   ATTEMPT REVIEW (MISSED)     -->
+    <!-- ============================= -->
+    <div id="missed-questions" class="quiz-group"></div>
 
     <hr>
 
@@ -172,6 +173,12 @@ fetch("/config/portal.json")
 
 <script>
 const HISTORY_KEY = "serverplus_history_v2";
+
+/* ============================
+   URL PARAMS (NEW)
+============================ */
+const _params = new URLSearchParams(window.location.search);
+const _attemptId = _params.get("attempt");
 
 /* ============================
    LOAD DB HISTORY
@@ -207,9 +214,11 @@ async function loadDbHistory() {
                     <td>${a.completed_at || ""}</td>
                     <td>${a.mode}</td>
                     <td>
-                        <a href="/history?attempt=${a.id}">
-                            🔍 View Details
+                        <a href="/review?attempt=${a.id}" class="review-link">
+                            🔁 Review
+                            <span style="opacity:0.75; margin-left:6px;">🔍 View Details</span>
                         </a>
+
                     </td>
                 </tr>
             `;
@@ -224,6 +233,68 @@ async function loadDbHistory() {
     }
 }
 
+/* ============================
+   LOAD MISSED QUESTIONS FOR ATTEMPT (NEW)
+   Uses /api/missed_questions?attempt=...
+============================ */
+async function loadMissedQuestions(attemptId) {
+    const box = document.getElementById("missed-questions");
+    if (!box) return;
+
+    if (!attemptId) {
+        box.innerHTML = "";
+        return;
+    }
+
+    box.innerHTML = "<p>Loading missed questions…</p>";
+
+    try {
+        const res = await fetch(`/api/missed_questions?attempt=${encodeURIComponent(attemptId)}`);
+        if (!res.ok) {
+            box.innerHTML = "<p>⚠️ Failed to load missed questions.</p>";
+            return;
+        }
+
+        const missed = await res.json();
+
+        if (!Array.isArray(missed) || missed.length === 0) {
+            box.innerHTML = "<p>🎉 No missed questions for this attempt.</p>";
+            return;
+        }
+
+        let html = "<h2>❌ Missed Questions (This Attempt)</h2>";
+
+        missed.forEach(m => {
+            // API returns strings like "A — pvdisplay" etc; preserve as-is
+            const correct = (m.correct_text || m.correct_letters || "");
+            const selected = (m.selected_text || m.selected_letters || "");
+
+            html += `
+                <div style="margin-top:10px; padding:12px; background:rgba(0,0,0,.6); border-radius:6px;">
+                    <b>Question ${m.attempt_question_number}</b><br>
+                    ${m.question_text || ""}<br>
+
+                    <div style="margin-top:6px; color:#00ff80">
+                        <b>Correct:</b><br>
+                        ${Array.isArray(correct) ? correct.join("<br>") : correct}
+                    </div>
+
+                    <div style="margin-top:6px; color:#ff6b6b">
+                        <b>Your Answer:</b><br>
+                        ${Array.isArray(selected) ? selected.join("<br>") : selected}
+                    </div>
+                </div>
+            `;
+        });
+
+        box.innerHTML = html;
+
+    } catch (err) {
+        console.error("Failed loading missed questions:", err);
+        box.innerHTML = "<p>⚠️ Failed to load missed questions.</p>";
+    }
+}
+
 
 /* ---------------------------------------------------
    QUIZ NAME REGISTRY MAP (unchanged)
@@ -234,7 +305,10 @@ let QUIZ_NAME_MAP = {};
 loadDbHistory();
 renderHistory();
 
-
+// NEW: if URL has ?attempt=..., load DB missed questions panel
+if (_attemptId) {
+    loadMissedQuestions(_attemptId);
+}
 
 /* =========================
    LOCAL STORAGE HISTORY (unchanged logic)
@@ -377,29 +451,28 @@ else if (rec.missed && rec.missed.length) {
 }
 
             const attemptKey =
-    rec.attemptId || rec.id || rec.uuid || "";
+                rec.attemptId || rec.id || rec.uuid || "";
 
-        const card = document.createElement("div");
-        card.className = "history-card " + cls;
-        card.setAttribute("data-attempt", attemptKey);
+            const card = document.createElement("div");
+            card.className = "history-card " + cls;
+            card.setAttribute("data-attempt", attemptKey);
 
-        // 🔥 Make card clickable
-        card.style.cursor = "pointer";
-        card.onclick = () => {
-            if (!attemptKey) {
-                alert("No attempt ID stored for this record.");
-                return;
-            }
-            location.href = `/history?attempt=${attemptKey}`;
-        };
+            // 🔥 Make card clickable
+            card.style.cursor = "pointer";
+            card.onclick = () => {
+                if (!attemptKey) {
+                    alert("No attempt ID stored for this record.");
+                    return;
+                }
+                location.href = `/review?attempt=${attemptKey}`;
+            };
 
-        card.innerHTML = `
-            <div><b>${rec.date}</b></div>
-            <div>Mode: ${rec.mode}</div>
-            <div>Score: ${rec.score} / ${rec.total} (${rec.percent}%)</div>
-            <div>Time Used: ${minsUsed} min</div>
-        `;
-
+            card.innerHTML = `
+                <div><b>${rec.date}</b></div>
+                <div>Mode: ${rec.mode}</div>
+                <div>Score: ${rec.score} / ${rec.total} (${rec.percent}%)</div>
+                <div>Time Used: ${minsUsed} min</div>
+            `;
 
             groupDiv.appendChild(card);
         });
@@ -423,7 +496,6 @@ function loadLogo() {
     // This function intentionally does nothing.
 }
 
-
 function highlightTargetAttempt() {
     const params = new URLSearchParams(window.location.search);
     const target = params.get("attempt");
@@ -443,7 +515,9 @@ function highlightTargetAttempt() {
         if (c === match) {
             c.style.display = "block";
             c.classList.add("highlighted");
-        } else c.style.display = "none";
+        } else {
+            c.style.display = "none";
+        }
     });
 
     match.scrollIntoView({ behavior:"smooth", block:"center" });
