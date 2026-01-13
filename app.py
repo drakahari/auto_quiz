@@ -209,6 +209,18 @@ def ensure_db_initialized():
 # ✅ INITIALIZE DATABASE ONCE, AT IMPORT TIME
 ensure_db_initialized()
 
+# =========================
+# SERVE RUNTIME LOGOS
+# =========================
+@app.route("/static/logos/<path:filename>")
+def serve_runtime_logos(filename):
+    return send_from_directory(LOGO_FOLDER, filename)
+
+
+
+
+
+
 
 
 @app.route("/config/portal.json")
@@ -1235,10 +1247,12 @@ def preview_paste():
             ts = int(time.time())
             temp_logo_name = f"temp_{ts}{ext}"
 
-            os.makedirs(STATIC_LOGO_FOLDER, exist_ok=True)
-            logo_file.save(os.path.join(STATIC_LOGO_FOLDER, temp_logo_name))
+            os.makedirs(LOGO_FOLDER, exist_ok=True)
+            dst = os.path.join(LOGO_FOLDER, temp_logo_name)
+            logo_file.save(dst)
 
-            print(f"[LOGO PREVIEW] Saved temp logo → {temp_logo_name}")
+            print(f"[LOGO PREVIEW] Saved temp logo → {dst}")
+
 
     if not quiz_text:
         return "No text provided.", 400
@@ -2091,21 +2105,21 @@ def process_paste():
     logo_file = request.files.get("quiz_logo")
     temp_logo_name = request.form.get("temp_logo_name")
 
-    # Case 1: Finalize temp logo from preview
+    # Case 1: Finalize temp logo from preview (PASTE FLOW)
     if temp_logo_name:
-        src = os.path.join(STATIC_LOGO_FOLDER, temp_logo_name)
+        src = os.path.join(LOGO_FOLDER, temp_logo_name)
 
         if os.path.exists(src):
             ext = os.path.splitext(temp_logo_name)[1].lower()
             logo_filename = f"logo_{ts}{ext}"
 
-            os.makedirs(os.path.join(app.static_folder, "logos"), exist_ok=True)
-            dst = os.path.join(app.static_folder, "logos", logo_filename)
+            dst = os.path.join(LOGO_FOLDER, logo_filename)
             os.rename(src, dst)
 
             print(f"[LOGO] Finalized logo → {dst}")
         else:
             print("[LOGO WARNING] Temp logo missing:", src)
+
 
     # Case 2: Direct upload (no preview)
     elif logo_file and logo_file.filename:
