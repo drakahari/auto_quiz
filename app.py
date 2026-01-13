@@ -3869,7 +3869,7 @@ fetch("/config/portal.json")
   const QUIZ_FILE = "/data/{jsonfile}";
 </script>
 
-<script src="/script.js"></script>
+<script src="/static/script.js"></script>
 
 </body>
 </html>
