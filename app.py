@@ -405,6 +405,34 @@ def dynamic_css():
 
 
 
+@app.route("/history")
+def history():
+    attempt_id = request.args.get("attempt")
+
+    if not attempt_id:
+        return "Missing attempt ID", 400
+
+    return send_from_directory(
+        app.static_folder,
+        "history.html"
+    )
+
+@app.route("/history.html")
+def history_html_redirect():
+    attempt = request.args.get("attempt")
+    if attempt:
+        return redirect(f"/history?attempt={attempt}", code=301)
+    return redirect("/history", code=301)
+
+@app.route("/review.html")
+def review_html_redirect():
+    attempt = request.args.get("attempt")
+    if attempt:
+        return redirect(f"/history?attempt={attempt}", code=301)
+    return redirect("/history", code=301)
+
+
+
 
 
 # =========================

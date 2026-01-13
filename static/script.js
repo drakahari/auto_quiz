@@ -595,13 +595,14 @@ function submitQuiz(force = false) {
             <h2>Exam Results</h2>
             <p><b>Score:</b> ${correct} / ${total} (${percent}%)</p>
 
-            <button onclick="location.href='/history.html?attempt=${attemptId}'">
+            <button onclick="location.href='/history?attempt=${attemptId}'">
                 📌 Review This Attempt
             </button>
 
-            <button onclick="location.href='/history.html'">
+            <button onclick="location.href='/history'">
                 📜 View Full History
             </button>
+
 
             <button onclick="location.reload()">
                 🔁 Retake Exam
