@@ -340,12 +340,22 @@ function updateStudyModeBadge() {
         if (!badge) {
             badge = document.createElement("div");
             badge.id = "studyModeBadge";
-            badge.innerHTML = "📘 <b>Study Mode</b><br><span style='font-size:11px;opacity:.8'>Learn at your own pace</span>";
-            badge.style.padding = "6px 10px";
-            badge.style.borderRadius = "6px";
-            badge.style.background = "rgba(255,255,255,0.08)";
-            badge.style.fontSize = "13px";
+            badge.innerHTML = `
+                <div style="font-size:16px;font-weight:600;letter-spacing:.3px">
+                    📘 Study Mode
+                </div>
+                <div style="font-size:12px;opacity:.9;margin-top:2px">
+                    Learn at your own pace
+                </div>
+            `;
+
+            badge.style.padding = "10px 14px";
+            badge.style.borderRadius = "8px";
+            badge.style.background = "rgba(255,255,255,0.15)";
+            badge.style.border = "1px solid rgba(255,255,255,0.25)";
             badge.style.textAlign = "center";
+            badge.style.boxShadow = "0 0 10px rgba(0,0,0,.35)";
+
 
             const timer = document.getElementById("timer");
             if (timer && timer.parentNode) {
