@@ -172,6 +172,8 @@ if (examMode && selected.includes(i)) {
 
     updateProgressBar();
     updateNavButtons();
+    updatePauseButtonUI();
+    updateTimerLabelUI();
 }
 
 /* =====================================================
@@ -277,6 +279,55 @@ function updateNavButtons() {
     }
 }
 
+/* =====================================================
+   STUDY MODE UI VISIBILITY
+===================================================== */
+function updateStudyModeUI() {
+    const timer = document.getElementById("timer");
+    const pauseBtn =
+        document.getElementById("pauseBtn") ||
+        document.querySelector("button[onclick='pauseQuiz()']");
+
+    if (!examMode) {
+        // Study mode → hide timer + pause
+        if (timer) timer.style.display = "none";
+        if (pauseBtn) pauseBtn.style.display = "none";
+    } else {
+        // Exam mode → restore
+        if (timer) timer.style.display = "";
+        if (pauseBtn) pauseBtn.style.display = "";
+    }
+}
+
+
+/* =====================================================
+   PAUSE BUTTON VISIBILITY
+===================================================== */
+function updatePauseButtonUI() {
+    const pauseBtn =
+        document.getElementById("pauseBtn") ||
+        document.querySelector("button[onclick='pauseQuiz()']");
+
+    if (!pauseBtn) return;
+
+    // Study mode → hide pause
+    pauseBtn.style.display = examMode ? "inline-block" : "none";
+}
+
+
+/* =====================================================
+   TIMER LABEL VISIBILITY
+===================================================== */
+function updateTimerLabelUI() {
+    const timerLabel = document.querySelector(
+        "#timer, .timer, .time-remaining, #timeRemaining"
+    );
+
+    if (!timerLabel) return;
+
+    timerLabel.style.display = examMode ? "" : "none";
+}
+
 
 
 /* =====================================================
@@ -361,6 +412,9 @@ function startQuiz(isExam) {
         resultDiv.classList.add("hidden");
         resultDiv.style.display = "none";
     }
+
+    updatePauseButtonUI(); // 👈 ADD THIS LINE EXACTLY HERE
+    updateTimerLabelUI();
 
     // Reset pause overlay / blur
     const overlay = document.getElementById("pauseOverlay");
