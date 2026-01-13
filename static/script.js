@@ -174,6 +174,7 @@ if (examMode && selected.includes(i)) {
     updateNavButtons();
     updatePauseButtonUI();
     updateTimerLabelUI();
+    updateStudyModeBadge();
 }
 
 /* =====================================================
@@ -329,6 +330,35 @@ function updateTimerLabelUI() {
 }
 
 
+/* =====================================================
+   STUDY MODE BADGE
+===================================================== */
+function updateStudyModeBadge() {
+    let badge = document.getElementById("studyModeBadge");
+
+    if (!examMode) {
+        if (!badge) {
+            badge = document.createElement("div");
+            badge.id = "studyModeBadge";
+            badge.innerHTML = "📘 <b>Study Mode</b><br><span style='font-size:11px;opacity:.8'>Learn at your own pace</span>";
+            badge.style.padding = "6px 10px";
+            badge.style.borderRadius = "6px";
+            badge.style.background = "rgba(255,255,255,0.08)";
+            badge.style.fontSize = "13px";
+            badge.style.textAlign = "center";
+
+            const timer = document.getElementById("timer");
+            if (timer && timer.parentNode) {
+                timer.parentNode.insertBefore(badge, timer.nextSibling);
+            }
+        }
+        badge.style.display = "block";
+    } else {
+        if (badge) badge.style.display = "none";
+    }
+}
+
+
 
 /* =====================================================
    STUDY-MODE FEEDBACK
@@ -415,6 +445,7 @@ function startQuiz(isExam) {
 
     updatePauseButtonUI(); // 👈 ADD THIS LINE EXACTLY HERE
     updateTimerLabelUI();
+    updateStudyModeBadge();
 
     // Reset pause overlay / blur
     const overlay = document.getElementById("pauseOverlay");
