@@ -73,7 +73,7 @@ print("[BUILD CHECK] APP_DATA_DIR =", APP_DATA_DIR)
 
 import sys
 
-DEBUG_LOGS = False
+DEBUG_LOGS = True
 
 def dprint(*args, **kwargs):
     if DEBUG_LOGS:
@@ -446,7 +446,8 @@ def save_registry(registry):
         json.dump(registry, f, indent=4)
 
 
-def add_quiz_to_registry(html, title, logo):
+def add_quiz_to_registry(quiz_id, html, title, logo):
+    print(f"[REGISTRY] add_quiz_to_registry title={title!r} logo={logo!r}")
     registry = load_registry()
 
     # 🔁 remove existing quiz with same title
@@ -456,6 +457,7 @@ def add_quiz_to_registry(html, title, logo):
     ]
 
     registry.append({
+        "id": quiz_id,   # ← DB id at creation time
         "html": html,
         "title": title,
         "logo": logo,
@@ -541,7 +543,7 @@ def delete_quiz(quiz_id):
     html_file_to_delete = None
 
     for q in registry:
-        if q.get("html") == source_file:
+        if q.get("id") == quiz_id:
             html_file_to_delete = q.get("html")
             try:
                 json_file_to_delete = q.get("html", "").replace(".html", ".json")
@@ -549,7 +551,9 @@ def delete_quiz(quiz_id):
                 pass
             logo_to_delete = q.get("logo")
             continue
+
         updated.append(q)
+
 
     save_registry(updated)
 
@@ -620,7 +624,8 @@ def save_quiz_to_db(quiz_title, source_file, quiz_data, logo_filename=None):
         """,
         (quiz_title, source_file),
     )
-    quiz_id = cur.lastrowid
+
+    quiz_id = cur.lastrowid  # ✅ CAPTURE DB ID
 
     # Insert questions + choices
     for q in quiz_data:
@@ -639,6 +644,7 @@ def save_quiz_to_db(quiz_title, source_file, quiz_data, logo_filename=None):
             """,
             (quiz_id, question_number, question_text),
         )
+
         question_id = cur.lastrowid
 
         for c in q_choices:
@@ -657,6 +663,9 @@ def save_quiz_to_db(quiz_title, source_file, quiz_data, logo_filename=None):
 
     conn.commit()
     conn.close()
+
+    return quiz_id  # ✅ REQUIRED FOR REGISTRY + DELETE
+
 
 
 
@@ -704,9 +713,10 @@ def quiz_library():
         ).fetchone()
 
         if not row:
-            # No DB row → skip delete capability entirely
-            # (quiz still renders, but delete is harmless)
+            merged["id"] = None
+            quizzes.append(merged)
             continue
+
 
         merged["id"] = row["id"]
         quizzes.append(merged)
@@ -2200,7 +2210,7 @@ def process_paste():
     # =========================
     source_file = f"quiz_{ts}.html"
 
-    save_quiz_to_db(
+    quiz_id = save_quiz_to_db(
         quiz_title,
         source_file,
         quiz_data,
@@ -2228,6 +2238,7 @@ def process_paste():
         logo_filename)
 
     add_quiz_to_registry(
+        quiz_id,
         html_name,
         quiz_title,
         logo_filename
@@ -2383,7 +2394,12 @@ def process_file():
         logo_file=quiz_logo,
     )
 
-    save_quiz_to_db(quiz_title, source_file, quiz_data, logo_filename)
+    quiz_id = save_quiz_to_db(
+        quiz_title,
+        source_file,
+        quiz_data,
+        logo_filename
+    )
 
 
 
@@ -2406,7 +2422,13 @@ def process_file():
         logo_filename
     )
 
-    add_quiz_to_registry(html_name, quiz_title, logo_filename)
+    add_quiz_to_registry(
+    quiz_id,
+    html_name,
+    quiz_title,
+    logo_filename
+)
+
 
     return redirect("/library")
 
