@@ -2112,7 +2112,7 @@ def process_paste():
     temp_logo_name = request.form.get("temp_logo_name")
 
     # Case 1: Finalize temp logo from preview
-    if temp_logo_name:
+    if temp_logo_name and temp_logo_name.lower() != "none":
         temp_dir = os.path.join(app.static_folder, "logos", "_temp")
         src = os.path.join(temp_dir, temp_logo_name)
 
