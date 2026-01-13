@@ -221,6 +221,95 @@ ensure_db_initialized()
 
 
 
+def finalize_logo_from_request(app, ts, *, logo_file=None, temp_logo_name=None):
+    """
+    Finalizes a quiz logo from either:
+      - a temp preview logo (_temp)
+      - a direct upload
+      - or no logo at all
+
+    Returns:
+        logo_filename (str) or None
+    """
+
+    static_logo_dir = os.path.join(app.static_folder, "logos")
+    temp_logo_dir = os.path.join(static_logo_dir, "_temp")
+    os.makedirs(static_logo_dir, exist_ok=True)
+
+    # Normalize inputs
+    temp_logo_name = (temp_logo_name or "").strip()
+
+    # =========================
+    # Case 1: Finalize preview logo
+    # =========================
+    if temp_logo_name and temp_logo_name.lower() != "none":
+        src = os.path.join(temp_logo_dir, temp_logo_name)
+
+        if not os.path.exists(src):
+            print("[LOGO WARNING] Temp logo missing:", src)
+            return None
+
+        ext = os.path.splitext(temp_logo_name)[1].lower()
+        logo_filename = f"logo_{ts}{ext}"
+        dst = os.path.join(static_logo_dir, logo_filename)
+
+        os.rename(src, dst)
+        assert os.path.exists(dst), f"Logo finalize invariant violated: {dst}"
+
+        print(f"[LOGO] Finalized logo → {dst}")
+        return logo_filename
+
+    # =========================
+    # Case 2: Direct upload
+    # =========================
+    if logo_file and logo_file.filename:
+        ext = os.path.splitext(logo_file.filename)[1].lower()
+        if ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
+            logo_filename = f"logo_{ts}{ext}"
+            dst = os.path.join(static_logo_dir, logo_filename)
+
+            logo_file.save(dst)
+            assert os.path.exists(dst), f"Logo upload invariant violated: {dst}"
+
+            print(f"[LOGO] Uploaded logo → {dst}")
+            return logo_filename
+
+    # =========================
+    # Case 3: No logo supplied (valid)
+    # =========================
+    return None
+
+
+
+def save_preview_logo(app, logo_file):
+    """
+    Saves a temporary preview logo for paste preview.
+    Preview logos are ONLY stored in static/logos/_temp
+    and are never finalized here.
+    """
+
+    if not logo_file or not logo_file.filename:
+        return None
+
+    ext = os.path.splitext(logo_file.filename)[1].lower()
+    if ext not in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
+        return None
+
+    temp_dir = os.path.join(app.static_folder, "logos", "_temp")
+    os.makedirs(temp_dir, exist_ok=True)
+
+    name = f"temp_{int(time.time())}{ext}"
+    dst = os.path.join(temp_dir, name)
+
+    logo_file.save(dst)
+    assert os.path.exists(dst), f"Preview logo invariant violated: {dst}"
+
+    print(f"[LOGO PREVIEW] Saved temp logo → {dst}")
+    return name
+
+
+
+
 
 
 
@@ -1239,24 +1328,14 @@ def preview_paste():
     strip_rules_raw = request.form.get("strip_text", "").strip()
 
     # =========================
-    # TEMPORARY LOGO HANDLING (PASTE PREVIEW)
+    # HANDLE LOGO PREVIEW (TEMP ONLY)
     # =========================
-    logo_file = request.files.get("quiz_logo")
-    temp_logo_name = None
+    preview_logo_name = save_preview_logo(
+        app,
+        request.files.get("quiz_logo")
+    )
 
-    if logo_file and logo_file.filename:
-        ext = os.path.splitext(logo_file.filename)[1].lower()
-        if ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
-            ts = int(time.time())
-            temp_logo_name = f"temp_{ts}{ext}"
 
-            temp_dir = os.path.join(app.static_folder, "logos", "_temp")
-            os.makedirs(temp_dir, exist_ok=True)
-
-            temp_path = os.path.join(temp_dir, temp_logo_name)
-            logo_file.save(temp_path)
-
-            print(f"[LOGO PREVIEW] Saved temp logo → {temp_path}")
 
 
 
@@ -1913,7 +1992,7 @@ function runDiff() {
         <!-- IMPORTANT: Send CLEANED text forward -->
         <form action="/process_paste" method="POST">
             <input type="hidden" name="quiz_title" value="{{ quiz_title }}">
-            <input type="hidden" name="temp_logo_name" value="{{ temp_logo_name }}">
+            <input type="hidden" name="temp_logo_name" value="{{ preview_logo_name }}">
             <textarea name="quiz_text" style="display:none;">{{ cleaned }}</textarea>
 
             <button type="submit">✅ Yes, Build My Quiz</button>
@@ -1934,10 +2013,10 @@ function runDiff() {
         cleaned=clean_text,
         conf_summary=conf_summary,
         conf_details=conf_details,
-        temp_logo_name=temp_logo_name,
+        preview_logo_name=preview_logo_name,
         regex_mode=regex_mode,
         strip_rules=strip_rules,
-        replace_rules=replace_rules,   # <-- FIXED
+        replace_rules=replace_rules,
         applied_rules=applied_rules,
         invis_cleanup_enabled=invis_cleanup_enabled,
         removed_unicode=removed_unicode,
@@ -1946,6 +2025,7 @@ function runDiff() {
         preset_headers_checked=preset_headers_checked,
         smart_suggestions=smart_suggestions
         )
+
 
 
 
@@ -2106,48 +2186,13 @@ def process_paste():
     # =========================
     # HANDLE LOGO (FINAL, SINGLE SOURCE OF TRUTH)
     # =========================
-    logo_filename = None
+    logo_filename = finalize_logo_from_request(
+        app,
+        ts,
+        logo_file=request.files.get("quiz_logo"),
+        temp_logo_name=request.form.get("temp_logo_name"),
+    )
 
-    logo_file = request.files.get("quiz_logo")
-    temp_logo_name = request.form.get("temp_logo_name")
-
-    # Case 1: Finalize temp logo from preview
-    if temp_logo_name and temp_logo_name.lower() != "none":
-        temp_dir = os.path.join(app.static_folder, "logos", "_temp")
-        src = os.path.join(temp_dir, temp_logo_name)
-
-        if os.path.exists(src):
-            ext = os.path.splitext(temp_logo_name)[1].lower()
-            logo_filename = f"logo_{ts}{ext}"
-
-            final_dir = os.path.join(app.static_folder, "logos")
-            os.makedirs(final_dir, exist_ok=True)
-
-            dst = os.path.join(final_dir, logo_filename)
-            os.rename(src, dst)
-
-            print(f"[LOGO] Finalized logo → {dst}")
-        else:
-            print("[LOGO WARNING] Temp logo missing:", src)
-
-
-
-    # Case 2: Direct upload (no preview)
-    elif logo_file and logo_file.filename:
-        ext = os.path.splitext(logo_file.filename)[1].lower()
-        if ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
-            logo_filename = f"logo_{ts}{ext}"
-            dst = os.path.join(STATIC_LOGO_FOLDER, logo_filename)
-            logo_file.save(dst)
-
-            print(f"[LOGO] Uploaded logo → {dst}")
-
-    # SAFETY CHECK
-    if logo_filename:
-        final_path = os.path.join(app.static_folder, "logos", logo_filename)
-        if not os.path.exists(final_path):
-            print("[LOGO ERROR] Logo filename set but file missing:", final_path)
-            logo_filename = None
 
 
     # =========================
@@ -2329,30 +2374,17 @@ def process_file():
             dprint(f"[PARSE WARNING] Q{i} missing choices or correct answer")
 
 
+   # =========================
+    # HANDLE LOGO (FINAL, SINGLE SOURCE OF TRUTH)
     # =========================
-    # HANDLE LOGO
-    # =========================
-    logo_filename = None
-    if quiz_logo and quiz_logo.filename:
-        ext = os.path.splitext(quiz_logo.filename)[1].lower()
-        if ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
-            logo_filename = f"logo_{ts}{ext}"
-
-            # Always save upload logos into Flask-served static folder
-            static_logo_dir = os.path.join(app.static_folder, "logos")
-            os.makedirs(static_logo_dir, exist_ok=True)
-
-            dst = os.path.join(static_logo_dir, logo_filename)
-            quiz_logo.save(dst)
-
-            print(f"[LOGO] Uploaded logo → {dst}")
-
-            # Safety check (prevents silent broken images)
-            if not os.path.exists(dst):
-                print("[LOGO ERROR] Upload logo missing after save:", dst)
-                logo_filename = None
+    logo_filename = finalize_logo_from_request(
+        app,
+        ts,
+        logo_file=quiz_logo,
+    )
 
     save_quiz_to_db(quiz_title, source_file, quiz_data, logo_filename)
+
 
 
 
