@@ -2,39 +2,67 @@ from flask import Flask, send_from_directory, request, redirect, render_template
 import os, re, json, time, sqlite3, sys
 from werkzeug.utils import secure_filename
 
+# =========================
+# PYINSTALLER PATH HELPER
+# =========================
+def resource_path(relative_path: str) -> str:
+    """
+    Resolve paths correctly in dev and when bundled by PyInstaller.
+    """
+    if hasattr(sys, "_MEIPASS"):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath(os.path.dirname(__file__)), relative_path)
 
 # =========================
 # APP DATA DIRECTORY
 # =========================
-if getattr(sys, "frozen", False):
-    # PyInstaller / EXE
-    APP_DATA_DIR = os.path.join(
-        os.environ.get("APPDATA", os.path.expanduser("~")),
-        "DLMS"
-    )
-else:
-    # Dev / Linux / normal python
-    APP_DATA_DIR = os.path.expanduser("~/.local/share/DLMS")
+def get_app_data_dir(app_name: str = "DLMS") -> str:
+    override = os.getenv("QUIZAPP_DATA_DIR")
+    if override:
+        os.makedirs(override, exist_ok=True)
+        return override
+
+    if sys.platform == "win32":
+        base = os.getenv("APPDATA") or os.path.expanduser("~")
+    elif sys.platform == "darwin":
+        base = os.path.expanduser("~/Library/Application Support")
+    else:
+        base = os.getenv("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
+
+    path = os.path.join(base, app_name)
+    os.makedirs(path, exist_ok=True)
+    return path
+
+APP_NAME = "DLMS"
+APP_DATA_DIR = get_app_data_dir(APP_NAME)
+
+# =========================
+# STATIC ROOT SELECTION
+# =========================
+def get_static_root():
+    if getattr(sys, "frozen", False):
+        # PyInstaller bundle: static assets live inside the bundle
+        return os.path.join(sys._MEIPASS, "static")
+    else:
+        # Dev mode: static assets live next to app.py
+        return os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
 
-#app = Flask(
-    #__name__,
-    #static_folder=os.path.join(APP_DATA_DIR, "static"),
-    #static_url_path="/static"
-#)
+STATIC_ROOT = get_static_root()
 
-if getattr(sys, "frozen", False):
-    # PyInstaller bundle: serve static from bundled assets
-    STATIC_ROOT = resource_path("static")
-else:
-    # Dev mode: serve static from user-writable app data
-    STATIC_ROOT = os.path.join(APP_DATA_DIR, "static")
-
+# =========================
+# FLASK APP
+# =========================
 app = Flask(
     __name__,
     static_folder=STATIC_ROOT,
     static_url_path="/static"
 )
+
+print("[DEBUG] Flask static folder =", app.static_folder)
+print("[BUILD CHECK] APP_DATA_DIR =", APP_DATA_DIR)
+
+
 
 
 
@@ -342,10 +370,14 @@ def add_quiz_to_registry(html, title, logo):
 def home():
     portal_title = get_portal_title()
 
-    with open(os.path.join(BASE_DIR, "index.html"), "r", encoding="utf-8") as f:
+    index_path = os.path.join(app.static_folder, "index.html")
+
+    with open(index_path, "r", encoding="utf-8") as f:
         html = f.read()
 
     return render_template_string(html, portal_title=portal_title)
+
+
 
 
 @app.route("/data/<path:filename>")
@@ -582,7 +614,7 @@ def quiz_library():
 <html>
 <head>
     <title>Quiz Library</title>
-    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/static/style.css">
 
     <!-- Drag + Drop Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
@@ -745,7 +777,7 @@ def upload_page():
     <head>
         <meta charset="UTF-8">
         <title>Upload Quiz File</title>
-        <link rel="stylesheet" href="/style.css">
+        <link rel="stylesheet" href="/static/style.css">
     </head>
 
     <body>
@@ -841,7 +873,7 @@ def paste_page():
     <head>
         <meta charset="UTF-8">
         <title>Paste Quiz Questions</title>
-        <link rel="stylesheet" href="/style.css">
+        <link rel="stylesheet" href="/static/style.css">
     </head>
 
     <body>
@@ -1524,7 +1556,7 @@ def preview_paste():
 <html>
 <head>
     <title>Preview Before Parsing</title>
-    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 
 <body>
@@ -2005,7 +2037,7 @@ def process_paste():
         <html>
         <head>
             <title>Parse Failed</title>
-            <link rel="stylesheet" href="/style.css">
+            <link rel="stylesheet" href="/static/style.css">
         </head>
         <body>
         <script>
@@ -2213,7 +2245,7 @@ def process_file():
         <html>
         <head>
             <title>Parse Failed</title>
-            <link rel="stylesheet" href="/style.css">
+            <link rel="stylesheet" href="/static/style.css">
         </head>
         <body>
         <script>
@@ -2324,7 +2356,7 @@ def settings_page():
 <html>
 <head>
 <title>Portal Settings</title>
-<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/static/style.css">
 </head>
 
 <body>
@@ -3626,7 +3658,7 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
 <head>
 <meta charset="UTF-8">
 <title>{quiz_title}</title>
-<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/static/style.css">
 
 <!-- 🔑 Canonical quiz identity for script.js + DB -->
 <script>
