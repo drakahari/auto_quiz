@@ -171,6 +171,7 @@ if (examMode && selected.includes(i)) {
 
 
     updateProgressBar();
+    updateNavButtons();
 }
 
 /* =====================================================
@@ -243,6 +244,40 @@ function prev() {
         renderQuestion();
     }
 }
+
+/* =====================================================
+   NAV BUTTON VISIBILITY (HIDE NEXT ON LAST QUESTION)
+===================================================== */
+function updateNavButtons() {
+    // Try common ways to find the buttons (works across old/new quiz HTML)
+    const buttons = Array.from(document.querySelectorAll("button"));
+
+    const nextBtn =
+        document.getElementById("nextBtn") ||
+        buttons.find(b => (b.getAttribute("onclick") || "").includes("next(")) ||
+        buttons.find(b => (b.textContent || "").trim().toLowerCase() === "next") ||
+        buttons.find(b => (b.textContent || "").toLowerCase().includes("next"));
+
+    const prevBtn =
+        document.getElementById("prevBtn") ||
+        buttons.find(b => (b.getAttribute("onclick") || "").includes("prev(")) ||
+        buttons.find(b => (b.textContent || "").trim().toLowerCase() === "prev") ||
+        buttons.find(b => (b.textContent || "").toLowerCase().includes("prev"));
+
+    // If we can't find the buttons on this quiz HTML, do nothing safely
+    if (!quiz.length) return;
+
+    // Prev disabled on first question (nice UX; safe)
+    if (prevBtn) prevBtn.disabled = (index === 0);
+
+    // Hide Next on last question; show otherwise
+    if (nextBtn) {
+        const isLast = (index === quiz.length - 1);
+        nextBtn.style.display = isLast ? "none" : "inline-block";
+    }
+}
+
+
 
 /* =====================================================
    STUDY-MODE FEEDBACK
