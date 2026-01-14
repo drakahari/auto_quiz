@@ -114,6 +114,10 @@ app = Flask(
     static_url_path="/static"
 )
 
+
+
+
+
 print("[DEBUG] Flask static folder =", app.static_folder)
 print("[BUILD CHECK] APP_DATA_DIR =", APP_DATA_DIR)
 
@@ -214,11 +218,7 @@ PORTAL_CONFIG = os.path.join(CONFIG_FOLDER, "portal.json")
 QUIZ_REGISTRY = os.path.join(CONFIG_FOLDER, "quizzes.json")
 DB_PATH = os.path.join(APP_DATA_DIR, "results.db")
 
-def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    ensure_schema(conn)
-    return conn
+
 
 
 REQUIRED_TABLES = {
@@ -230,6 +230,7 @@ REQUIRED_TABLES = {
     "missed_questions",
     "schema_meta",
 }
+
 
 
 
@@ -4039,10 +4040,6 @@ def get_or_create_question(conn, quiz_id, q):
 
 
 
-
-
-
-
 # =========================
 # DATABASE HELPERS
 # =========================
@@ -4051,7 +4048,12 @@ def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+
+    # 🔒 Ensure schema is always up to date
+    ensure_schema(conn)
+
     return conn
+
 
 
 
@@ -4071,18 +4073,26 @@ def db_execute(query, params=()):
 def ensure_schema(conn):
     cur = conn.cursor()
 
-    # Get existing columns for missed_questions
+    # -------------------------
+    # MISSED QUESTIONS TABLE
+    # -------------------------
     cur.execute("PRAGMA table_info(missed_questions)")
-    existing_cols = {row[1] for row in cur.fetchall()}
+    cols = {row[1]: row for row in cur.fetchall()}
 
     migrations = []
 
-    if "question_text" not in existing_cols:
-        migrations.append(
-            "ALTER TABLE missed_questions ADD COLUMN question_text TEXT"
-        )
+    def add_col(name, coldef):
+        if name not in cols:
+            migrations.append(f"ALTER TABLE missed_questions ADD COLUMN {name} {coldef}")
 
-    # (Future-safe: add more here later)
+    add_col("question_id", "INTEGER")
+    add_col("question_text", "TEXT")
+    add_col("choices_text", "TEXT")
+    add_col("correct_letters", "TEXT")
+    add_col("selected_letters", "TEXT")
+    add_col("selected_text", "TEXT")
+    add_col("correct_text", "TEXT")
+    add_col("attempt_question_number", "INTEGER")
 
     for sql in migrations:
         print("[DB MIGRATION]", sql)
@@ -4090,6 +4100,7 @@ def ensure_schema(conn):
 
     if migrations:
         conn.commit()
+
 
 
 def resolve_logo_filename(logo_filename):
