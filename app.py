@@ -688,7 +688,7 @@ def save_order():
 # =========================
 # QUIZ DB SAVE HELPER (UPLOAD + PASTE)
 # =========================
-def save_quiz_to_db(quiz_title, source_file, quiz_data, logo_filename=None):
+def save_quiz_to_db(quiz_title, source_file, quiz_data, registry_id, logo_filename=None):
     conn = get_db()
     cur = conn.cursor()
 
@@ -698,13 +698,13 @@ def save_quiz_to_db(quiz_title, source_file, quiz_data, logo_filename=None):
         (source_file,)
     )
 
-    # Insert quiz
+    # Insert quiz (now stores registry_id too)
     cur.execute(
         """
-        INSERT INTO quizzes (title, source_file)
-        VALUES (?, ?)
+        INSERT INTO quizzes (title, source_file, registry_id)
+        VALUES (?, ?, ?)
         """,
-        (quiz_title, source_file),
+        (quiz_title, source_file, registry_id),
     )
 
     quiz_id = cur.lastrowid  # ✅ CAPTURE DB ID
@@ -747,6 +747,7 @@ def save_quiz_to_db(quiz_title, source_file, quiz_data, logo_filename=None):
     conn.close()
 
     return quiz_id  # ✅ REQUIRED FOR REGISTRY + DELETE
+
 
 
 
@@ -2271,6 +2272,11 @@ def process_paste():
     )
 
 
+    # =========================
+    # REGISTRY ID (CANONICAL)
+    # =========================
+    registry_id = int(ts)
+
 
     # =========================
     # SAVE QUIZ
@@ -2281,8 +2287,10 @@ def process_paste():
         quiz_title,
         source_file,
         quiz_data,
+        registry_id,
         logo_filename
     )
+
 
 
 
@@ -2454,7 +2462,7 @@ def process_file():
             dprint(f"[PARSE WARNING] Q{i} missing choices or correct answer")
 
 
-   # =========================
+    # =========================
     # HANDLE LOGO (FINAL, SINGLE SOURCE OF TRUTH)
     # =========================
     logo_filename = finalize_logo_from_request(
@@ -2463,12 +2471,20 @@ def process_file():
         logo_file=quiz_logo,
     )
 
+    # =========================
+    # REGISTRY ID (CANONICAL)
+    # =========================
+    registry_id = int(ts)
+
     quiz_id = save_quiz_to_db(
         quiz_title,
         source_file,
         quiz_data,
+        registry_id,
         logo_filename
     )
+
+
 
 
 
@@ -2855,7 +2871,7 @@ def save_settings():
 
 
 # =====================================================
-# RECORD QUIZ ATTEMPT (ID-FIRST, SAFE TITLE FALLBACK)
+# RECORD QUIZ ATTEMPT (DB-ID CANONICAL)
 # =====================================================
 @app.route("/record_attempt", methods=["POST"])
 def record_attempt():
@@ -2863,41 +2879,34 @@ def record_attempt():
     print("📩 Incoming Attempt Payload:", json.dumps(data, indent=2))
 
     attempt_id = data.get("attemptId")
-    quiz_id = data.get("quizId")
-    quiz_title = data.get("quizTitle")
+    quiz_id = data.get("quizId")  # ✅ quizzes.id ONLY
+
+    if not attempt_id:
+        return {"error": "Missing attemptId"}, 400
+
+    if not quiz_id:
+        return {"error": "Missing quizId"}, 400
 
     score = data.get("score", 0)
     total = data.get("total", 0)
     percent = data.get("percent", 0)
-
     started_at = data.get("startedAt")
     completed_at = data.get("completedAt")
     time_remaining = data.get("timeRemaining")
     mode = data.get("mode", "Exam")
 
-    if not attempt_id:
-        return {"error": "Missing attemptId"}, 400
-
     conn = get_db()
     cur = conn.cursor()
 
     try:
-        # -----------------------------
-        # RESOLVE QUIZ ID (ID IS CANONICAL)
-        # -----------------------------
-        if not quiz_id:
-            raise Exception("Missing quizId")
-
+        # Validate quiz exists
         cur.execute("SELECT id FROM quizzes WHERE id = ?", (quiz_id,))
         if not cur.fetchone():
-            raise Exception(f"Quiz ID {quiz_id} does not exist")
-
+            raise Exception(f"Quiz ID {quiz_id} not found in DB")
 
         print(f"Saving attempt: attempt_id={attempt_id} quiz_id={quiz_id}")
 
-        # -----------------------------
-        # INSERT ATTEMPT
-        # -----------------------------
+        # Insert attempt
         cur.execute("""
             INSERT INTO attempts (
                 id, quiz_id, started_at, completed_at,
@@ -2915,28 +2924,17 @@ def record_attempt():
             mode,
         ))
 
-        # -----------------------------
-        # INSERT MISSED QUESTIONS (FULL SNAPSHOT)
-        # -----------------------------
+        # Insert missed questions snapshot
         for m in data.get("missedDetails", []):
-            dprint("🧪 MISSED QUESTION RAW:", json.dumps(m, indent=2))
-
             attempt_qnum = m.get("attemptQuestionNumber", m.get("number"))
             if attempt_qnum is None:
-                raise Exception(f"Missing attemptQuestionNumber: {m}")
+                raise Exception("Missing attemptQuestionNumber")
 
-            # ---- FULL CHOICES SNAPSHOT ----
-            choices_lines = []
-            for c in m.get("choices", []):
-                label = c.get("label")
-                text = c.get("text")
-                if label and text:
-                    choices_lines.append(f"{label} — {text}")
-
-            choices_text = "\n".join(choices_lines)
-
-            dprint("🧪 SNAPSHOT choices_text:")
-            dprint(choices_text if choices_text else "(no choices present)")
+            choices_text = "\n".join(
+                f"{c['label']} — {c['text']}"
+                for c in m.get("choices", [])
+                if c.get("label") and c.get("text")
+            )
 
             cur.execute("""
                 INSERT INTO missed_questions (
@@ -2957,7 +2955,7 @@ def record_attempt():
                 ",".join(m.get("selectedLetters", [])),
                 "\n".join(m.get("selectedText", [])),
                 "\n".join(m.get("correctText", [])),
-                attempt_qnum
+                attempt_qnum,
             ))
 
         conn.commit()
@@ -2970,6 +2968,9 @@ def record_attempt():
 
     finally:
         conn.close()
+
+
+
 
 
 
@@ -4206,6 +4207,18 @@ def ensure_schema(conn):
 
     if migrations:
         conn.commit()
+
+    # =================================================
+    # QUIZZES TABLE MIGRATION (ADD REGISTRY ID)
+    # =================================================
+    cur.execute("PRAGMA table_info(quizzes)")
+    quiz_cols = {row[1] for row in cur.fetchall()}
+
+    if "registry_id" not in quiz_cols:
+        print("[DB MIGRATION] Adding registry_id column to quizzes")
+        cur.execute("ALTER TABLE quizzes ADD COLUMN registry_id INTEGER")
+        conn.commit()
+
 
 
 
