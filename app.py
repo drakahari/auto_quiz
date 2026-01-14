@@ -257,7 +257,7 @@ def ensure_db_initialized():
     if missing_tables:
         dprint(f"[DB] Missing tables detected: {missing_tables}")
 
-        init_sql_path = resource_path(os.path.join("data", "init.sql"))
+        init_sql_path = resource_path("init.sql")
         dprint(f"[DB] init.sql path = {init_sql_path}")
 
         with open(init_sql_path, "r", encoding="utf-8") as f:
@@ -4079,6 +4079,66 @@ def ensure_schema(conn):
     cur.execute("PRAGMA table_info(missed_questions)")
     cols = {row[1]: row for row in cur.fetchall()}
 
+    # -------------------------
+    # FIX legacy NOT NULL constraint on question_id
+    # -------------------------
+    qid_col = cols.get("question_id")
+    if qid_col and qid_col[3] == 1:  # NOT NULL detected
+        print("[DB MIGRATION] Rebuilding missed_questions to remove NOT NULL on question_id")
+
+        cur.executescript("""
+            BEGIN;
+
+            ALTER TABLE missed_questions RENAME TO missed_questions_old;
+
+            CREATE TABLE missed_questions (
+                id INTEGER PRIMARY KEY,
+                attempt_id TEXT NOT NULL,
+                question_id INTEGER,
+                correct_letters TEXT,
+                question_text TEXT,
+                choices_text TEXT,
+                selected_letters TEXT,
+                selected_text TEXT,
+                correct_text TEXT,
+                attempt_question_number INTEGER
+            );
+
+            INSERT INTO missed_questions (
+                id,
+                attempt_id,
+                question_id,
+                correct_letters,
+                question_text,
+                choices_text,
+                selected_letters,
+                selected_text,
+                correct_text,
+                attempt_question_number
+            )
+            SELECT
+                id,
+                attempt_id,
+                question_id,
+                correct_letters,
+                question_text,
+                choices_text,
+                selected_letters,
+                selected_text,
+                correct_text,
+                attempt_question_number
+            FROM missed_questions_old;
+
+            DROP TABLE missed_questions_old;
+
+            COMMIT;
+        """)
+
+        # Refresh column info after rebuild
+        cur.execute("PRAGMA table_info(missed_questions)")
+        cols = {row[1]: row for row in cur.fetchall()}
+
+        return
     migrations = []
 
     def add_col(name, coldef):
