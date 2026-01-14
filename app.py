@@ -4073,18 +4073,45 @@ def db_execute(query, params=()):
 def ensure_schema(conn):
     cur = conn.cursor()
 
-    # -------------------------
-    # MISSED QUESTIONS TABLE
-    # -------------------------
-    cur.execute("PRAGMA table_info(missed_questions)")
-    cols = {row[1]: row for row in cur.fetchall()}
+    # -------------------------------------------------
+    # Introspect existing schema (if table exists)
+    # -------------------------------------------------
+    cur.execute("""
+        SELECT name FROM sqlite_master
+        WHERE type='table' AND name='missed_questions'
+    """)
+    table_exists = cur.fetchone() is not None
 
-    # -------------------------
-    # FIX legacy NOT NULL constraint on question_id
-    # -------------------------
+    cols = {}
+    if table_exists:
+        cur.execute("PRAGMA table_info(missed_questions)")
+        cols = {row[1]: row for row in cur.fetchall()}
+
+    # -------------------------------------------------
+    # Helper flags (explicit, no assumptions)
+    # -------------------------------------------------
+    has_question_id = "question_id" in cols
+    has_question_text = "question_text" in cols
+    has_choices_text = "choices_text" in cols
+    has_correct_text = "correct_text" in cols
+    has_selected_text = "selected_text" in cols
+    has_attempt_qnum = "attempt_question_number" in cols
+
     qid_col = cols.get("question_id")
-    if qid_col and qid_col[3] == 1:  # NOT NULL detected
-        print("[DB MIGRATION] Rebuilding missed_questions to remove NOT NULL on question_id")
+    qid_not_null = qid_col and qid_col[3] == 1  # NOT NULL flag
+
+    # -------------------------------------------------
+    # FULL REBUILD REQUIRED?
+    #
+    # Rebuild if:
+    #  - table exists AND
+    #  - question_id is NOT NULL (legacy constraint)
+    #
+    # Rebuild is SAFE because we NEVER reference
+    # missing columns — we inject NULLs explicitly.
+    # -------------------------------------------------
+    if table_exists and qid_not_null:
+        print("[DB MIGRATION] Rebuilding missed_questions (safe rebuild, binary-compatible)")
 
         cur.executescript("""
             BEGIN;
@@ -4103,7 +4130,15 @@ def ensure_schema(conn):
                 correct_text TEXT,
                 attempt_question_number INTEGER
             );
+        """)
 
+        # -------------------------------------------------
+        # Build SELECT list dynamically — NO ASSUMPTIONS
+        # -------------------------------------------------
+        def col_or_null(name):
+            return name if name in cols else "NULL AS " + name
+
+        insert_sql = f"""
             INSERT INTO missed_questions (
                 id,
                 attempt_id,
@@ -4119,26 +4154,29 @@ def ensure_schema(conn):
             SELECT
                 id,
                 attempt_id,
-                question_id,
-                correct_letters,
-                question_text,
-                choices_text,
-                selected_letters,
-                selected_text,
-                correct_text,
-                attempt_question_number
+                {col_or_null("question_id")},
+                {col_or_null("correct_letters")},
+                {col_or_null("question_text")},
+                {col_or_null("choices_text")},
+                {col_or_null("selected_letters")},
+                {col_or_null("selected_text")},
+                {col_or_null("correct_text")},
+                {col_or_null("attempt_question_number")}
             FROM missed_questions_old;
+        """
 
-            DROP TABLE missed_questions_old;
+        cur.execute(insert_sql)
+        cur.execute("DROP TABLE missed_questions_old")
+        conn.commit()
 
-            COMMIT;
-        """)
-
-        # Refresh column info after rebuild
+        # Refresh schema info after rebuild
         cur.execute("PRAGMA table_info(missed_questions)")
         cols = {row[1]: row for row in cur.fetchall()}
 
-        return
+    # -------------------------------------------------
+    # INCREMENTAL ADD-COLUMN MIGRATIONS
+    # (for non-rebuild cases)
+    # -------------------------------------------------
     migrations = []
 
     def add_col(name, coldef):
@@ -4160,6 +4198,7 @@ def ensure_schema(conn):
 
     if migrations:
         conn.commit()
+
 
 
 
