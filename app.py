@@ -131,7 +131,7 @@ print("[BUILD CHECK] APP_DATA_DIR =", APP_DATA_DIR)
 
 import sys
 
-DEBUG_LOGS = False
+DEBUG_LOGS = True
 
 def dprint(*args, **kwargs):
     if DEBUG_LOGS:
@@ -195,9 +195,11 @@ CONFIG_FOLDER = os.path.join(APP_DATA_DIR, "config")
 
 # App-data logos (used for temp storage / preview)
 LOGO_FOLDER = os.path.join(APP_DATA_DIR, "static", "logos")
+LOGO_TEMP_FOLDER = os.path.join(LOGO_FOLDER, "_temp")
+os.makedirs(LOGO_TEMP_FOLDER, exist_ok=True)
 
 # Flask-served logos (what the browser loads)
-STATIC_LOGO_FOLDER = os.path.join(app.root_path, "static", "logos")
+#STATIC_LOGO_FOLDER = os.path.join(app.root_path, "static", "logos")
 
 BACKGROUND_FOLDER = os.path.join(APP_DATA_DIR, "static", "bg")
 
@@ -208,7 +210,7 @@ for d in [
     CONFIG_FOLDER,
     BACKGROUND_FOLDER,
     LOGO_FOLDER,
-    STATIC_LOGO_FOLDER,
+    #STATIC_LOGO_FOLDER,
 ]:
     os.makedirs(d, exist_ok=True)
 
@@ -290,22 +292,19 @@ def finalize_logo_from_request(app, ts, *, logo_file=None, temp_logo_name=None):
       - a direct upload
       - or no logo at all
 
-    Returns:
-        logo_filename (str) or None
+    Final logos ALWAYS live in APP_DATA_DIR/static/logos
     """
 
-    static_logo_dir = os.path.join(app.static_folder, "logos")
-    temp_logo_dir = os.path.join(static_logo_dir, "_temp")
-    os.makedirs(static_logo_dir, exist_ok=True)
+    os.makedirs(LOGO_FOLDER, exist_ok=True)
+    os.makedirs(LOGO_TEMP_FOLDER, exist_ok=True)
 
-    # Normalize inputs
     temp_logo_name = (temp_logo_name or "").strip()
 
     # =========================
     # Case 1: Finalize preview logo
     # =========================
     if temp_logo_name and temp_logo_name.lower() != "none":
-        src = os.path.join(temp_logo_dir, temp_logo_name)
+        src = os.path.join(LOGO_TEMP_FOLDER, temp_logo_name)
 
         if not os.path.exists(src):
             print("[LOGO WARNING] Temp logo missing:", src)
@@ -313,7 +312,7 @@ def finalize_logo_from_request(app, ts, *, logo_file=None, temp_logo_name=None):
 
         ext = os.path.splitext(temp_logo_name)[1].lower()
         logo_filename = f"logo_{ts}{ext}"
-        dst = os.path.join(static_logo_dir, logo_filename)
+        dst = os.path.join(LOGO_FOLDER, logo_filename)
 
         os.rename(src, dst)
         assert os.path.exists(dst), f"Logo finalize invariant violated: {dst}"
@@ -328,7 +327,7 @@ def finalize_logo_from_request(app, ts, *, logo_file=None, temp_logo_name=None):
         ext = os.path.splitext(logo_file.filename)[1].lower()
         if ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
             logo_filename = f"logo_{ts}{ext}"
-            dst = os.path.join(static_logo_dir, logo_filename)
+            dst = os.path.join(LOGO_FOLDER, logo_filename)
 
             logo_file.save(dst)
             assert os.path.exists(dst), f"Logo upload invariant violated: {dst}"
@@ -337,17 +336,17 @@ def finalize_logo_from_request(app, ts, *, logo_file=None, temp_logo_name=None):
             return logo_filename
 
     # =========================
-    # Case 3: No logo supplied (valid)
+    # Case 3: No logo supplied
     # =========================
     return None
+
 
 
 
 def save_preview_logo(app, logo_file):
     """
     Saves a temporary preview logo for paste preview.
-    Preview logos are ONLY stored in static/logos/_temp
-    and are never finalized here.
+    Preview logos live ONLY in APP_DATA_DIR/static/logos/_temp
     """
 
     if not logo_file or not logo_file.filename:
@@ -357,17 +356,17 @@ def save_preview_logo(app, logo_file):
     if ext not in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
         return None
 
-    temp_dir = os.path.join(app.static_folder, "logos", "_temp")
-    os.makedirs(temp_dir, exist_ok=True)
+    os.makedirs(LOGO_TEMP_FOLDER, exist_ok=True)
 
     name = f"temp_{int(time.time())}{ext}"
-    dst = os.path.join(temp_dir, name)
+    dst = os.path.join(LOGO_TEMP_FOLDER, name)
 
     logo_file.save(dst)
     assert os.path.exists(dst), f"Preview logo invariant violated: {dst}"
 
     print(f"[LOGO PREVIEW] Saved temp logo → {dst}")
     return name
+
 
 
 
@@ -759,8 +758,17 @@ def save_quiz_to_db(quiz_title, source_file, quiz_data, logo_filename=None):
 def quiz_library():
     registry = load_registry()   # ← MUST come first
 
-    dprint("[DEBUG] Using registry file:", QUIZ_REGISTRY)
-    dprint("[DEBUG] Registry contents:", registry)
+    dprint("[REGISTRY DEBUG] Using registry file:", QUIZ_REGISTRY)
+    dprint("[REGISTRY DEBUG] Registry size:", len(registry))
+    dprint("[REGISTRY DEBUG] Registry entries:", [
+        {
+            "id": q.get("id"),
+            "title": q.get("title"),
+            "html": q.get("html")
+        }
+        for q in registry
+    ])
+
 
     # =========================
     # DEBUG: Verify logo files exist on disk
