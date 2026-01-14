@@ -110,12 +110,13 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 app = Flask(
     __name__,
-    static_folder=os.path.join(BASE_DIR, "static"),
+    static_folder=STATIC_ROOT,
     static_url_path="/static"
 )
 
 print("[DEBUG] Flask static folder =", app.static_folder)
 print("[BUILD CHECK] APP_DATA_DIR =", APP_DATA_DIR)
+
 
 
 
@@ -212,6 +213,13 @@ for d in [
 PORTAL_CONFIG = os.path.join(CONFIG_FOLDER, "portal.json")
 QUIZ_REGISTRY = os.path.join(CONFIG_FOLDER, "quizzes.json")
 DB_PATH = os.path.join(APP_DATA_DIR, "results.db")
+
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    ensure_schema(conn)
+    return conn
+
 
 REQUIRED_TABLES = {
     "quizzes",
@@ -363,6 +371,14 @@ def save_preview_logo(app, logo_file):
 
 
 
+
+
+@app.route("/user-static/<path:filename>")
+def user_static(filename):
+    return send_from_directory(
+        os.path.join(APP_DATA_DIR, "static"),
+        filename
+    )
 
 
 
@@ -735,7 +751,6 @@ def save_quiz_to_db(quiz_title, source_file, quiz_data, logo_filename=None):
 
 
 
-
 # =========================
 # LIBRARY (WITH DRAG + DROP!)
 # =========================
@@ -759,7 +774,11 @@ def quiz_library():
 
 
     # Registry is now authoritative
-    quizzes = list(registry)
+    quizzes = [
+    {**q, "logo": resolve_logo_filename(q.get("logo"))}
+    for q in registry
+]
+
 
 
     return render_template_string("""
@@ -843,7 +862,7 @@ def quiz_library():
                     ">
 
                         {% if q['logo'] %}
-                        <img src="/static/logos/{{ q['logo'] }}"
+                        <img src="/user-static/logos/{{ q['logo'] }}"
                              style="max-height:90px; width:auto;">
                         {% else %}
                         <div style="height:90px;"></div>
@@ -3815,7 +3834,7 @@ def analyze_confidence(clean_text):
 def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_filename, quiz_id):
     # Optional logo for mode banner (left/right)
     if logo_filename:
-        mode_logo = f'<img src="/static/logos/{logo_filename}" class="mode-badge">'
+        mode_logo = f'<img src="/user-static/logos/{logo_filename}" class="mode-badge">'
     else:
         mode_logo = ""
 
@@ -3944,6 +3963,7 @@ fetch("/config/portal.json")
 
 
 
+
 # =========================
 # DATABASE CONFIG
 # =========================
@@ -4046,6 +4066,46 @@ def db_execute(query, params=()):
     except Exception as e:
         print("DB ERROR:", e)
         return False
+
+
+def ensure_schema(conn):
+    cur = conn.cursor()
+
+    # Get existing columns for missed_questions
+    cur.execute("PRAGMA table_info(missed_questions)")
+    existing_cols = {row[1] for row in cur.fetchall()}
+
+    migrations = []
+
+    if "question_text" not in existing_cols:
+        migrations.append(
+            "ALTER TABLE missed_questions ADD COLUMN question_text TEXT"
+        )
+
+    # (Future-safe: add more here later)
+
+    for sql in migrations:
+        print("[DB MIGRATION]", sql)
+        cur.execute(sql)
+
+    if migrations:
+        conn.commit()
+
+
+def resolve_logo_filename(logo_filename):
+    """
+    Returns a valid logo filename or None if missing on disk.
+    """
+    if not logo_filename:
+        return None
+
+    logo_path = os.path.join(APP_DATA_DIR, "static", "logos", logo_filename)
+    if not os.path.exists(logo_path):
+        print(f"[LOGO AUTO-HEAL] Missing logo file: {logo_filename}")
+        return None
+
+    return logo_filename
+
 
 
 @app.route("/history_db")
