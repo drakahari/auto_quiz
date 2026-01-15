@@ -192,6 +192,8 @@ UPLOAD_FOLDER = os.path.join(APP_DATA_DIR, "uploads")
 DATA_FOLDER = os.path.join(APP_DATA_DIR, "data")
 QUIZ_FOLDER = os.path.join(APP_DATA_DIR, "quizzes")
 CONFIG_FOLDER = os.path.join(APP_DATA_DIR, "config")
+REGISTRY_FILE = os.path.join(APP_DATA_DIR, "config", "quizzes.json")
+
 
 # App-data logos (used for temp storage / preview)
 LOGO_FOLDER = os.path.join(APP_DATA_DIR, "static", "logos")
@@ -2909,19 +2911,35 @@ def record_attempt():
         exists = cur.fetchone() is not None
 
         if not exists:
-            # Introspect quizzes table columns so we don't assume schema
+            # Introspect quizzes table columns (schema-safe)
             cur.execute("PRAGMA table_info(quizzes)")
-            qcols = [r[1] for r in cur.fetchall()]
+            cols = {row[1]: row for row in cur.fetchall()}
 
-            # Minimum viable insert: (id, title) if those columns exist
-            if "id" in qcols and "title" in qcols:
-                cur.execute(
-                    "INSERT INTO quizzes (id, title) VALUES (?, ?)",
-                    (quiz_id, quiz_title or f"Quiz {quiz_id}")
-                )
-            else:
-                # If schema is unexpected, fail loudly with actionable detail
-                raise Exception(f"quizzes table missing expected columns; found={qcols}")
+            title_val = quiz_title or f"Quiz {quiz_id}"
+            source_file_val = "[auto-restored]"
+
+            fields = []
+            values = []
+
+            if "id" in cols:
+                fields.append("id")
+                values.append(quiz_id)
+
+            if "title" in cols:
+                fields.append("title")
+                values.append(title_val)
+
+            if "source_file" in cols:
+                fields.append("source_file")
+                values.append(source_file_val)
+
+            sql = f"""
+                INSERT INTO quizzes ({",".join(fields)})
+                VALUES ({",".join(["?"] * len(values))})
+            """
+
+            cur.execute(sql, values)
+
 
         else:
             # Keep title synced if provided (helps when registry differs)
@@ -3042,15 +3060,52 @@ def api_attempts():
     conn = get_db()
     cur = conn.cursor()
 
-    # ------------------------------------------------------------------
+    # ------------------------------------------------------------
+    # Load registry FIRST (authoritative quiz list)
+    # ------------------------------------------------------------
+    registry = []
+    registry_map = {}
+
+    try:
+        with open(REGISTRY_FILE, "r", encoding="utf-8") as f:
+            registry = json.load(f) or []
+    except Exception as e:
+        print(f"[REGISTRY ERROR] Unable to read registry: {e}")
+        registry = []
+
+    registry_map = {}
+
+    for q in registry:
+        # Determine quiz ID from registry entry
+        rid = None
+
+        if "id" in q:
+            rid = q["id"]
+        elif "quiz_id" in q:
+            rid = q["quiz_id"]
+        elif "timestamp" in q:
+            rid = q["timestamp"]
+
+        # Normalize to int when possible
+        try:
+            rid = int(rid)
+        except (TypeError, ValueError):
+            continue
+
+        registry_map[rid] = q
+
+    print(f"[DEBUG] Registry map keys: {sorted(registry_map.keys())}")
+
+
+    # ------------------------------------------------------------
     # Load attempts (DB-authoritative)
-    # Preserve attempts even if the quiz has been deleted
-    # ------------------------------------------------------------------
+    # DO NOT filter based on quiz existence in DB
+    # ------------------------------------------------------------
     cur.execute("""
         SELECT
-            a.id AS attempt_id,
+            a.id AS attempt_pk,
             a.quiz_id,
-            COALESCE(q.title, '[Deleted Quiz]') AS quiz_title,
+            q.title AS db_quiz_title,
             a.score,
             a.total,
             a.percent,
@@ -3064,12 +3119,49 @@ def api_attempts():
         ORDER BY a.completed_at DESC
     """)
 
-    attempts = [dict(row) for row in cur.fetchall()]
+    attempts = []
 
-    # ------------------------------------------------------------------
-    # Attach missed questions (stable + explicit key usage)
-    # ------------------------------------------------------------------
-    for attempt in attempts:
+    for row in cur.fetchall():
+        try:
+            quiz_id = int(row["quiz_id"])
+        except (TypeError, ValueError):
+            quiz_id = row["quiz_id"]
+
+
+        # --------------------------------------------------------
+        # Resolve quiz title with correct precedence:
+        # 1) Registry (source of truth)
+        # 2) DB quiz title
+        # 3) Fallback label
+        # --------------------------------------------------------
+        quiz_title = None
+
+        if quiz_id in registry_map:
+            quiz_title = registry_map[quiz_id].get("title")
+
+        if not quiz_title:
+            quiz_title = row["db_quiz_title"]
+
+        if not quiz_title:
+            quiz_title = "[Deleted Quiz]"
+
+        attempt = {
+            "attempt_id": row["attempt_pk"],
+            "quiz_id": quiz_id,
+            "quiz": quiz_title,
+            "score": row["score"],
+            "total": row["total"],
+            "percent": row["percent"],
+            "started_at": row["started_at"],
+            "completed_at": row["completed_at"],
+            "time_remaining": row["time_remaining"],
+            "mode": row["mode"],
+            "missedQuestions": []
+        }
+
+        # --------------------------------------------------------
+        # Attach missed questions (always DB-driven)
+        # --------------------------------------------------------
         cur.execute("""
             SELECT
                 attempt_question_number,
@@ -3081,24 +3173,23 @@ def api_attempts():
             FROM missed_questions
             WHERE attempt_id = ?
             ORDER BY attempt_question_number
-        """, (attempt["attempt_id"],))
+        """, (row["attempt_pk"],))
 
-        mq = cur.fetchall()
-
-        attempt["missedQuestions"] = [
-            {
+        for m in cur.fetchall():
+            attempt["missedQuestions"].append({
                 "number": m["attempt_question_number"],
                 "question": m["question_text"],
                 "correctLetters": (m["correct_letters"] or "").split(",") if m["correct_letters"] else [],
                 "correctText": (m["correct_text"] or "").split("\n") if m["correct_text"] else [],
                 "selectedLetters": (m["selected_letters"] or "").split(",") if m["selected_letters"] else [],
                 "selectedText": (m["selected_text"] or "").split("\n") if m["selected_text"] else [],
-            }
-            for m in mq
-        ]
+            })
+
+        attempts.append(attempt)
 
     conn.close()
     return jsonify(attempts)
+
 
 
 
