@@ -2908,46 +2908,12 @@ def record_attempt():
         # 1) Ensure quiz exists in DB (AUTO-UPSERT)
         # ------------------------------------------------------------
         cur.execute("SELECT 1 FROM quizzes WHERE id = ?", (quiz_id,))
-        exists = cur.fetchone() is not None
-
-        if not exists:
-            # Introspect quizzes table columns (schema-safe)
-            cur.execute("PRAGMA table_info(quizzes)")
-            cols = {row[1]: row for row in cur.fetchall()}
-
-            title_val = quiz_title or f"Quiz {quiz_id}"
-            source_file_val = "[auto-restored]"
-
-            fields = []
-            values = []
-
-            if "id" in cols:
-                fields.append("id")
-                values.append(quiz_id)
-
-            if "title" in cols:
-                fields.append("title")
-                values.append(title_val)
-
-            if "source_file" in cols:
-                fields.append("source_file")
-                values.append(source_file_val)
-
-            sql = f"""
-                INSERT INTO quizzes ({",".join(fields)})
-                VALUES ({",".join(["?"] * len(values))})
-            """
-
-            cur.execute(sql, values)
+        if cur.fetchone() is None:
+            raise Exception(f"Attempt references unknown quiz_id={quiz_id}")
 
 
-        else:
-            # Keep title synced if provided (helps when registry differs)
-            if quiz_title:
-                cur.execute(
-                    "UPDATE quizzes SET title = ? WHERE id = ?",
-                    (quiz_title, quiz_id)
-                )
+
+       
 
         # ------------------------------------------------------------
         # 2) Insert attempt
