@@ -3619,21 +3619,34 @@ def clear_db_history():
         conn = get_db()
         cur = conn.cursor()
 
-        # Respect foreign keys
+        # Ensure FK enforcement
         cur.execute("PRAGMA foreign_keys = ON")
 
-        # Delete dependent rows first
+        # Delete deepest dependencies first
+        cur.execute("DELETE FROM attempt_answers")
         cur.execute("DELETE FROM missed_questions")
         cur.execute("DELETE FROM attempts")
 
         conn.commit()
         conn.close()
 
-        return {"status": "ok", "message": "Persistent history cleared"}
+        print("[DB] Persistent exam history fully cleared")
+
+        return {
+            "status": "ok",
+            "message": "Persistent history cleared"
+        }
 
     except Exception as e:
         print("DB CLEAR ERROR:", e)
-        return {"status": "error"}, 500
+        return {
+            "status": "error",
+            "error": str(e)
+        }, 500
+
+
+
+
 
 @app.route("/api/portal_config")
 def api_portal_config():
