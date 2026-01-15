@@ -2876,98 +2876,155 @@ def save_settings():
 @app.route("/record_attempt", methods=["POST"])
 def record_attempt():
     data = request.get_json(force=True) or {}
-    print("📩 Incoming Attempt Payload:", json.dumps(data, indent=2))
 
-    attempt_id = data.get("attemptId")
-    quiz_id = data.get("quizId")  # ✅ quizzes.id ONLY
+    quiz_id = data.get("quizId")
+    quiz_title = (data.get("quizTitle") or "").strip()
 
-    if not attempt_id:
-        return {"error": "Missing attemptId"}, 400
-
-    if not quiz_id:
-        return {"error": "Missing quizId"}, 400
-
-    score = data.get("score", 0)
-    total = data.get("total", 0)
-    percent = data.get("percent", 0)
+    score = data.get("score")
+    total = data.get("total")
+    percent = data.get("percent")
+    attempt_id = data.get("attemptId")  # UI timestamp string
     started_at = data.get("startedAt")
     completed_at = data.get("completedAt")
     time_remaining = data.get("timeRemaining")
-    mode = data.get("mode", "Exam")
+    mode = data.get("mode") or "Study"
+    missed_details = data.get("missedDetails") or []
+
+    # Basic validation (keep it forgiving but safe)
+    if quiz_id is None:
+        return jsonify({"error": "Missing quizId"}), 400
+    if not attempt_id:
+        return jsonify({"error": "Missing attemptId"}), 400
+    if score is None or total is None:
+        return jsonify({"error": "Missing score/total"}), 400
 
     conn = get_db()
     cur = conn.cursor()
 
     try:
-        # Validate quiz exists
-        cur.execute("SELECT id FROM quizzes WHERE id = ?", (quiz_id,))
-        if not cur.fetchone():
-            raise Exception(f"Quiz ID {quiz_id} not found in DB")
+        # ------------------------------------------------------------
+        # 1) Ensure quiz exists in DB (AUTO-UPSERT)
+        # ------------------------------------------------------------
+        cur.execute("SELECT 1 FROM quizzes WHERE id = ?", (quiz_id,))
+        exists = cur.fetchone() is not None
 
-        print(f"Saving attempt: attempt_id={attempt_id} quiz_id={quiz_id}")
+        if not exists:
+            # Introspect quizzes table columns so we don't assume schema
+            cur.execute("PRAGMA table_info(quizzes)")
+            qcols = [r[1] for r in cur.fetchall()]
 
-        # Insert attempt
-        cur.execute("""
-            INSERT INTO attempts (
-                id, quiz_id, started_at, completed_at,
-                score, total, percent, time_remaining, mode
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            attempt_id,
-            quiz_id,
-            started_at,
-            completed_at,
-            score,
-            total,
-            percent,
-            time_remaining,
-            mode,
-        ))
+            # Minimum viable insert: (id, title) if those columns exist
+            if "id" in qcols and "title" in qcols:
+                cur.execute(
+                    "INSERT INTO quizzes (id, title) VALUES (?, ?)",
+                    (quiz_id, quiz_title or f"Quiz {quiz_id}")
+                )
+            else:
+                # If schema is unexpected, fail loudly with actionable detail
+                raise Exception(f"quizzes table missing expected columns; found={qcols}")
 
-        # Insert missed questions snapshot
-        for m in data.get("missedDetails", []):
-            attempt_qnum = m.get("attemptQuestionNumber", m.get("number"))
-            if attempt_qnum is None:
-                raise Exception("Missing attemptQuestionNumber")
+        else:
+            # Keep title synced if provided (helps when registry differs)
+            if quiz_title:
+                cur.execute(
+                    "UPDATE quizzes SET title = ? WHERE id = ?",
+                    (quiz_title, quiz_id)
+                )
 
-            choices_text = "\n".join(
-                f"{c['label']} — {c['text']}"
-                for c in m.get("choices", [])
-                if c.get("label") and c.get("text")
-            )
+        # ------------------------------------------------------------
+        # 2) Insert attempt
+        #    We store the UI attemptId in attempts.id if that's your schema,
+        #    otherwise fall back to attempts.attempt_id if present.
+        # ------------------------------------------------------------
+        cur.execute("PRAGMA table_info(attempts)")
+        acols = [r[1] for r in cur.fetchall()]
+
+        if "attempt_id" in acols:
+            # Common schema: attempts has integer PK id and text attempt_id
+            cur.execute("""
+                INSERT INTO attempts (
+                    attempt_id, quiz_id, score, total, percent,
+                    started_at, completed_at, time_remaining, mode
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                attempt_id, quiz_id, score, total, percent,
+                started_at, completed_at, time_remaining, mode
+            ))
+            # Fetch internal PK id for missed_questions FK usage if needed
+            cur.execute("SELECT id FROM attempts WHERE attempt_id = ?", (attempt_id,))
+            attempt_pk = cur.fetchone()
+            attempt_pk = attempt_pk["id"] if attempt_pk else None
+
+        else:
+            # Alternate schema: attempts.id IS the attempt id (TEXT)
+            cur.execute("""
+                INSERT INTO attempts (
+                    id, quiz_id, score, total, percent,
+                    started_at, completed_at, time_remaining, mode
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                attempt_id, quiz_id, score, total, percent,
+                started_at, completed_at, time_remaining, mode
+            ))
+            attempt_pk = attempt_id
+
+        # ------------------------------------------------------------
+        # 3) Save missed questions (if any)
+        # ------------------------------------------------------------
+        # Determine what missed_questions expects as attempt_id (pk vs attemptId)
+        # We'll check the column type by name presence only.
+        cur.execute("PRAGMA table_info(missed_questions)")
+        mcols = [r[1] for r in cur.fetchall()]
+
+        # Use attempt_pk when available; otherwise use attempt_id string
+        missed_attempt_ref = attempt_pk if attempt_pk is not None else attempt_id
+
+        # Insert missed questions
+        for md in missed_details:
+            aqn = md.get("attemptQuestionNumber")
+            qtext = md.get("question")
+            choices = md.get("choices") or []
+            correct_letters = md.get("correctLetters") or []
+            correct_text = md.get("correctText") or []
+            selected_letters = md.get("selectedLetters") or []
+            selected_text = md.get("selectedText") or []
+
+            # Flatten choice text if you store it (optional)
+            choices_text = "\n".join([f'{c.get("label")} — {c.get("text")}' for c in choices if c])
 
             cur.execute("""
                 INSERT INTO missed_questions (
                     attempt_id,
-                    correct_letters,
+                    attempt_question_number,
                     question_text,
                     choices_text,
-                    selected_letters,
-                    selected_text,
+                    correct_letters,
                     correct_text,
-                    attempt_question_number
+                    selected_letters,
+                    selected_text
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                attempt_id,
-                ",".join(m.get("correctLetters", [])),
-                m.get("question"),
+                missed_attempt_ref,
+                aqn,
+                qtext,
                 choices_text,
-                ",".join(m.get("selectedLetters", [])),
-                "\n".join(m.get("selectedText", [])),
-                "\n".join(m.get("correctText", [])),
-                attempt_qnum,
+                ",".join(correct_letters),
+                "\n".join(correct_text),
+                ",".join(selected_letters),
+                "\n".join(selected_text),
             ))
 
         conn.commit()
-        return {"status": "ok"}
+        return jsonify({"ok": True, "attempt_id": attempt_id}), 200
 
     except Exception as e:
         conn.rollback()
-        print("DB ERROR:", e)
-        return {"status": "db_error", "detail": str(e)}, 500
+        print(f"DB ERROR in /record_attempt: {e}")
+        return jsonify({"error": str(e)}), 500
 
     finally:
         conn.close()
+
 
 
 
