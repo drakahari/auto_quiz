@@ -3534,20 +3534,16 @@ def export_anki_genanki():
     data = request.get_json(force=True) or {}
 
     attempt_id = data.get("attempt_id")
-    attempt_qnums = data.get("attempt_question_numbers") or data.get("question_numbers") or []
 
-    if not attempt_id or not attempt_qnums:
-        return {"error": "Missing attempt_id or question numbers"}, 400
-
-    attempt_qnums = [int(x) for x in attempt_qnums]
-    q_marks = ",".join("?" for _ in attempt_qnums)
+    if not attempt_id:
+        return {"error": "Missing attempt_id"}, 400
 
     conn = get_db()
     cur = conn.cursor()
 
     # 🔑 IMPORTANT: use SNAPSHOT DATA ONLY
     cur.execute(
-        f"""
+        """
         SELECT
             mq.attempt_question_number,
             mq.question_text,
@@ -3558,17 +3554,16 @@ def export_anki_genanki():
         JOIN attempts a ON a.id = mq.attempt_id
         JOIN quizzes qu ON qu.id = a.quiz_id
         WHERE mq.attempt_id = ?
-          AND mq.attempt_question_number IN ({q_marks})
         ORDER BY mq.attempt_question_number
         """,
-        [attempt_id, *attempt_qnums]
+        [attempt_id]
     )
 
     rows = cur.fetchall()
     conn.close()
 
     if not rows:
-        return {"error": "No missed questions found"}, 404
+        return {"error": "No missed questions found for this attempt"}, 404
 
     print(f"[ANKI] exporting {len(rows)} missed questions")
 
@@ -3614,6 +3609,7 @@ def export_anki_genanki():
 
 
 
+
 # =====================================================
 # EXPORT MISSED QUESTIONS → TSV (ANKI IMPORT)
 # =====================================================
@@ -3625,9 +3621,17 @@ def export_anki_missed_tsv():
     attempt_qnums = data.get("attempt_question_numbers") or data.get("question_numbers") or []
 
     if not attempt_id or not attempt_qnums:
+        print("[ANKI DEBUG] raw payload:", data)
         return {"error": "Missing attempt_id or attempt_question_numbers"}, 400
 
-    attempt_qnums = [int(x) for x in attempt_qnums]
+    attempt_qnums = [
+    int(x) for x in attempt_qnums
+    if x is not None and str(x).isdigit()
+]
+
+    if not attempt_qnums:
+        return {"error": "No valid question numbers after filtering"}, 400
+
 
     conn = get_db()
     cur = conn.cursor()
