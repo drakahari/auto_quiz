@@ -1,5 +1,5 @@
 from flask import Flask, send_from_directory, request, redirect, render_template_string, jsonify, Response
-import os, re, json, time, sqlite3, sys
+import os, re, json, time, sqlite3, sys, shutil
 from werkzeug.utils import secure_filename
 
 # =========================
@@ -714,30 +714,73 @@ def delete_quiz(quiz_id):
 # =========================
 @app.route("/api/wipe_database", methods=["POST"])
 def wipe_database():
-    print("[DB] FULL DATABASE WIPE REQUESTED")
+    print("[DB] FULL FACTORY RESET REQUESTED")
 
+    # -----------------------------
+    # 1️⃣ WIPE DATABASE COMPLETELY
+    # -----------------------------
     conn = get_db()
-    conn.execute("PRAGMA foreign_keys = OFF")  # disable for mass delete
+    conn.execute("PRAGMA foreign_keys = OFF")
     cur = conn.cursor()
 
-    # --- Delete ALL rows ---
-    cur.execute("DELETE FROM missed_questions")
-    cur.execute("DELETE FROM attempt_answers")
-    cur.execute("DELETE FROM attempts")
-    cur.execute("DELETE FROM choices")
-    cur.execute("DELETE FROM questions")
-    cur.execute("DELETE FROM quizzes")
-
-    # --- Reset AUTOINCREMENT counters ---
-    cur.execute("DELETE FROM sqlite_sequence")
+    cur.executescript("""
+        DELETE FROM missed_questions;
+        DELETE FROM attempt_answers;
+        DELETE FROM attempts;
+        DELETE FROM choices;
+        DELETE FROM questions;
+        DELETE FROM quizzes;
+        DELETE FROM sqlite_sequence;
+    """)
 
     conn.commit()
     conn.execute("PRAGMA foreign_keys = ON")
     conn.close()
 
-    print("[DB] FULL DATABASE RESET COMPLETE")
+    print("[DB] Database tables cleared and IDs reset")
 
-    return {"ok": True}
+    # -----------------------------
+    # 2️⃣ CLEAR QUIZ REGISTRY
+    # -----------------------------
+    registry_path = os.path.join(APP_DATA_DIR, "config", "quizzes.json")
+
+    try:
+        os.makedirs(os.path.dirname(registry_path), exist_ok=True)
+        with open(registry_path, "w") as f:
+            json.dump([], f, indent=2)
+        print("[REGISTRY] quizzes.json reset")
+    except Exception as e:
+        print("[REGISTRY ERROR]", e)
+        return jsonify(status="error", error="Failed to reset quiz registry"), 500
+
+    # -----------------------------
+    # 3️⃣ DELETE GENERATED QUIZ FILES
+    # -----------------------------
+    quiz_dirs = [
+        os.path.join(APP_DATA_DIR, "quizzes"),
+        os.path.join(APP_DATA_DIR, "static", "logos"),
+        os.path.join(APP_DATA_DIR, "static", "logos", "_temp"),
+    ]
+
+    for d in quiz_dirs:
+        if os.path.exists(d):
+            for name in os.listdir(d):
+                path = os.path.join(d, name)
+                try:
+                    if os.path.isfile(path):
+                        os.remove(path)
+                    elif os.path.isdir(path):
+                        shutil.rmtree(path)
+                except Exception as e:
+                    print(f"[FILE DELETE ERROR] {path}", e)
+                    return jsonify(status="error", error=f"Failed deleting {path}"), 500
+
+    print("[FILES] All quiz files and logos removed")
+
+    print("[FACTORY RESET] COMPLETE")
+
+    return jsonify(status="ok")
+
 
 
 
@@ -2847,34 +2890,36 @@ fetch("/config/portal.json")
         }
     });
 
-    // FULL RESET button — exact duplicate wiring (SAME ROUTE for test)
-    document.getElementById("wipeDBBtn").addEventListener("click", async () => {
+    // FULL RESET button — REAL ROUTE
+document.getElementById("wipeDBBtn").addEventListener("click", async () => {
 
-        if (!confirm(
-            "⚠ TEST MODE (WIPE BUTTON)\\n\\n" +
-            "This is temporarily wired to the same action as the red Clear button.\\n\\n" +
-            "If you see this confirm, the button wiring works.\\n\\n" +
-            "Continue?"
-        )) return;
+    if (!confirm(
+        "⚠ FACTORY RESET ⚠\\n\\n" +
+        "This will permanently delete ALL quizzes, attempts, and history.\\n\\n" +
+        "Quiz IDs will be reset back to 1.\\n\\n" +
+        "This cannot be undone.\\n\\n" +
+        "Continue?"
+    )) return;
 
-        try {
-            const res = await fetch("/api/clear_db_history", { method: "POST" });
-            const data = await res.json();
+    try {
+        const res = await fetch("/api/wipe_database", { method: "POST" });
+        const data = await res.json();
 
-            if (data.status === "ok") {
-                const el = document.getElementById("wipeDBStatus");
-                if (el) el.innerText = "✅ WIPE button click confirmed (test mode)";
-                alert("WIPE button click confirmed (test mode).");
-                location.reload();
-            } else {
-                throw new Error();
-            }
-
-        } catch (err) {
+        if (data.status === "ok") {
             const el = document.getElementById("wipeDBStatus");
-            if (el) el.innerText = "❌ WIPE button failed (test mode)";
+            if (el) el.innerText = "✅ FULL RESET completed successfully.";
+            alert("Factory reset completed. Application will reload.");
+            location.reload();
+        } else {
+            throw new Error();
         }
-    });
+
+    } catch (err) {
+        const el = document.getElementById("wipeDBStatus");
+        if (el) el.innerText = "❌ FULL RESET failed.";
+    }
+});
+
 </script>
 
 
