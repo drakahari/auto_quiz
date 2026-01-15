@@ -549,11 +549,37 @@ def save_registry(registry):
 def add_quiz_to_registry(quiz_id, html, title, logo=None):
     """
     Canonical registry update:
-    - Replace by *id* (not title).
-    - Also de-dupe by html filename (safety).
-    - Never remove older quizzes just because titles collide.
+    - quiz_id is the DATABASE quizzes.id (authoritative)
+    - Registry is a UI index only
     """
-    print(f"[REGISTRY] add_quiz_to_registry id={quiz_id} title={title!r} logo={logo!r}")
+    print(f"[REGISTRY] add_quiz_to_registry db_id={quiz_id} title={title!r} logo={logo!r}")
+
+    registry = load_registry()
+
+    try:
+        quiz_id = int(quiz_id)
+    except Exception:
+        raise ValueError("add_quiz_to_registry requires a numeric DB quiz_id")
+
+    kept = []
+    for q in registry:
+        # De-dupe strictly by DB quiz_id or html
+        if q.get("id") == quiz_id:
+            continue
+        if html and q.get("html") == html:
+            continue
+        kept.append(q)
+
+    kept.append({
+        "id": quiz_id,          # ✅ DB PRIMARY KEY
+        "html": html,
+        "title": title,
+        "logo": logo,
+        "timestamp": int(time.time())
+    })
+
+    save_registry(kept)
+
 
     registry = load_registry()
 
@@ -2308,12 +2334,13 @@ def process_paste():
     # =========================
     source_file = f"quiz_{ts}.html"
 
-    quiz_id = save_quiz_to_db(
+    db_quiz_id = save_quiz_to_db(
         quiz_title,
         source_file,
         quiz_data,
         logo_filename
     )
+
 
 
 
@@ -2337,11 +2364,13 @@ def process_paste():
         logo_filename)
 
     add_quiz_to_registry(
-        quiz_id,
+        db_quiz_id,
         html_name,
         quiz_title,
         logo_filename
     )
+
+
 
 
     build_quiz_html(
