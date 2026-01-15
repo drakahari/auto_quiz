@@ -201,49 +201,50 @@ async function loadDbHistory() {
         const res = await fetch("/api/attempts");
         if (!res.ok) throw new Error("HTTP " + res.status);
 
-        const attempts = await res.json();
+        const data = await res.json();
+        const attempts = Array.isArray(data) ? data : (data.attempts || []);
 
         console.log("[HISTORY] attempts array:", attempts);
-
-        if (!Array.isArray(attempts) || !attempts.length) {
-            box.innerHTML = "<p>No persistent attempts yet.</p>";
-            return;
-        }
-
-
 
         if (!attempts.length) {
             box.innerHTML = "<p>No persistent attempts yet.</p>";
             return;
         }
 
-        let html = "<table class='historyTable'><tr>" +
-                   "<th>Quiz</th>" +
-                   "<th>Score</th>" +
-                   "<th>Date</th>" +
-                   "<th>Mode</th>" +
-                   "<th>Review</th>" +
-                   "</tr>";
+        let html = `
+            <table class="historyTable">
+                <thead>
+                    <tr>
+                        <th>Quiz</th>
+                        <th>Score</th>
+                        <th>Date</th>
+                        <th>Mode</th>
+                        <th>Review</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
 
         attempts.forEach(a => {
+            const attemptId = a.id; // authoritative identity
+
             html += `
-                <tr>
+                <tr data-attempt-id="${attemptId}">
                     <td>${a.quiz_title || "Unknown Quiz"}</td>
                     <td>${a.score}/${a.total} (${a.percent}%)</td>
                     <td>${a.completed_at || ""}</td>
                     <td>${a.mode}</td>
                     <td>
-                        <a href="/review?attempt=${a.id}" class="review-link">
+                        <a href="/review?attempt=${attemptId}" class="review-link">
                             🔁 Review
                             <span style="opacity:0.75; margin-left:6px;">🔍 View Details</span>
                         </a>
-
                     </td>
                 </tr>
             `;
         });
 
-        html += "</table>";
+        html += "</tbody></table>";
         box.innerHTML = html;
 
     } catch (err) {
@@ -251,6 +252,7 @@ async function loadDbHistory() {
         box.innerHTML = "<p>⚠️ Unable to load persistent history.</p>";
     }
 }
+
 
 /* ============================
    LOAD MISSED QUESTIONS FOR ATTEMPT (NEW)

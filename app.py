@@ -532,36 +532,59 @@ def load_registry():
     if not os.path.exists(QUIZ_REGISTRY):
         return []
     try:
-        with open(QUIZ_REGISTRY, "r") as f:
-            return json.load(f)
-    except:
+        with open(QUIZ_REGISTRY, "r", encoding="utf-8") as f:
+            return json.load(f) or []
+    except Exception as e:
+        print(f"[REGISTRY ERROR] load_registry failed: {e}")
         return []
 
-
 def save_registry(registry):
-    with open(QUIZ_REGISTRY, "w") as f:
-        json.dump(registry, f, indent=4)
+    try:
+        os.makedirs(os.path.dirname(QUIZ_REGISTRY), exist_ok=True)
+        with open(QUIZ_REGISTRY, "w", encoding="utf-8") as f:
+            json.dump(registry, f, indent=4)
+    except Exception as e:
+        print(f"[REGISTRY ERROR] save_registry failed: {e}")
 
+def add_quiz_to_registry(quiz_id, html, title, logo=None):
+    """
+    Canonical registry update:
+    - Replace by *id* (not title).
+    - Also de-dupe by html filename (safety).
+    - Never remove older quizzes just because titles collide.
+    """
+    print(f"[REGISTRY] add_quiz_to_registry id={quiz_id} title={title!r} logo={logo!r}")
 
-def add_quiz_to_registry(quiz_id, html, title, logo):
-    print(f"[REGISTRY] add_quiz_to_registry title={title!r} logo={logo!r}")
     registry = load_registry()
 
-    # 🔁 remove existing quiz with same title
-    registry = [
-        q for q in registry
-        if q.get("title") != title
-    ]
+    # Normalize quiz_id to int if possible (registry IDs are timestamp-ish)
+    try:
+        qid_norm = int(quiz_id)
+    except Exception:
+        qid_norm = quiz_id  # keep as-is if it truly isn't numeric
 
-    registry.append({
-        "id": quiz_id,   # ← DB id at creation time
+    kept = []
+    for q in registry:
+        # Match by id
+        same_id = (q.get("id") == qid_norm) or (str(q.get("id")) == str(qid_norm))
+        # Match by html (safety)
+        same_html = (q.get("html") == html) if html else False
+
+        if same_id or same_html:
+            continue
+        kept.append(q)
+
+    kept.append({
+        "id": qid_norm,
         "html": html,
         "title": title,
         "logo": logo,
         "timestamp": int(time.time())
     })
 
-    save_registry(registry)
+    save_registry(kept)
+
+
 
 
 
@@ -690,7 +713,7 @@ def save_order():
 # =========================
 # QUIZ DB SAVE HELPER (UPLOAD + PASTE)
 # =========================
-def save_quiz_to_db(quiz_title, source_file, quiz_data, registry_id, logo_filename=None):
+def save_quiz_to_db(quiz_title, source_file, quiz_data, logo_filename=None):
     conn = get_db()
     cur = conn.cursor()
 
@@ -703,10 +726,10 @@ def save_quiz_to_db(quiz_title, source_file, quiz_data, registry_id, logo_filena
     # Insert quiz (now stores registry_id too)
     cur.execute(
         """
-        INSERT INTO quizzes (title, source_file, registry_id)
-        VALUES (?, ?, ?)
+        INSERT INTO quizzes (title, source_file)
+        VALUES (?, ?)
         """,
-        (quiz_title, source_file, registry_id),
+        (quiz_title, source_file),
     )
 
     quiz_id = cur.lastrowid  # ✅ CAPTURE DB ID
@@ -2277,7 +2300,7 @@ def process_paste():
     # =========================
     # REGISTRY ID (CANONICAL)
     # =========================
-    registry_id = int(ts)
+    
 
 
     # =========================
@@ -2289,7 +2312,6 @@ def process_paste():
         quiz_title,
         source_file,
         quiz_data,
-        registry_id,
         logo_filename
     )
 
@@ -2476,13 +2498,12 @@ def process_file():
     # =========================
     # REGISTRY ID (CANONICAL)
     # =========================
-    registry_id = int(ts)
+    
 
     quiz_id = save_quiz_to_db(
         quiz_title,
         source_file,
         quiz_data,
-        registry_id,
         logo_filename
     )
 
@@ -2879,20 +2900,21 @@ def save_settings():
 def record_attempt():
     data = request.get_json(force=True) or {}
 
-    quiz_id = data.get("quizId")
+    # --- Input from UI ---
+    quiz_id = data.get("quizId")      # REGISTRY ID (from frontend)
     quiz_title = (data.get("quizTitle") or "").strip()
 
     score = data.get("score")
     total = data.get("total")
     percent = data.get("percent")
-    attempt_id = data.get("attemptId")  # UI timestamp string
+    attempt_id = data.get("attemptId")
     started_at = data.get("startedAt")
     completed_at = data.get("completedAt")
     time_remaining = data.get("timeRemaining")
     mode = data.get("mode") or "Study"
     missed_details = data.get("missedDetails") or []
 
-    # Basic validation (keep it forgiving but safe)
+    # --- Basic validation ---
     if quiz_id is None:
         return jsonify({"error": "Missing quizId"}), 400
     if not attempt_id:
@@ -2900,31 +2922,27 @@ def record_attempt():
     if score is None or total is None:
         return jsonify({"error": "Missing score/total"}), 400
 
+    try:
+        quiz_id = int(quiz_id)
+    except (TypeError, ValueError):
+        return jsonify({"error": f"Invalid quizId: {quiz_id}"}), 400
+
     conn = get_db()
     cur = conn.cursor()
 
     try:
         # ------------------------------------------------------------
-        # 1) Ensure quiz exists in DB (AUTO-UPSERT)
+        # 1) Resolve REGISTRY ID → DB QUIZ ID (AUTHORITATIVE)
         # ------------------------------------------------------------
-        cur.execute("SELECT 1 FROM quizzes WHERE id = ?", (quiz_id,))
-        if cur.fetchone() is None:
-            raise Exception(f"Attempt references unknown quiz_id={quiz_id}")
-
-
-
-       
+        
 
         # ------------------------------------------------------------
         # 2) Insert attempt
-        #    We store the UI attemptId in attempts.id if that's your schema,
-        #    otherwise fall back to attempts.attempt_id if present.
         # ------------------------------------------------------------
         cur.execute("PRAGMA table_info(attempts)")
         acols = [r[1] for r in cur.fetchall()]
 
         if "attempt_id" in acols:
-            # Common schema: attempts has integer PK id and text attempt_id
             cur.execute("""
                 INSERT INTO attempts (
                     attempt_id, quiz_id, score, total, percent,
@@ -2934,13 +2952,13 @@ def record_attempt():
                 attempt_id, quiz_id, score, total, percent,
                 started_at, completed_at, time_remaining, mode
             ))
-            # Fetch internal PK id for missed_questions FK usage if needed
-            cur.execute("SELECT id FROM attempts WHERE attempt_id = ?", (attempt_id,))
-            attempt_pk = cur.fetchone()
-            attempt_pk = attempt_pk["id"] if attempt_pk else None
-
+            cur.execute(
+                "SELECT id FROM attempts WHERE attempt_id = ?",
+                (attempt_id,)
+            )
+            row = cur.fetchone()
+            attempt_pk = row[0] if row else None
         else:
-            # Alternate schema: attempts.id IS the attempt id (TEXT)
             cur.execute("""
                 INSERT INTO attempts (
                     id, quiz_id, score, total, percent,
@@ -2953,17 +2971,10 @@ def record_attempt():
             attempt_pk = attempt_id
 
         # ------------------------------------------------------------
-        # 3) Save missed questions (if any)
+        # 3) Save missed questions
         # ------------------------------------------------------------
-        # Determine what missed_questions expects as attempt_id (pk vs attemptId)
-        # We'll check the column type by name presence only.
-        cur.execute("PRAGMA table_info(missed_questions)")
-        mcols = [r[1] for r in cur.fetchall()]
-
-        # Use attempt_pk when available; otherwise use attempt_id string
         missed_attempt_ref = attempt_pk if attempt_pk is not None else attempt_id
 
-        # Insert missed questions
         for md in missed_details:
             aqn = md.get("attemptQuestionNumber")
             qtext = md.get("question")
@@ -2973,8 +2984,11 @@ def record_attempt():
             selected_letters = md.get("selectedLetters") or []
             selected_text = md.get("selectedText") or []
 
-            # Flatten choice text if you store it (optional)
-            choices_text = "\n".join([f'{c.get("label")} — {c.get("text")}' for c in choices if c])
+            choices_text = "\n".join(
+                f'{c.get("label")} — {c.get("text")}'
+                for c in choices
+                if isinstance(c, dict)
+            )
 
             cur.execute("""
                 INSERT INTO missed_questions (
@@ -3021,17 +3035,24 @@ def record_attempt():
 
 
 
+
+
 @app.route("/api/attempts")
 def api_attempts():
     conn = get_db()
     cur = conn.cursor()
 
-    # ------------------------------------------------------------
-    # Load registry FIRST (authoritative quiz list)
-    # ------------------------------------------------------------
-    registry = []
-    registry_map = {}
+    # -------------------------
+    # Detect schema variants
+    # -------------------------
+    cur.execute("PRAGMA table_info(attempts)")
+    attempt_cols = {r[1] for r in cur.fetchall()}
+    has_attempt_id_col = "attempt_id" in attempt_cols  # UI timestamp string storage
 
+    # -------------------------
+    # Load registry map (id -> entry)
+    # -------------------------
+    registry = []
     try:
         with open(REGISTRY_FILE, "r", encoding="utf-8") as f:
             registry = json.load(f) or []
@@ -3040,80 +3061,91 @@ def api_attempts():
         registry = []
 
     registry_map = {}
-
     for q in registry:
-        # Determine quiz ID from registry entry
-        rid = None
-
-        if "id" in q:
-            rid = q["id"]
-        elif "quiz_id" in q:
-            rid = q["quiz_id"]
-        elif "timestamp" in q:
-            rid = q["timestamp"]
-
-        # Normalize to int when possible
+        rid = q.get("id", q.get("quiz_id", q.get("timestamp")))
         try:
             rid = int(rid)
         except (TypeError, ValueError):
             continue
-
         registry_map[rid] = q
 
     print(f"[DEBUG] Registry map keys: {sorted(registry_map.keys())}")
 
+    # -------------------------
+    # Query attempts
+    # Return IDs that the UI actually uses (attempt_id string if available)
+    # -------------------------
+    if has_attempt_id_col:
+        cur.execute("""
+            SELECT
+                a.id AS attempt_pk,
+                a.attempt_id AS attempt_id,
+                a.quiz_id,
+                q.title AS db_quiz_title,
+                a.score,
+                a.total,
+                a.percent,
+                a.started_at,
+                a.completed_at,
+                a.time_remaining,
+                a.mode
+            FROM attempts a
+            LEFT JOIN quizzes q ON q.id = a.quiz_id
+            ORDER BY a.completed_at DESC
+        """)
+    else:
+        cur.execute("""
+            SELECT
+                a.id AS attempt_pk,
+                NULL AS attempt_id,
+                a.quiz_id,
+                q.title AS db_quiz_title,
+                a.score,
+                a.total,
+                a.percent,
+                a.started_at,
+                a.completed_at,
+                a.time_remaining,
+                a.mode
+            FROM attempts a
+            LEFT JOIN quizzes q ON q.id = a.quiz_id
+            ORDER BY a.completed_at DESC
+        """)
 
-    # ------------------------------------------------------------
-    # Load attempts (DB-authoritative)
-    # DO NOT filter based on quiz existence in DB
-    # ------------------------------------------------------------
-    cur.execute("""
-        SELECT
-            a.id AS attempt_pk,
-            a.quiz_id,
-            q.title AS db_quiz_title,
-            a.score,
-            a.total,
-            a.percent,
-            a.started_at,
-            a.completed_at,
-            a.time_remaining,
-            a.mode
-        FROM attempts a
-        LEFT JOIN quizzes q
-            ON q.id = a.quiz_id
-        ORDER BY a.completed_at DESC
-    """)
+    out = []
 
-    attempts = []
-
-    for row in cur.fetchall():
+    rows = cur.fetchall()
+    for row in rows:
+        # Normalize quiz_id to int for registry lookup
+        qid_raw = row["quiz_id"]
         try:
-            quiz_id = int(row["quiz_id"])
+            quiz_id_norm = int(qid_raw)
         except (TypeError, ValueError):
-            quiz_id = row["quiz_id"]
+            quiz_id_norm = qid_raw
 
-
-        # --------------------------------------------------------
-        # Resolve quiz title with correct precedence:
-        # 1) Registry (source of truth)
-        # 2) DB quiz title
-        # 3) Fallback label
-        # --------------------------------------------------------
+        # Title resolution:
+        # 1) Registry title (best for file-based quizzes)
+        # 2) DB title
+        # 3) Fallback
         quiz_title = None
-
-        if quiz_id in registry_map:
-            quiz_title = registry_map[quiz_id].get("title")
+        if isinstance(quiz_id_norm, int) and quiz_id_norm in registry_map:
+            quiz_title = registry_map[quiz_id_norm].get("title")
 
         if not quiz_title:
             quiz_title = row["db_quiz_title"]
 
         if not quiz_title:
-            quiz_title = "[Deleted Quiz]"
+            quiz_title = "Unknown Quiz"
 
-        attempt = {
-            "attempt_id": row["attempt_pk"],
-            "quiz_id": quiz_id,
+        # Choose the ID the UI should use in URLs:
+        # - prefer attempts.attempt_id (timestamp string) when available
+        # - else fall back to integer PK
+        public_attempt_id = row["attempt_id"] or row["attempt_pk"]
+
+        attempt_obj = {
+            # UI fields expected by history/dashboard/review:
+            "id": public_attempt_id,
+            "quiz_id": quiz_id_norm,
             "quiz_title": quiz_title,
             "score": row["score"],
             "total": row["total"],
@@ -3122,39 +3154,68 @@ def api_attempts():
             "completed_at": row["completed_at"],
             "time_remaining": row["time_remaining"],
             "mode": row["mode"],
+
+            # Extra debug/compat fields:
+            "attempt_pk": row["attempt_pk"],
+            "attempt_id": row["attempt_id"],
+
+            # Some pages check this:
             "missedQuestions": []
         }
 
-        # --------------------------------------------------------
-        # Attach missed questions (always DB-driven)
-        # --------------------------------------------------------
-        cur.execute("""
-            SELECT
-                attempt_question_number,
-                question_text,
-                correct_letters,
-                correct_text,
-                selected_letters,
-                selected_text
-            FROM missed_questions
-            WHERE attempt_id = ?
-            ORDER BY attempt_question_number
-        """, (row["attempt_pk"],))
+        # Attach missed questions (best-effort across schema variants)
+        # Try by PK first, then by attempt_id string if needed.
+        missed_rows = []
+        try:
+            cur.execute("""
+                SELECT
+                    attempt_question_number,
+                    question_text,
+                    correct_letters,
+                    correct_text,
+                    selected_letters,
+                    selected_text
+                FROM missed_questions
+                WHERE attempt_id = ?
+                ORDER BY attempt_question_number
+            """, (row["attempt_pk"],))
+            missed_rows = cur.fetchall()
+        except Exception:
+            missed_rows = []
 
-        for m in cur.fetchall():
-            attempt["missedQuestions"].append({
-                "number": m["attempt_question_number"],
-                "question": m["question_text"],
-                "correctLetters": (m["correct_letters"] or "").split(",") if m["correct_letters"] else [],
-                "correctText": (m["correct_text"] or "").split("\n") if m["correct_text"] else [],
-                "selectedLetters": (m["selected_letters"] or "").split(",") if m["selected_letters"] else [],
-                "selectedText": (m["selected_text"] or "").split("\n") if m["selected_text"] else [],
+        if not missed_rows and row["attempt_id"]:
+            cur.execute("""
+                SELECT
+                    attempt_question_number,
+                    question_text,
+                    correct_letters,
+                    correct_text,
+                    selected_letters,
+                    selected_text
+                FROM missed_questions
+                WHERE attempt_id = ?
+                ORDER BY attempt_question_number
+            """, (row["attempt_id"],))
+            missed_rows = cur.fetchall()
+
+        for m in missed_rows:
+            attempt_obj["missedQuestions"].append({
+                "attempt_question_number": m["attempt_question_number"],
+                "question_text": m["question_text"],
+                "correct_letters": m["correct_letters"],
+                "correct_text": m["correct_text"],
+                "selected_letters": m["selected_letters"],
+                "selected_text": m["selected_text"],
             })
 
-        attempts.append(attempt)
+        out.append(attempt_obj)
 
     conn.close()
-    return jsonify(attempts)
+
+    # IMPORTANT: return object with "attempts" to satisfy dashboard/review.html
+    return jsonify({"attempts": out})
+
+
 
 
 
