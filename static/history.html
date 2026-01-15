@@ -179,6 +179,11 @@ fetch("/config/portal.json")
 <script>
 const HISTORY_KEY = "serverplus_history_v2";
 
+// 🔒 DB-only mode: disable legacy localStorage history
+window.DB_ONLY_MODE = true;
+
+
+
 /* ============================
    URL PARAMS (NEW)
 ============================ */
@@ -189,14 +194,23 @@ const _attemptId = _params.get("attempt");
    LOAD DB HISTORY
 ============================ */
 async function loadDbHistory() {
+    console.log("[HISTORY] loadDbHistory() called");
     const box = document.getElementById("dbHistoryBox");
 
     try {
         const res = await fetch("/api/attempts");
         if (!res.ok) throw new Error("HTTP " + res.status);
 
-        const data = await res.json();
-        const attempts = data.attempts || [];
+        const attempts = await res.json();
+
+        console.log("[HISTORY] attempts array:", attempts);
+
+        if (!Array.isArray(attempts) || !attempts.length) {
+            box.innerHTML = "<p>No persistent attempts yet.</p>";
+            return;
+        }
+
+
 
         if (!attempts.length) {
             box.innerHTML = "<p>No persistent attempts yet.</p>";
@@ -307,8 +321,9 @@ async function loadMissedQuestions(attemptId) {
 let QUIZ_NAME_MAP = {};
 
 // quizzes.json deprecated — database is now the source of truth
-loadDbHistory();
-renderHistory();
+
+// renderHistory(); // DISABLED — DB history is canonical
+
 
 // NEW: if URL has ?attempt=..., load DB missed questions panel
 if (_attemptId) {
@@ -343,7 +358,8 @@ function loadHistoryStore() {
    RENDER EXISTING HISTORY
 ========================= */
 function renderHistory() {
-    return; // 🔒 legacy localStorage history disabled
+    if (DB_ONLY_MODE) return;
+
 
     const historyDiv = document.getElementById("historyOutput");
     historyDiv.innerHTML = "";
@@ -494,7 +510,8 @@ function clearHistory() {
     if (!confirm("Delete ALL quiz history from this browser only?")) return;
     localStorage.removeItem(HISTORY_KEY);
     localStorage.removeItem("history");
-    renderHistory();
+    // renderHistory(); // DISABLED — DB history is canonical
+
 }
 
 function loadLogo() {
@@ -527,9 +544,31 @@ function highlightTargetAttempt() {
         }
     });
 
-    match.scrollIntoView({ behavior:"smooth", block:"center" });
+    match.scrollIntoView({ behavior: "smooth", block: "center" });
 }
+
+</script>
+
+<script>
+/* ============================
+   MODE LOCK
+   DB is the ONLY source of truth
+============================ */
+const DB_ONLY_MODE = true;
+
+/* ============================
+   INITIAL LOAD
+============================ */
+document.addEventListener("DOMContentLoaded", () => {
+    // Load persistent DB-backed history
+    loadDbHistory();
+
+    // Highlight specific attempt if linked from review
+    highlightTargetAttempt();
+});
 </script>
 
 </body>
 </html>
+
+

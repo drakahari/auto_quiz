@@ -3036,7 +3036,8 @@ def api_attempts():
 
 
     conn.close()
-    return jsonify({"attempts": attempts})
+    return jsonify(attempts)
+
 
 
 # =====================================================
