@@ -3148,7 +3148,7 @@ def api_attempts():
         attempt = {
             "attempt_id": row["attempt_pk"],
             "quiz_id": quiz_id,
-            "quiz": quiz_title,
+            "quiz_title": quiz_title,
             "score": row["score"],
             "total": row["total"],
             "percent": row["percent"],
