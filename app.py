@@ -743,11 +743,7 @@ def save_quiz_to_db(quiz_title, source_file, quiz_data, logo_filename=None):
     conn = get_db()
     cur = conn.cursor()
 
-    # Replace existing quiz with same source_file
-    cur.execute(
-        "DELETE FROM quizzes WHERE source_file = ?",
-        (source_file,)
-    )
+    
 
     # Insert quiz (now stores registry_id too)
     cur.execute(
@@ -2332,7 +2328,7 @@ def process_paste():
     # =========================
     # SAVE QUIZ
     # =========================
-    source_file = f"quiz_{ts}.html"
+    source_file = f"quiz_upload_{ts}_{int(time.time() * 1000)}"
 
     db_quiz_id = save_quiz_to_db(
         quiz_title,
@@ -2380,7 +2376,7 @@ def process_paste():
         get_portal_title(),
         quiz_title,
         logo_filename,
-        quiz_id
+        db_quiz_id
     )
 
 
@@ -2412,7 +2408,11 @@ def process_file():
 
     # ---- determine source_file (required by schema) ----
     if file.filename:
-        source_file = file.filename
+        now = int(time.time())
+        source_file = f"quiz_upload_{now}_{int(time.time() * 1000)}"
+
+
+
     else:
         source_file = f"manual_paste_{int(time.time())}"
 
