@@ -2985,25 +2985,33 @@ def api_attempts():
     conn = get_db()
     cur = conn.cursor()
 
-    # Load attempts
+    # ------------------------------------------------------------------
+    # Load attempts (DB-authoritative)
+    # Preserve attempts even if the quiz has been deleted
+    # ------------------------------------------------------------------
     cur.execute("""
-        SELECT a.id,
-               a.quiz_id,
-               q.title AS quiz_title,
-               a.score,
-               a.total,
-               a.percent,
-               a.started_at,
-               a.completed_at,
-               a.time_remaining,
-               a.mode
+        SELECT
+            a.id AS attempt_id,
+            a.quiz_id,
+            COALESCE(q.title, '[Deleted Quiz]') AS quiz_title,
+            a.score,
+            a.total,
+            a.percent,
+            a.started_at,
+            a.completed_at,
+            a.time_remaining,
+            a.mode
         FROM attempts a
-        LEFT JOIN quizzes q ON a.quiz_id = q.id
+        LEFT JOIN quizzes q
+            ON q.id = a.quiz_id
         ORDER BY a.completed_at DESC
     """)
+
     attempts = [dict(row) for row in cur.fetchall()]
 
-    # Attach missed questions
+    # ------------------------------------------------------------------
+    # Attach missed questions (stable + explicit key usage)
+    # ------------------------------------------------------------------
     for attempt in attempts:
         cur.execute("""
             SELECT
@@ -3016,27 +3024,25 @@ def api_attempts():
             FROM missed_questions
             WHERE attempt_id = ?
             ORDER BY attempt_question_number
-        """, (attempt["id"],))
+        """, (attempt["attempt_id"],))
 
         mq = cur.fetchall()
 
-
         attempt["missedQuestions"] = [
-        {
-            "number": m["attempt_question_number"],
-            "question": m["question_text"],
-            "correctLetters": (m["correct_letters"] or "").split(","),
-            "correctText": (m["correct_text"] or "").split("\n"),
-            "selectedLetters": (m["selected_letters"] or "").split(","),
-            "selectedText": (m["selected_text"] or "").split("\n"),
-        }
-        for m in mq
-    ]
-
-
+            {
+                "number": m["attempt_question_number"],
+                "question": m["question_text"],
+                "correctLetters": (m["correct_letters"] or "").split(",") if m["correct_letters"] else [],
+                "correctText": (m["correct_text"] or "").split("\n") if m["correct_text"] else [],
+                "selectedLetters": (m["selected_letters"] or "").split(",") if m["selected_letters"] else [],
+                "selectedText": (m["selected_text"] or "").split("\n") if m["selected_text"] else [],
+            }
+            for m in mq
+        ]
 
     conn.close()
     return jsonify(attempts)
+
 
 
 
