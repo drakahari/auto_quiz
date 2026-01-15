@@ -582,3 +582,6 @@ a:hover {
 a:active {
     color: #00ffaa;
 }
+button {
+    pointer-events: auto;
+}

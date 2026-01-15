@@ -709,6 +709,35 @@ def delete_quiz(quiz_id):
     print("[DELETE] Completed quiz_id:", quiz_id)
     return redirect("/library")
 
+# =========================
+# WIPE DATABASE (FULL RESET)
+# =========================
+@app.route("/api/wipe_database", methods=["POST"])
+def wipe_database():
+    print("[DB] FULL DATABASE WIPE REQUESTED")
+
+    conn = get_db()
+    conn.execute("PRAGMA foreign_keys = OFF")  # disable for mass delete
+    cur = conn.cursor()
+
+    # --- Delete ALL rows ---
+    cur.execute("DELETE FROM missed_questions")
+    cur.execute("DELETE FROM attempt_answers")
+    cur.execute("DELETE FROM attempts")
+    cur.execute("DELETE FROM choices")
+    cur.execute("DELETE FROM questions")
+    cur.execute("DELETE FROM quizzes")
+
+    # --- Reset AUTOINCREMENT counters ---
+    cur.execute("DELETE FROM sqlite_sequence")
+
+    conn.commit()
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.close()
+
+    print("[DB] FULL DATABASE RESET COMPLETE")
+
+    return {"ok": True}
 
 
 
@@ -2735,8 +2764,9 @@ fetch("/config/portal.json")
 
         <h3>Persistent Exam Storage</h3>
         <p style="opacity:.75">
-            These results are stored in the application database.  
-            Clearing will permanently delete all recorded attempts and missed-question history.
+            These results are stored in the application database.
+            Resetting will permanently delete <strong>all quizzes, attempts, and missed-question history</strong>,
+            and reset quiz numbering back to the beginning.
         </p>
 
         <button id="clearDBBtn" style="
@@ -2755,6 +2785,22 @@ fetch("/config/portal.json")
         <button onclick="location.href='/'">⬅ Back To Portal</button>
 
     </div>
+                                  
+        <hr style="margin:20px 0">
+
+        <h3 style="color:#b30000">⚠️ Factory Reset</h3>
+        <p style="opacity:.75">
+            This will permanently delete <b>ALL quizzes</b>, <b>ALL attempts</b>,
+            and <b>reset quiz IDs back to 1</b>.
+        </p>
+
+        <button id="wipeDBBtn" style="background:#b30000;color:white">
+            🧨 Clear Saved Permanent Results (FULL RESET)
+        </button>
+
+        <div id="wipeDBStatus" style="margin-top:8px;font-size:13px;"></div>
+
+
 
     <script>
     // Toggle Advanced Parsing Panel
@@ -2773,11 +2819,13 @@ fetch("/config/portal.json")
         });
     })();
 
-    // Clear DB history button
+    // Clear DB history button (KNOWN WORKING STYLE)
     document.getElementById("clearDBBtn").addEventListener("click", async () => {
 
         if (!confirm(
-            "⚠ This will permanently delete ALL saved exam results and missed question records.\\n\\nThis cannot be undone.\\n\\nContinue?"
+            "⚠ This will permanently delete ALL saved exam results and missed question records.\\n\\n" +
+            "This cannot be undone.\\n\\n" +
+            "Continue?"
         )) return;
 
         try {
@@ -2798,7 +2846,37 @@ fetch("/config/portal.json")
                 "⚠️ Failed to clear persistent history.";
         }
     });
-    </script>
+
+    // FULL RESET button — exact duplicate wiring (SAME ROUTE for test)
+    document.getElementById("wipeDBBtn").addEventListener("click", async () => {
+
+        if (!confirm(
+            "⚠ TEST MODE (WIPE BUTTON)\\n\\n" +
+            "This is temporarily wired to the same action as the red Clear button.\\n\\n" +
+            "If you see this confirm, the button wiring works.\\n\\n" +
+            "Continue?"
+        )) return;
+
+        try {
+            const res = await fetch("/api/clear_db_history", { method: "POST" });
+            const data = await res.json();
+
+            if (data.status === "ok") {
+                const el = document.getElementById("wipeDBStatus");
+                if (el) el.innerText = "✅ WIPE button click confirmed (test mode)";
+                alert("WIPE button click confirmed (test mode).");
+                location.reload();
+            } else {
+                throw new Error();
+            }
+
+        } catch (err) {
+            const el = document.getElementById("wipeDBStatus");
+            if (el) el.innerText = "❌ WIPE button failed (test mode)";
+        }
+    });
+</script>
+
 
 </div>
 </body>

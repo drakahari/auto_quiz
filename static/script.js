@@ -810,4 +810,40 @@ function saveHistory(percent, correct, total, missed, attemptId) {
     console.log("History saved for quizKey:", quizKey, "Attempt:", attemptId);
 }
 
+function resetDatabase() {
+    const msg =
+        "⚠️ WARNING ⚠️\n\n" +
+        "This will permanently delete:\n" +
+        "• ALL quizzes\n" +
+        "• ALL attempts\n" +
+        "• ALL missed-question history\n\n" +
+        "Quiz numbering will restart from the beginning.\n\n" +
+        "This action CANNOT be undone.\n\n" +
+        "Click OK to continue.";
+
+    if (!confirm(msg)) {
+        return;
+    }
+
+    fetch("/wipe_database", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        }
+    })
+    .then(res => {
+        if (!res.ok) {
+            throw new Error("Database reset failed");
+        }
+        return res.json();
+    })
+    .then(() => {
+        alert("Database reset complete.");
+        window.location.reload();
+    })
+    .catch(err => {
+        console.error(err);
+        alert("Error resetting database. See console.");
+    });
+}
 
