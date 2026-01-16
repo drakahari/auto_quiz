@@ -2805,11 +2805,11 @@ fetch("/config/portal.json")
 
         <hr>
 
-        <h3>Persistent Exam Storage</h3>
+        <h3>Persistent Exam Result Storage</h3>
         <p style="opacity:.75">
             These results are stored in the application database.
-            Resetting will permanently delete <strong>all quizzes, attempts, and missed-question history</strong>,
-            and reset quiz numbering back to the beginning.
+            Resetting will permanently delete <strong>all attempts, and missed-question history</strong>,
+            quizzes will remain in the quiz library.
         </p>
 
         <button id="clearDBBtn" style="
@@ -2819,7 +2819,7 @@ fetch("/config/portal.json")
             border-radius:8px;
             border:1px solid rgba(255,255,255,.3);
         ">
-            🗑 Clear Saved Permanent Results (Database)
+            🗑 Clear Saved Results from Database and Dashboard
         </button>
 
         <p id="clearDBStatus" style="margin-top:6px;"></p>
@@ -2838,7 +2838,7 @@ fetch("/config/portal.json")
         </p>
 
         <button id="wipeDBBtn" style="background:#b30000;color:white">
-            🧨 Clear Saved Permanent Results (FULL RESET)
+            🧨 Clear ALL DATABASE AND QUIZ RECORDS (FULL RESET)
         </button>
 
         <div id="wipeDBStatus" style="margin-top:8px;font-size:13px;"></div>
