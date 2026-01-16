@@ -372,7 +372,26 @@ def save_preview_logo(app, logo_file):
 
 
 
+@app.route("/help/")
+def help_index():
+    return send_from_directory("static", "help.html")
 
+@app.route("/help/about")
+def help_about():
+    return send_from_directory("static", "about.html")
+
+@app.route("/help/quiz-help")
+def help_quiz():
+    return send_from_directory("static", "quiz-help.html")
+
+@app.route("/help/advanced-features")
+def help_advanced():
+    return send_from_directory("static", "advanced-features.html")
+
+@app.route("/regex-help")
+@app.route("/regex-help/")
+def regex_help():
+    return send_from_directory(app.static_folder, "regex-help.html")
 
 
 @app.route("/user-static/<path:filename>")

@@ -72,6 +72,22 @@
         background: #16a34a;
     }
 
+/* Generic navigation buttons (Help / Back / Portal) */
+button {
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+button:hover {
+    background: #1d4ed8;
+}
+
+
     .example {
         background: #020617;
         border-left: 4px solid #38bdf8;
@@ -217,6 +233,11 @@ This preset fixes <strong>most real-world paste issues</strong>.
 <div class="warning">
 Rules are applied top → bottom.<br>
 Preview output before saving quizzes.
+</div>
+
+<div style="margin-top:40px; display:flex; gap:12px; flex-wrap:wrap;">
+    <button onclick="location.href='/help'">⬅ Back to Help Index</button>
+    <button onclick="location.href='/'">🏠 Back to Portal</button>
 </div>
 
 <footer>
