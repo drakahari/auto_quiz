@@ -23,16 +23,94 @@ button:hover { background:#1d4ed8; }
 <h1>Advanced &amp; Experimental Features</h1>
 
 <div class="warning">
-These features are optional. Defaults are recommended.
+Advanced features are optional and intended for experienced users.<br>
+Default settings are recommended for most workflows.
 </div>
 
+<h2>Portal Settings</h2>
+
 <p>
-Portal Settings allow customization such as background images and advanced
-parsing options.
+Portal Settings allow you to customize the appearance and behavior of DLMS
+without affecting core quiz functionality.
+</p>
+
+<p>
+Common options include background images, experimental parsing behavior,
+and optional tooling designed for power users.
+</p>
+
+<h2>Resetting Missed Questions/ Clearing Exam &amp; History Results</h2>
+
+<p>
+DLMS tracks missed questions across quiz attempts to support targeted
+review and long-term learning. DLMS also maintains a persistent history of completed quiz attempts, including
+scores, dates, and review data.
+</p>
+
+<p>
+If desired, you may reset the missed-question and quiz attempt history. This clears all
+stored missed-question records while leaving quizzes intact.
 </p>
 
 <div class="tip">
-If unsure, leave experimental features disabled.
+Use this option if you want to start fresh after remediation or focused study.
+</div>
+
+
+
+<p>
+
+</p>
+
+<p>
+You may choose to clear this history if you want to:
+</p>
+
+<ul>
+    <li>Remove old exam results</li>
+    <li>Reset progress tracking</li>
+    <li>Begin a new study cycle</li>
+</ul>
+
+<p>
+This action affects attempt history only and does not delete quizzes.
+</p>
+
+<h2>Full Database Reset (Factory Reset)</h2>
+
+<div class="warning">
+This action is destructive and cannot be undone.
+</div>
+
+<p>
+DLMS provides an optional full database reset for users who want to
+completely wipe all application data.
+</p>
+
+<p>
+A full reset permanently deletes:
+</p>
+
+<ul>
+    <li>All quizzes</li>
+    <li>All attempt history</li>
+    <li>All missed-question records</li>
+    <li>All stored metadata</li>
+</ul>
+
+<p>
+This option is intended for:
+</p>
+
+<ul>
+    <li>Fresh starts</li>
+    <li>Testing and development</li>
+    <li>System handoff or reuse</li>
+</ul>
+
+<div class="tip">
+DLMS requires explicit confirmation before performing a full reset to
+prevent accidental data loss.
 </div>
 
 <div style="margin-top:40px;">
