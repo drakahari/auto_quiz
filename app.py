@@ -953,7 +953,9 @@ def quiz_library():
 <head>
     <title>Quiz Library</title>
     <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="/static/favicon.ico">
 
+                                  
     <!-- Drag + Drop Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
 
@@ -1116,6 +1118,7 @@ def upload_page():
         <meta charset="UTF-8">
         <title>Upload Quiz File</title>
         <link rel="stylesheet" href="/static/style.css">
+        <link rel="icon" href="/static/favicon.ico">
     </head>
 
     <body>
@@ -1212,6 +1215,7 @@ def paste_page():
         <meta charset="UTF-8">
         <title>Paste Quiz Questions</title>
         <link rel="stylesheet" href="/static/style.css">
+        <link rel="icon" href="/static/favicon.ico">
     </head>
 
     <body>
@@ -1890,6 +1894,8 @@ def preview_paste():
 <head>
     <title>Preview Before Parsing</title>
     <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="/static/favicon.ico">
+                              
 </head>
 
 <body>
@@ -2372,6 +2378,7 @@ def process_paste():
         <head>
             <title>Parse Failed</title>
             <link rel="stylesheet" href="/static/style.css">
+            <link rel="icon" href="/static/favicon.ico">
         </head>
         <body>
         <script>
@@ -2566,6 +2573,7 @@ def process_file():
         <head>
             <title>Parse Failed</title>
             <link rel="stylesheet" href="/static/style.css">
+            <link rel="icon" href="/static/favicon.ico">
         </head>
         <body>
         <script>
@@ -2698,6 +2706,7 @@ def settings_page():
 <head>
 <title>Portal Settings</title>
 <link rel="stylesheet" href="/static/style.css">
+<link rel="icon" href="/static/favicon.ico">                                 
 </head>
 
 <body>
@@ -4244,6 +4253,7 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
 <meta charset="UTF-8">
 <title>{quiz_title}</title>
 <link rel="stylesheet" href="/static/style.css">
+<link rel="icon" href="/static/favicon.ico">
 
 <!-- 🔑 Canonical quiz identity for script.js + DB -->
 <script>
