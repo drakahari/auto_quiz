@@ -3182,24 +3182,85 @@ def record_attempt():
             attempt_pk = attempt_id
 
         # ------------------------------------------------------------
-        # 3) Save missed questions
+        # 3) Save missed questions (RECONSTRUCT SNAPSHOT)
         # ------------------------------------------------------------
         missed_attempt_ref = attempt_pk if attempt_pk is not None else attempt_id
 
         for md in missed_details:
             aqn = md.get("attemptQuestionNumber")
-            qtext = md.get("question")
-            choices = md.get("choices") or []
-            correct_letters = md.get("correctLetters") or []
-            correct_text = md.get("correctText") or []
-            selected_letters = md.get("selectedLetters") or []
-            selected_text = md.get("selectedText") or []
+            if aqn is None:
+                continue
 
-            choices_text = "\n".join(
-                f'{c.get("label")} — {c.get("text")}'
-                for c in choices
-                if isinstance(c, dict)
-            )
+            # 🔑 Pull authoritative question snapshot from DB
+            cur.execute("""
+                SELECT q.question_text, q.id
+                FROM questions q
+                WHERE q.quiz_id = ? AND q.question_number = ?
+            """, (quiz_id, aqn))
+            qrow = cur.fetchone()
+
+            question_text = qrow["question_text"] if qrow else ""
+            question_id = qrow["id"] if qrow else None
+
+            if not question_id:
+                print(f"[WARN] Missing question snapshot for quiz_id={quiz_id}, qnum={aqn}")
+
+
+            # Pull choices
+            choices_text = ""
+            if question_id:
+                cur.execute("""
+                    SELECT label, text
+                    FROM choices
+                    WHERE question_id = ?
+                    ORDER BY label
+                """, (question_id,))
+                choices_text = "\n".join(
+                    f"{r['label']} — {r['text']}"
+                    for r in cur.fetchall()
+                )
+
+            correct_letters = md.get("correctLetters") or []
+            selected_letters = md.get("selectedLetters") or []
+
+            # Normalize types
+            if isinstance(correct_letters, str):
+                correct_letters = [correct_letters]
+            if isinstance(selected_letters, str):
+                selected_letters = [selected_letters]
+
+            correct_letters = [str(x) for x in correct_letters if x]
+            selected_letters = [str(x) for x in selected_letters if x]
+
+
+
+            correct_text = ""
+            selected_text = ""
+
+            if question_id:
+                # Resolve correct text
+                cur.execute("""
+                    SELECT label, text
+                    FROM choices
+                    WHERE question_id = ? AND is_correct = 1
+                """, (question_id,))
+                correct_text = "\n".join(
+                    f"{r['label']} — {r['text']}"
+                    for r in cur.fetchall()
+                )
+
+                # Resolve selected text
+                if selected_letters:
+                    cur.execute(f"""
+                        SELECT label, text
+                        FROM choices
+                        WHERE question_id = ?
+                        AND label IN ({",".join("?" * len(selected_letters))})
+                    """, (question_id, *selected_letters))
+                    selected_text = "\n".join(
+                        f"{r['label']} — {r['text']}"
+                        for r in cur.fetchall()
+                    )
 
             cur.execute("""
                 INSERT INTO missed_questions (
@@ -3215,13 +3276,15 @@ def record_attempt():
             """, (
                 missed_attempt_ref,
                 aqn,
-                qtext,
+                question_text,
                 choices_text,
                 ",".join(correct_letters),
-                "\n".join(correct_text),
+                correct_text,
                 ",".join(selected_letters),
-                "\n".join(selected_text),
+                selected_text,
             ))
+
+
 
         conn.commit()
         return jsonify({"ok": True, "attempt_id": attempt_id}), 200

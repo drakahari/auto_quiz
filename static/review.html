@@ -123,12 +123,20 @@ async function loadReview() {
             <b>Mode:</b> ${attempt.mode}
         `;
 
-        const missed = attempt.missedQuestions || [];
+        // 🔑 SNAPSHOT-BASED MISSED QUESTIONS (AUTHORITATIVE)
+        const mqRes = await fetch(`/api/missed_questions?attempt=${encodeURIComponent(attemptId)}`);
+        if (!mqRes.ok) {
+            box.innerHTML = "<p>⚠️ Failed to load missed questions.</p>";
+            return;
+        }
 
-        if (missed.length === 0) {
+        const missed = await mqRes.json();
+
+        if (!Array.isArray(missed) || missed.length === 0) {
             box.innerHTML = "<p>🎉 No missed questions!</p>";
             return;
         }
+
 
 
         let html = "";
@@ -139,30 +147,27 @@ async function loadReview() {
                 <div class="ankiRow">
                     <input type="checkbox"
                         class="anki-select"
-                        data-qnum="${m.number}"
+                        data-qnum="${m.attempt_question_number}"
                         onchange="syncSelectAllAnki()">
                     <span>Add to Anki deck</span>
                 </div>
 
-                <h3>Question ${m.number}</h3>
+                <h3>Question ${m.attempt_question_number}</h3>
 
-                <div>${m.question}</div>
+                <div>${m.question_text || ""}</div>
 
                 <div class="correctBox">
                     <b>Correct Answer</b><br>
-                    ${(m.correctText && m.correctText.length)
-                        ? m.correctText.join("<br>")
-                        : "(No correct answer recorded)"}
+                    ${m.correct_text || "(No correct answer recorded)"}
                 </div>
 
                 <div class="userBox">
                     <b>Your Answer</b><br>
-                    ${(m.selectedText && m.selectedText.length)
-                        ? m.selectedText.join("<br>")
-                        : "<i>(No answer recorded)</i>"}
+                    ${m.selected_text || "<i>(No answer recorded)</i>"}
                 </div>
             </div>`;
         });
+
 
 
         box.innerHTML = html;
