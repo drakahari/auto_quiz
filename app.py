@@ -431,18 +431,14 @@ def serve_portal_config():
     (title, background image, feature toggles).
     """
     dprint("\n[PORTAL CONFIG] ===== SERVING /config/portal.json =====")
-    dprint("[PORTAL CONFIG] Reading from:", PORTAL_CONFIG)
 
-    try:
-        with open(PORTAL_CONFIG, "r", encoding="utf-8") as f:
-            cfg = json.load(f)
-        dprint("[PORTAL CONFIG] Loaded config:", cfg)
-    except Exception as e:
-        print("[PORTAL CONFIG][ERROR] Failed to load config:", e)
-        cfg = {}
+    cfg = load_portal_config()
 
+    dprint("[PORTAL CONFIG] Loaded config:", cfg)
     dprint("[PORTAL CONFIG] ===== END SERVE =====\n")
+
     return jsonify(cfg)
+
 
 
 
@@ -520,37 +516,53 @@ cleanup_temp_logos()
 def load_portal_config():
     default = {
         "title": "Training & Practice Center",
-        "show_confidence": True,
+        "show_confidence": False,
         "enable_regex_replace": False
     }
 
+    # Ensure config directory exists
+    os.makedirs(os.path.dirname(PORTAL_CONFIG), exist_ok=True)
+
+    # First run: create portal.json
     if not os.path.exists(PORTAL_CONFIG):
-        return default
+        try:
+            with open(PORTAL_CONFIG, "w", encoding="utf-8") as f:
+                json.dump(default, f, indent=2)
+            print("[PORTAL CONFIG] Created default portal.json")
+        except Exception as e:
+            print("[PORTAL CONFIG][ERROR] Failed to create portal.json:", e)
 
+        return default.copy()
+
+    # Normal load
     try:
-        with open(PORTAL_CONFIG, "r") as f:
+        with open(PORTAL_CONFIG, "r", encoding="utf-8") as f:
             data = json.load(f)
-            return {
-                "title": data.get("title", default["title"]),
-                "show_confidence": data.get("show_confidence", True),
-                "enable_regex_replace": data.get("enable_regex_replace", False)
-            }
-    except:
-        return default
+
+        return {
+            "title": data.get("title", default["title"]),
+            "show_confidence": data.get("show_confidence", default["show_confidence"]),
+            "enable_regex_replace": data.get("enable_regex_replace", default["enable_regex_replace"]),
+        }
+
+    except Exception as e:
+        print("[PORTAL CONFIG][ERROR] Failed to load portal.json:", e)
+        return default.copy()
 
 
 
 
-def save_portal_config(title, show_confidence=True, enable_regex_strip=False):
+
+def save_portal_config(title, show_confidence=False, enable_regex_replace=False):
     cfg = {
         "title": title,
         "show_confidence": show_confidence,
-        "enable_regex_strip": enable_regex_strip
+        "enable_regex_replace": enable_regex_replace
     }
 
-
-    with open(PORTAL_CONFIG, "w") as f:
+    with open(PORTAL_CONFIG, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=4)
+
 
 
 def get_portal_title():
@@ -558,7 +570,7 @@ def get_portal_title():
 
 
 def get_confidence_setting():
-    return load_portal_config().get("show_confidence", True)
+    return load_portal_config().get("show_confidence", False)
 
 
 
