@@ -3,6 +3,9 @@ dist/
 build/
 *.spec
 
+# Local release artifacts (never commit)
+releases/
+
 # Virtual environments
 venv/
 __pycache__/
@@ -15,3 +18,4 @@ __pycache__/
 # OS junk
 .DS_Store
 Thumbs.db
+
