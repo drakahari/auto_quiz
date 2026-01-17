@@ -131,7 +131,7 @@ print("[BUILD CHECK] APP_DATA_DIR =", APP_DATA_DIR)
 
 import sys
 
-DEBUG_LOGS = True
+DEBUG_LOGS = False
 
 def dprint(*args, **kwargs):
     if DEBUG_LOGS:
