@@ -17,13 +17,7 @@ fetch("/config/portal.json")
       }
   });
 </script>
-
-
-
-
-
 </head>
-
 
 <body>
 
@@ -44,9 +38,6 @@ fetch("/config/portal.json")
             generate quizzes, take exams, track performance, and review progress.
         </p>
 
-        <!-- ============================= -->
-        <!--        Main Action Grid       -->
-        <!-- ============================= -->
         <div class="portal-grid">
 
             <div class="portal-card" onclick="location.href='/library'">
@@ -79,12 +70,46 @@ fetch("/config/portal.json")
                 <p>Learn how to use DLMS and its features.</p>
             </div>
 
+            <!-- ✅ NEW: Shutdown card -->
+            <div class="portal-card settings-card"
+                 id="shutdownBtn"
+                 style="border:2px solid #b30000">
+                <h2>🛑 Shutdown DLMS</h2>
+                <p>Safely stop the application</p>
+            </div>
 
         </div>
 
     </div>
 
 </div>
+
+<!-- ✅ Shutdown handler (known working pattern) -->
+<script>
+document.getElementById("shutdownBtn").addEventListener("click", async () => {
+
+    if (!confirm(
+        "🛑 SHUTDOWN DLMS 🛑\n\n" +
+        "This will stop the application.\n\n" +
+        "You will need to restart it manually.\n\n" +
+        "Continue?"
+    )) return;
+
+    try {
+        const res = await fetch("/api/shutdown", { method: "POST" });
+        const data = await res.json();
+
+        if (data.status === "ok") {
+            alert("DLMS is shutting down.");
+        } else {
+            throw new Error();
+        }
+
+    } catch (err) {
+        alert("❌ Failed to shut down DLMS.");
+    }
+});
+</script>
 
 </body>
 </html>

@@ -1,5 +1,5 @@
 from flask import Flask, send_from_directory, request, redirect, render_template_string, jsonify, Response
-import os, re, json, time, sqlite3, sys, shutil
+import os, re, json, time, sqlite3, sys, shutil, signal
 from werkzeug.utils import secure_filename
 
 # =========================
@@ -401,6 +401,24 @@ def user_static(filename):
         filename
     )
 
+# =========================
+# SHUTDOWN APPLICATION
+# =========================
+@app.route("/api/shutdown", methods=["POST"])
+def shutdown_app():
+    print("[SYSTEM] Shutdown requested via UI")
+
+    pid = os.getpid()
+
+    def shutdown():
+        print("[SYSTEM] Sending SIGINT to self")
+        os.kill(pid, signal.SIGINT)
+
+    # Delay lets Flask return HTTP 200 before dying
+    from threading import Timer
+    Timer(0.5, shutdown).start()
+
+    return jsonify(status="ok")
 
 
 
@@ -3037,7 +3055,8 @@ def save_settings():
         save_path = os.path.join(BACKGROUND_FOLDER, filename)
         file.save(save_path)
 
-        cfg["background_image"] = f"/static/bg/{filename}"
+        cfg["background_image"] = f"/user-static/bg/{filename}"
+
 
         dprint("[SETTINGS] Background saved to:", save_path)
         dprint("[SETTINGS] background_image set to:", cfg["background_image"])
