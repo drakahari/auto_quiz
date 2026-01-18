@@ -4,6 +4,28 @@ DLMS is a self-hosted quiz and learning application designed for study, practice
 and exam preparation. It supports both **Study Mode** and **Exam Mode**, detailed
 attempt history, confidence analysis, and Anki export for long-term retention.
 
+Why DLMS Exists
+
+DLMS was created to address a gap between simple quiz tools and full-scale learning management systems. Many existing solutions are either too limited for serious study or too complex, restrictive, or heavyweight for individual learners, educators, and IT professionals.
+
+DLMS is designed to be local, transparent, and learner-focused. It gives users full control over their content, data, and study workflow without requiring cloud accounts, subscriptions, or external services. By running entirely on the user’s system as a local web application, DLMS prioritizes privacy, reliability, and portability.
+
+For users who prefer deeper system integration, DLMS can also be run as a systemd service (This is what I do!).
+
+The project emphasizes learning effectiveness, not just assessment. Features like Study Mode, confidence analysis, attempt history, and Anki export are intended to help users identify weak areas, reinforce understanding, and retain knowledge over time. Especially in certification, technical training, and self-directed study scenarios.
+
+DLMS exists because effective learning tools should be:
+
+Powerful without being bloated
+
+Flexible without being fragile
+
+Private by default
+
+Open for inspection, improvement, and reuse
+
+
+
 DLMS runs as a **local web application**.
 
 ---
