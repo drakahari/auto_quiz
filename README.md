@@ -10,7 +10,7 @@ DLMS was created to address a gap between simple quiz tools and full-scale learn
 
 DLMS is designed to be local, transparent, and learner-focused. It gives users full control over their content, data, and study workflow without requiring cloud accounts, subscriptions, or external services. By running entirely on the user’s system as a local web application, DLMS prioritizes privacy, reliability, and portability.
 
-For users who prefer deeper system integration, DLMS can also be run as a systemd service (This is what I do!).
+For users who prefer deeper system integration, DLMS can also be enabled as a systemd service (This is what I do!).
 
 The project emphasizes learning effectiveness, not just assessment. Features like Study Mode, confidence analysis, attempt history, and Anki export are intended to help users identify weak areas, reinforce understanding, and retain knowledge over time. Especially in certification, technical training, and self-directed study scenarios.
 
