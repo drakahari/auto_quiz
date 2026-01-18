@@ -1,4 +1,6 @@
+# ----------------------------
 # PyInstaller artifacts
+# ----------------------------
 dist/
 build/
 *.spec
@@ -6,16 +8,31 @@ build/
 # Local release artifacts (never commit)
 releases/
 
-# Virtual environments
+# ----------------------------
+# Python / venv / caches
+# ----------------------------
 venv/
+.venv/
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
 
-# Local runtime data
+# ----------------------------
+# Local runtime / data
+# (DLMS runtime data should live in user profile dirs, not the repo)
+# ----------------------------
 *.db
 *.sqlite
+*.sqlite3
 *.log
 
-# OS junk
+# ----------------------------
+# Editor / OS junk
+# ----------------------------
 .DS_Store
 Thumbs.db
-
+.vscode/
+.idea/
