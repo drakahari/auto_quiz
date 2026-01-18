@@ -4370,18 +4370,18 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
 <body>
 
 <!-- 🔹 Load background dynamically -->
-<script>
-fetch("/config/portal.json")
-  .then(r => r.json())
-  .then(cfg => {{
-      if (cfg.background_image) {{
-          document.documentElement.style.setProperty(
-              "--portal-bg",
-              `url(${{cfg.background_image}})`
-          );
-      }}
-  }});
-</script>
+# <script>
+# fetch("/config/portal.json")
+#   .then(r => r.json())
+#   .then(cfg => {{
+#       if (cfg.background_image) {{
+#           document.documentElement.style.setProperty(
+#               "--portal-bg",
+#               `url(${{cfg.background_image}})`
+#           );
+#       }}
+#   }});
+# </script>
 
 <!-- 🔹 Overlay shown when exam is paused -->
 <div id="pauseOverlay" class="pause-overlay">
