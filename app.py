@@ -447,23 +447,38 @@ def serve_portal_config():
 def dynamic_css():
     cfg = load_portal_config()
 
+    print("[DYNAMIC.CSS] background_image =", cfg.get("background_image"))
+
     bg = (cfg.get("background_image") or "").strip()
 
-    # Normalize background image to a usable URL
     if not bg:
         bg_url = "/static/bg/fiber.jpg"
-    elif bg.startswith("/"):
-        # already a path (defensive / backward-compat)
-        bg_url = bg
     else:
-        # filename-only (correct modern case)
-        bg_url = f"/static/bg/{bg}"
+        user_bg = os.path.join(APP_DATA_DIR, "static", "bg", bg)
+        static_bg = os.path.join(app.static_folder, "bg", bg)
+
+        if os.path.exists(user_bg):
+            bg_url = f"/user-bg/{bg}"
+        elif os.path.exists(static_bg):
+            bg_url = f"/static/bg/{bg}"
+        else:
+            bg_url = "/static/bg/fiber.jpg"
 
     return f""":root {{
   --portal-bg: url('{bg_url}');
 }}
 """, 200, {"Content-Type": "text/css"}
 
+
+
+
+# =========================
+# SERVE USER BACKGROUNDS (RUNTIME SAFE)
+# =========================
+@app.route("/user-bg/<path:filename>")
+def serve_user_background(filename):
+    bg_dir = os.path.join(APP_DATA_DIR, "static", "bg")
+    return send_from_directory(bg_dir, filename)
 
 
 
@@ -3016,34 +3031,34 @@ document.getElementById("wipeDBBtn").addEventListener("click", async () => {
 
 
 
-def load_portal_config():
-    default = {
-        "title": "Training & Practice Center",
-        "show_confidence": True,
-        "enable_regex_replace": False,
-        "auto_bom_clean": False,
-        "enable_show_invisibles": False,
-        "background_image": None,
-    }
+# def load_portal_config():
+#     default = {
+#         "title": "Training & Practice Center",
+#         "show_confidence": True,
+#         "enable_regex_replace": False,
+#         "auto_bom_clean": False,
+#         "enable_show_invisibles": False,
+#         "background_image": None,
+#     }
 
-    if not os.path.exists(PORTAL_CONFIG):
-        return default.copy()
+#     if not os.path.exists(PORTAL_CONFIG):
+#         return default.copy()
 
-    try:
-        with open(PORTAL_CONFIG, "r") as f:
-            data = json.load(f) or {}
+#     try:
+#         with open(PORTAL_CONFIG, "r") as f:
+#             data = json.load(f) or {}
 
-        # Backward compatibility
-        if "auto_clean_hidden" in data and "auto_bom_clean" not in data:
-            data["auto_bom_clean"] = bool(data.get("auto_clean_hidden"))
+#         # Backward compatibility
+#         if "auto_clean_hidden" in data and "auto_bom_clean" not in data:
+#             data["auto_bom_clean"] = bool(data.get("auto_clean_hidden"))
 
-        cfg = default.copy()
-        cfg.update(data)
+#         cfg = default.copy()
+#         cfg.update(data)
 
-        return cfg
+#         return cfg
 
-    except Exception:
-        return default.copy()
+#     except Exception:
+#         return default.copy()
 
 
 
