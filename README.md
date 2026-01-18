@@ -1,4 +1,4 @@
-This is version 1.0 Created on 1/9/26 by Mike Buchanan# DLMS – Digital Learning & Management System
+This is version 1.1 Created on 1/9/26 by Mike Buchanan# DLMS – Digital Learning & Management System
 
 DLMS is a self-hosted quiz and learning application designed for study, practice,
 and exam preparation. It supports both **Study Mode** and **Exam Mode**, detailed
