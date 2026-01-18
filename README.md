@@ -77,12 +77,6 @@ focus on missed material.
 ![Study Mode Example 1](docs/screenshots/SS1.png)
 ![Study Mode Example 2](docs/screenshots/SS2.png)
 
-### Anki Export Examples
-
-![Anki Export Example 1](docs/screenshots/anki1.png)
-![Anki Export Example 2](docs/screenshots/anki2.png)
-
----
 
 ## 🧩 Anki Integration
 
@@ -91,6 +85,16 @@ learning system. This allows users to turn weak areas into targeted study decks
 for long-term retention.
 
 ---
+
+
+### Anki Export Examples
+
+![Anki Export Example 1](docs/screenshots/anki1.png)
+![Anki Export Example 2](docs/screenshots/anki2.png)
+
+---
+
+
 
 ## 🖥️ Running DLMS
 
