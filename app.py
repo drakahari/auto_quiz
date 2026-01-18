@@ -452,22 +452,23 @@ def dynamic_css():
     bg = (cfg.get("background_image") or "").strip()
 
     if not bg:
-        bg_url = "/static/bg/fiber.jpg"
+        css_bg = "none"
     else:
         user_bg = os.path.join(APP_DATA_DIR, "static", "bg", bg)
         static_bg = os.path.join(app.static_folder, "bg", bg)
 
         if os.path.exists(user_bg):
-            bg_url = f"/user-bg/{bg}"
+            css_bg = f"url('/user-bg/{bg}')"
         elif os.path.exists(static_bg):
-            bg_url = f"/static/bg/{bg}"
+            css_bg = f"url('/static/bg/{bg}')"
         else:
-            bg_url = "/static/bg/fiber.jpg"
+            css_bg = "none"
 
     return f""":root {{
-  --portal-bg: url('{bg_url}');
+  --portal-bg: {css_bg};
 }}
 """, 200, {"Content-Type": "text/css"}
+
 
 
 
