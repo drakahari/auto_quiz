@@ -38,7 +38,7 @@ Study Mode is designed to help users learn and reinforce concepts rather than
 simulate a timed exam. Users can review questions, analyze confidence levels,
 and focus on missed material.
 
-(See screenshots below.)
+(See screenshots below. No logos or quiz questions/answers are provided)
 ### Study Mode Examples
 
 ![Study Mode Example 1](docs/screenshots/SS1.png)
