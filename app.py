@@ -446,13 +446,26 @@ def serve_portal_config():
 @app.route("/dynamic.css")
 def dynamic_css():
     cfg = load_portal_config()
-    bg = cfg.get("background_image", "/static/fiber.jpg")
 
-    return f"""
-:root {{
-  --portal-bg: url('{bg}');
+    bg = (cfg.get("background_image") or "").strip()
+
+    # Normalize background image to a usable URL
+    if not bg:
+        bg_url = "/static/bg/fiber.jpg"
+    elif bg.startswith("/"):
+        # already a path (defensive / backward-compat)
+        bg_url = bg
+    else:
+        # filename-only (correct modern case)
+        bg_url = f"/static/bg/{bg}"
+
+    return f""":root {{
+  --portal-bg: url('{bg_url}');
 }}
 """, 200, {"Content-Type": "text/css"}
+
+
+
 
 
 
@@ -517,7 +530,8 @@ def load_portal_config():
     default = {
         "title": "Training & Practice Center",
         "show_confidence": False,
-        "enable_regex_replace": False
+        "enable_regex_replace": False,
+        "background_image": None,   # ← REQUIRED (safe default)
     }
 
     # Ensure config directory exists
@@ -534,35 +548,45 @@ def load_portal_config():
 
         return default.copy()
 
-    # Normal load
+    # Normal load (MERGE, do not FILTER)
     try:
         with open(PORTAL_CONFIG, "r", encoding="utf-8") as f:
-            data = json.load(f)
+            data = json.load(f) or {}
 
-        return {
-            "title": data.get("title", default["title"]),
-            "show_confidence": data.get("show_confidence", default["show_confidence"]),
-            "enable_regex_replace": data.get("enable_regex_replace", default["enable_regex_replace"]),
-        }
+        # Merge defaults with stored values
+        cfg = default.copy()
+        cfg.update(data)
+
+        # Normalize booleans (checkbox safety)
+        cfg["show_confidence"] = bool(cfg.get("show_confidence", False))
+        cfg["enable_regex_replace"] = bool(cfg.get("enable_regex_replace", False))
+
+        # Normalize title
+        cfg["title"] = str(cfg.get("title") or default["title"]).strip()
+
+        # Normalize background
+        bg = cfg.get("background_image")
+        cfg["background_image"] = bg.strip() if isinstance(bg, str) and bg.strip() else None
+
+        return cfg
 
     except Exception as e:
         print("[PORTAL CONFIG][ERROR] Failed to load portal.json:", e)
         return default.copy()
 
 
+def save_portal_config(title, show_confidence=False, enable_regex_replace=False, background_image=None):
+    cfg = load_portal_config()
 
+    cfg["title"] = title
+    cfg["show_confidence"] = bool(show_confidence)
+    cfg["enable_regex_replace"] = bool(enable_regex_replace)
 
-
-def save_portal_config(title, show_confidence=False, enable_regex_replace=False):
-    cfg = {
-        "title": title,
-        "show_confidence": show_confidence,
-        "enable_regex_replace": enable_regex_replace
-    }
+    if background_image is not None:
+        cfg["background_image"] = background_image
 
     with open(PORTAL_CONFIG, "w", encoding="utf-8") as f:
-        json.dump(cfg, f, indent=4)
-
+        json.dump(cfg, f, indent=2)
 
 
 def get_portal_title():
@@ -972,18 +996,18 @@ def quiz_library():
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
 
     <!-- Background Loader -->
-    <script>
-    fetch("/config/portal.json")
-      .then(r => r.json())
-      .then(cfg => {
-          if (cfg.background_image) {
-              document.documentElement.style.setProperty(
-                  "--portal-bg",
-                  `url(${cfg.background_image})`
-              );
-          }
-      });
-    </script>
+    # <script>
+    # fetch("/config/portal.json")
+    #   .then(r => r.json())
+    #   .then(cfg => {
+    #       if (cfg.background_image) {
+    #           document.documentElement.style.setProperty(
+    #               "--portal-bg",
+    #               `url(${cfg.background_image})`
+    #           );
+    #       }
+    #   });
+    # </script>
 </head>
 
 <body>
@@ -1135,18 +1159,18 @@ def upload_page():
 
     <body>
 
-    <script>
-fetch("/config/portal.json")
-  .then(r => r.json())
-  .then(cfg => {
-      if (cfg.background_image) {
-          document.documentElement.style.setProperty(
-              "--portal-bg",
-              `url(${cfg.background_image})`
-          );
-      }
-  });
-</script>
+#     <script>
+# fetch("/config/portal.json")
+#   .then(r => r.json())
+#   .then(cfg => {
+#       if (cfg.background_image) {
+#           document.documentElement.style.setProperty(
+#               "--portal-bg",
+#               `url(${cfg.background_image})`
+#           );
+#       }
+#   });
+# </script>
 
 
     <div class="container">
@@ -2723,18 +2747,18 @@ def settings_page():
 
 <body>
                                   
-<script>
-fetch("/config/portal.json")
-  .then(r => r.json())
-  .then(cfg => {
-      if (cfg.background_image) {
-          document.documentElement.style.setProperty(
-              "--portal-bg",
-              `url(${cfg.background_image})`
-          );
-      }
-  });
-</script>
+# <script>
+# fetch("/config/portal.json")
+#   .then(r => r.json())
+#   .then(cfg => {
+#       if (cfg.background_image) {
+#           document.documentElement.style.setProperty(
+#               "--portal-bg",
+#               `url(${cfg.background_image})`
+#           );
+#       }
+#   });
+# </script>
 
 
 
@@ -2993,35 +3017,34 @@ document.getElementById("wipeDBBtn").addEventListener("click", async () => {
 
 
 def load_portal_config():
-    """Always returns a valid portal config dict."""
     default = {
         "title": "Training & Practice Center",
         "show_confidence": True,
         "enable_regex_replace": False,
         "auto_bom_clean": False,
         "enable_show_invisibles": False,
+        "background_image": None,
     }
 
     if not os.path.exists(PORTAL_CONFIG):
-        return default
+        return default.copy()
 
     try:
         with open(PORTAL_CONFIG, "r") as f:
-            data = json.load(f)
+            data = json.load(f) or {}
 
-        # 🔄 Backward compatibility: if old key exists, map it
+        # Backward compatibility
         if "auto_clean_hidden" in data and "auto_bom_clean" not in data:
             data["auto_bom_clean"] = bool(data.get("auto_clean_hidden"))
 
-        return {
-            "title": data.get("title", default["title"]),
-            "show_confidence": data.get("show_confidence", default["show_confidence"]),
-            "enable_regex_replace": data.get("enable_regex_replace", default["enable_regex_replace"]),
-            "auto_bom_clean": data.get("auto_bom_clean", default["auto_bom_clean"]),
-            "enable_show_invisibles": data.get("enable_show_invisibles", default["enable_show_invisibles"]),
-        }
-    except:
-        return default
+        cfg = default.copy()
+        cfg.update(data)
+
+        return cfg
+
+    except Exception:
+        return default.copy()
+
 
 
 
@@ -3076,7 +3099,14 @@ def save_settings():
         save_path = os.path.join(BACKGROUND_FOLDER, filename)
         file.save(save_path)
 
-        cfg["background_image"] = f"/user-static/bg/{filename}"
+        # 🔒 HARD ASSERT: ensure the file actually exists
+        if not os.path.exists(save_path):
+            raise RuntimeError(
+                f"Background image failed to save: {save_path}"
+            )
+
+        cfg["background_image"] = filename
+
 
 
         dprint("[SETTINGS] Background saved to:", save_path)
