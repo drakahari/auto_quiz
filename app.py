@@ -510,6 +510,21 @@ def dashboard():
     return send_from_directory(app.static_folder, "dashboard.html")
 
 
+@app.route("/toggle_hidden", methods=["POST"])
+def toggle_hidden():
+    quiz_id = int(
+        request.form.get("id") or request.json.get("id")
+    )
+
+    registry = load_registry()
+    for q in registry:
+        if q.get("id") == quiz_id:
+            q["hidden"] = not q.get("hidden", False)
+
+    save_registry(registry)
+    return redirect("/library")
+
+
 
 
 
@@ -973,11 +988,11 @@ def quiz_library():
         {
             "id": q.get("id"),
             "title": q.get("title"),
-            "html": q.get("html")
+            "html": q.get("html"),
+            "hidden": q.get("hidden", False),
         }
         for q in registry
     ])
-
 
     # =========================
     # DEBUG: Verify logo files exist on disk
@@ -990,12 +1005,32 @@ def quiz_library():
 
     portal_title = get_portal_title()
 
+    # =====================================================
+    # VIEW MODE RESOLUTION (BACKWARD COMPATIBLE)
+    # =====================================================
+    # Priority:
+    # 1) explicit ?view=
+    # 2) legacy ?show_hidden=1
+    # 3) default = visible only
 
-    # Registry is now authoritative
+    view = request.args.get("view")
+
+    if not view and request.args.get("show_hidden") == "1":
+        view = "all"
+
+    if view == "hidden":
+        filtered = [q for q in registry if q.get("hidden", False)]
+    elif view == "all":
+        filtered = registry
+    else:
+        # default: visible only
+        view = "visible"
+        filtered = [q for q in registry if not q.get("hidden", False)]
+
     quizzes = [
-    {**q, "logo": resolve_logo_filename(q.get("logo"))}
-    for q in registry
-]
+        {**q, "logo": resolve_logo_filename(q.get("logo"))}
+        for q in filtered
+    ]
 
 
 
@@ -1007,27 +1042,11 @@ def quiz_library():
     <link rel="stylesheet" href="/static/style.css">
     <link rel="icon" href="/static/favicon.ico">
 
-                                  
-    <!-- Drag + Drop Library -->
+    <!-- Drag + Drop -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
-
-    <!-- Background Loader -->
-    # <script>
-    # fetch("/config/portal.json")
-    #   .then(r => r.json())
-    #   .then(cfg => {
-    #       if (cfg.background_image) {
-    #           document.documentElement.style.setProperty(
-    #               "--portal-bg",
-    #               `url(${cfg.background_image})`
-    #           );
-    #       }
-    #   });
-    # </script>
 </head>
 
 <body>
-
 <div class="container">
 
     <h1 class="hero-title">
@@ -1037,84 +1056,153 @@ def quiz_library():
 
     <div class="card">
 
+        <!-- =============================
+             VIEW MODE CONTROLS (ALWAYS VISIBLE)
+        ============================== -->
+        <form method="GET"
+              action="/library"
+              style="
+                margin-bottom:18px;
+                display:flex;
+                gap:16px;
+                align-items:center;
+                flex-wrap:wrap;
+              ">
+
+            <span style="opacity:.8;font-size:14px;">View:</span>
+
+            <label>
+                <input type="radio"
+                       name="view"
+                       value="visible"
+                       onchange="this.form.submit()"
+                       {% if request.args.get('view','visible') == 'visible' %}checked{% endif %}>
+                Visible
+            </label>
+
+            <label>
+                <input type="radio"
+                       name="view"
+                       value="hidden"
+                       onchange="this.form.submit()"
+                       {% if request.args.get('view') == 'hidden' %}checked{% endif %}>
+                Hidden
+            </label>
+
+            <label>
+                <input type="radio"
+                       name="view"
+                       value="all"
+                       onchange="this.form.submit()"
+                       {% if request.args.get('view') == 'all' %}checked{% endif %}>
+                All
+            </label>
+
+        </form>
+
         {% if quizzes %}
-            <h2>Drag to Reorder</h2>
 
-            <div id="quizList">
-            {% for q in quizzes %}
-                <div class="quiz-card"
-                     data-id="{{ q['html'] }}"
-                     style="
-                        padding:14px;
-                        margin:10px;
-                        background:rgba(0,0,0,.6);
-                        border-radius:8px;
-                        display:flex;
-                        justify-content:space-between;
-                        gap:20px;
-                        cursor:grab;
-                     ">
+        <!-- =============================
+             QUIZ LIST
+        ============================== -->
+        <div id="quizList">
 
-                    <div style="flex:1;">
-                        <h3 style="
-                            margin-top:0;
-                            margin-bottom:6px;
-                            font-size:24px;
-                            font-weight:900;
-                            letter-spacing:.5px;">
-                            {{ q['title'] }}
-                        </h3>
+        {% for q in quizzes %}
+        <div class="quiz-card"
+             data-id="{{ q['html'] }}"
+             style="
+                padding:14px;
+                margin:10px;
+                background:rgba(0,0,0,.6);
+                border-radius:8px;
+                display:flex;
+                justify-content:space-between;
+                gap:20px;
+                cursor:grab;
+             ">
 
-                        <div style="margin-top:10px;">
-                            <button onclick="location.href='/quizzes/{{ q['html'] }}'"
-                                    style="padding:8px 14px; border-radius:6px;">
-                                ▶ Open Quiz
-                            </button>
-                        </div>
-                    </div>
+            <!-- LEFT -->
+            <div style="flex:1;">
+                <h3 style="
+                    margin-top:0;
+                    margin-bottom:6px;
+                    font-size:24px;
+                    font-weight:900;
+                ">
+                    {{ q['title'] }}
+                    {% if q.get('hidden') %}
+                        <span style="font-size:14px;opacity:.6;">(Hidden)</span>
+                    {% endif %}
+                </h3>
 
-                    <div style="
-                        width:150px;
-                        display:flex;
-                        flex-direction:column;
-                        justify-content:space-between;
-                        align-items:center;
-                    ">
+                <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+                    <button onclick="location.href='/quizzes/{{ q['html'] }}'">
+                        ▶ Open Quiz
+                    </button>
 
-                        {% if q['logo'] %}
-                        <img src="/user-static/logos/{{ q['logo'] }}"
-                             style="max-height:90px; width:auto;">
-                        {% else %}
-                        <div style="height:90px;"></div>
-                        {% endif %}
-
-                        <form method="POST"
-                              action="/delete_quiz/{{ q['id'] }}"
-                              onsubmit="return confirm('Delete this quiz permanently?');"
-                              style="margin-top:12px; width:100%; text-align:center;">
-
-                            <button type="submit"
-                                    style="
-                                        width:100%;
-                                        background:#7a0000;
-                                        color:white;
-                                        border:none;
-                                        padding:7px 0;
-                                        font-size:13px;
-                                        border-radius:6px;
-                                        cursor:pointer;
-                                    ">
-                                🗑 Delete
-                            </button>
-                        </form>
-
-                    </div>
+                    <!-- HIDE / UNHIDE -->
+                    <form method="POST"
+                          action="/toggle_hidden"
+                          style="display:inline;">
+                        <input type="hidden" name="id" value="{{ q['id'] }}">
+                        <button type="submit" style="font-size:12px;">
+                            {% if q.get('hidden') %}
+                                👁 Unhide
+                            {% else %}
+                                🙈 Hide
+                            {% endif %}
+                        </button>
+                    </form>
                 </div>
-            {% endfor %}
             </div>
 
+            <!-- RIGHT -->
+            <div style="
+                width:150px;
+                min-width:150px;
+                flex-shrink:0;
+                display:flex;
+                flex-direction:column;
+                justify-content:space-between;
+                align-items:center;
+            ">
+
+                {% if q['logo'] %}
+                <img src="/user-static/logos/{{ q['logo'] }}"
+                     style="max-height:90px; width:auto;">
+                {% else %}
+                <div style="height:90px;"></div>
+                {% endif %}
+
+                <form method="POST"
+                      action="/delete_quiz/{{ q['id'] }}"
+                      onsubmit="return confirm('Delete this quiz permanently?');"
+                      style="margin-top:12px; width:100%; text-align:center;">
+
+                    <button type="submit"
+                            style="
+                                width:100%;
+                                background:#7a0000;
+                                color:white;
+                                border:none;
+                                padding:7px 0;
+                                font-size:13px;
+                                border-radius:6px;
+                            ">
+                        🗑 Delete
+                    </button>
+                </form>
+
+            </div>
+        </div>
+        {% endfor %}
+
+        </div>
+
         {% else %}
-            <p>No quizzes created yet. Upload one 😊</p>
+        <p style="opacity:.8;">
+            No quizzes found for this view.
+        </p>
         {% endif %}
 
         <br>
@@ -1123,9 +1211,11 @@ def quiz_library():
         <button onclick="location.href='/'">⬅ Back To Portal</button>
 
     </div>
-
 </div>
 
+<!-- =============================
+     DRAG + DROP (SAFE)
+============================= -->
 <script>
 const list = document.getElementById("quizList");
 
@@ -1149,6 +1239,10 @@ if (list) {
 
 </body>
 </html>
+
+
+
+
     """, quizzes=quizzes, portal_title=portal_title)
 
 
