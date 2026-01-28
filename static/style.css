@@ -675,3 +675,20 @@ a:active {
 button {
     pointer-events: auto;
 }
+
+/* =============================
+   DELETE BUTTON HOVER GLOW
+============================= */
+.btn-delete {
+    transition:
+        box-shadow 0.15s ease,
+        transform 0.15s ease,
+        filter 0.15s ease;
+}
+
+.btn-delete:hover {
+    box-shadow: 0 0 10px rgba(255, 80, 80, 0.7);
+    filter: brightness(1.15);
+    transform: translateY(-1px) scale(1.02);
+}
+

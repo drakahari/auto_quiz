@@ -1191,6 +1191,7 @@ def quiz_library():
                       style="margin-top:12px; width:100%; text-align:center;">
 
                     <button type="submit"
+                            class="btn-delete"
                             style="
                                 width:100%;
                                 background:#7a0000;
