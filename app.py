@@ -516,13 +516,19 @@ def toggle_hidden():
         request.form.get("id") or request.json.get("id")
     )
 
+    view = request.form.get("view")  # ← preserve context
+
     registry = load_registry()
     for q in registry:
         if q.get("id") == quiz_id:
             q["hidden"] = not q.get("hidden", False)
 
     save_registry(registry)
+
+    if view:
+        return redirect(f"/library?view={view}")
     return redirect("/library")
+
 
 
 
@@ -1142,9 +1148,13 @@ def quiz_library():
 
                     <!-- HIDE / UNHIDE -->
                     <form method="POST"
-                          action="/toggle_hidden"
-                          style="display:inline;">
+                        action="/toggle_hidden"
+                        style="display:inline;">
                         <input type="hidden" name="id" value="{{ q['id'] }}">
+                        <input type="hidden"
+                                name="view"
+                                value="{{ request.args.get('view', 'visible') }}">
+
                         <button type="submit" style="font-size:12px;">
                             {% if q.get('hidden') %}
                                 👁 Unhide
@@ -1153,6 +1163,7 @@ def quiz_library():
                             {% endif %}
                         </button>
                     </form>
+
                 </div>
             </div>
 
