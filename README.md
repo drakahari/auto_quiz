@@ -1,4 +1,12 @@
-This is version 1.1
+## Latest Release
+
+**DLMS v1.2** is now available.
+
+- Improved quiz library behavior (view state preserved)
+- UI polish for destructive actions (delete hover emphasis)
+
+👉 Download from the [Releases page](../../releases).
+
 Created on 1/9/26 by Mike Buchanan
 
 # DLMS – Digital Learning & Management System
