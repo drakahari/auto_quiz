@@ -852,21 +852,29 @@ def edit_quiz(quiz_id):
 
                 <ul>
                 {% for c in q.choices %}
-                    <li>
+                    <li style="margin-bottom:6px;">
                         <b>{{ c["label"] }}.</b>
 
                         <input type="text"
                                name="choice_{{ c['id'] }}"
                                value="{{ c['text'] }}"
-                               style="width:75%; padding:6px;">
+                               style="width:65%; padding:6px;">
 
                         <input type="checkbox"
                                name="correct_{{ c['id'] }}"
                                {% if c["is_correct"] %}checked{% endif %}>
                         Correct
 
+                        <button type="submit"
+                                form="delete-choice-{{ c.id }}"
+                                class="btn-delete"
+                                onclick="return confirm('Delete this answer choice?');"
+                                style="font-size:11px; padding:4px 6px;">
+                            ❌
+                        </button>
+
                         {% if c["is_correct"] %}
-                            <span style="color:#00ff80;"> ✅ Correct</span>
+                            <span style="color:#00ff80;">✅ Correct</span>
                         {% endif %}
                     </li>
                 {% endfor %}
@@ -901,7 +909,7 @@ def edit_quiz(quiz_id):
             <button type="submit">💾 Save Changes</button>
         </form>
 
-        <!-- ✅ OUTSIDE FORMS: SAFE DELETE + ADD CHOICES -->
+        <!-- ✅ OUTSIDE FORMS: SAFE DELETE + ADD CHOICES + DELETE CHOICES -->
         {% for q in questions %}
         <form id="delete-question-{{ q.id }}"
               method="POST"
@@ -912,6 +920,13 @@ def edit_quiz(quiz_id):
               method="POST"
               action="/add_choices/{{ quiz['id'] }}/{{ q.id }}">
         </form>
+
+            {% for c in q.choices %}
+            <form id="delete-choice-{{ c.id }}"
+                  method="POST"
+                  action="/delete_choice/{{ quiz['id'] }}/{{ c.id }}">
+            </form>
+            {% endfor %}
         {% endfor %}
 
         <button onclick="location.href='/library'">⬅ Back to Library</button>
@@ -1241,18 +1256,27 @@ def add_choices_to_question(quiz_id, question_id):
         (question_id,)
     ).fetchall()
 
-    start_index = len(existing)
+    used_labels = {row[0] for row in existing}
 
-    for i in range(count):
-        label = chr(ord("A") + start_index + i)
+    added = 0
+    label_index = 0
 
-        cur.execute(
-            """
-            INSERT INTO choices (question_id, label, text, is_correct)
-            VALUES (?, ?, ?, ?)
-            """,
-            (question_id, label, f"Option {label}", 0)
-        )
+    while added < count:
+        label = chr(ord("A") + label_index)
+
+        if label not in used_labels:
+            cur.execute(
+                """
+                INSERT INTO choices (question_id, label, text, is_correct)
+                VALUES (?, ?, ?, ?)
+                """,
+                (question_id, label, f"Option {label}", 0)
+            )
+
+            used_labels.add(label)
+            added += 1
+
+        label_index += 1
 
     conn.commit()
     conn.close()
@@ -1263,6 +1287,62 @@ def add_choices_to_question(quiz_id, question_id):
     return redirect(f"/edit_quiz/{quiz_id}")
 
 
+
+# =========================
+# DELETE CHOICE FROM QUESTION
+# =========================
+@app.route("/delete_choice/<int:quiz_id>/<int:choice_id>", methods=["POST"])
+def delete_choice_from_question(quiz_id, choice_id):
+    conn = get_db()
+    cur = conn.cursor()
+
+    # Find the question this choice belongs to
+    row = cur.execute(
+        """
+        SELECT question_id
+        FROM choices
+        WHERE id = ?
+        """,
+        (choice_id,)
+    ).fetchone()
+
+    if not row:
+        conn.close()
+        return redirect(f"/edit_quiz/{quiz_id}")
+
+    question_id = row[0]
+
+    # Do not allow deleting the last remaining choice
+    choice_count = cur.execute(
+        """
+        SELECT COUNT(*)
+        FROM choices
+        WHERE question_id = ?
+        """,
+        (question_id,)
+    ).fetchone()[0]
+
+    if choice_count <= 1:
+        conn.close()
+        flash("A question must have at least one answer choice.", "error")
+        return redirect(f"/edit_quiz/{quiz_id}")
+
+    # Delete the selected choice
+    cur.execute(
+        """
+        DELETE FROM choices
+        WHERE id = ?
+        """,
+        (choice_id,)
+    )
+
+    conn.commit()
+    conn.close()
+
+    rebuild_quiz_json_from_db(quiz_id)
+    rebuild_quiz_html_from_registry(quiz_id)
+
+    return redirect(f"/edit_quiz/{quiz_id}")
 
 
 # =========================
