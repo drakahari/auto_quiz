@@ -692,3 +692,26 @@ button {
     transform: translateY(-1px) scale(1.02);
 }
 
+/* =============================
+   FLASH MESSAGES
+============================= */
+.flash {
+    padding: 12px 16px;
+    margin: 14px 0;
+    border-radius: 8px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.flash.error {
+    background: rgba(180, 0, 0, 0.85);
+    color: white;
+    border: 1px solid #ff8080;
+    box-shadow: 0 0 12px rgba(255, 0, 0, 0.35);
+}
+
+.flash.success {
+    background: rgba(0, 120, 60, 0.85);
+    color: white;
+    border: 1px solid #80ffbf;
+}

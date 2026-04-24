@@ -1,4 +1,4 @@
-from flask import Flask, send_from_directory, request, redirect, render_template_string, jsonify, Response
+from flask import Flask, send_from_directory, request, redirect, render_template_string, jsonify, Response, flash, url_for
 import os, re, json, time, sqlite3, sys, shutil, signal
 from werkzeug.utils import secure_filename
 
@@ -113,7 +113,7 @@ app = Flask(
     static_folder=STATIC_ROOT,
     static_url_path="/static"
 )
-
+app.secret_key = "dlms-dev"
 
 
 
@@ -758,6 +758,419 @@ def serve_quiz(filename):
 
 
 # =========================
+# EDIT QUIZ - FORM
+# =========================
+@app.route("/edit_quiz/<int:quiz_id>")
+def edit_quiz(quiz_id):
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    quiz = cur.execute(
+        "SELECT id, title, source_file FROM quizzes WHERE id = ?",
+        (quiz_id,)
+    ).fetchone()
+
+    if not quiz:
+        conn.close()
+        return "Quiz not found", 404
+
+    questions = cur.execute(
+        """
+        SELECT id, question_number, question_text
+        FROM questions
+        WHERE quiz_id = ?
+        ORDER BY question_number, id
+        """,
+        (quiz_id,)
+    ).fetchall()
+
+    question_list = []
+
+    for q in questions:
+        choices = cur.execute(
+            """
+            SELECT id, label, text, is_correct
+            FROM choices
+            WHERE question_id = ?
+            ORDER BY label
+            """,
+            (q["id"],)
+        ).fetchall()
+
+        question_list.append({
+            "id": q["id"],
+            "number": q["question_number"],
+            "text": q["question_text"],
+            "choices": choices
+        })
+
+    conn.close()
+
+    return render_template_string("""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Edit Quiz</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="container">
+    <h1 class="hero-title">✏️ Edit Quiz</h1>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="card">
+        <form method="POST" action="/edit_quiz/{{ quiz['id'] }}">
+            <label><b>Quiz Title</b></label><br>
+            <input type="text" name="quiz_title" value="{{ quiz['title'] }}" style="width:100%; padding:8px;">
+            <p><b>Quiz ID:</b> {{ quiz["id"] }}</p>
+            <p><b>Source file:</b> {{ quiz["source_file"] }}</p>
+
+        {% for q in questions %}
+            <div class="card" style="margin-top:18px;">
+                <h3>Question {{ q.number }}</h3>
+
+                <!-- ✅ FIXED DELETE BUTTON (NO NESTED FORM) -->
+                <button type="submit"
+                        form="delete-question-{{ q.id }}"
+                        class="btn-delete"
+                        onclick="return confirm('Delete this question permanently?');"
+                        style="margin-bottom:10px;">
+                    🗑 Delete Question
+                </button>
+
+                <textarea name="question_{{ q.id }}" style="width:100%; min-height:90px;">{{ q.text }}</textarea>
+
+                <ul>
+                {% for c in q.choices %}
+                    <li>
+                        <b>{{ c["label"] }}.</b>
+                        <input type="text"
+                               name="choice_{{ c['id'] }}"
+                               value="{{ c['text'] }}"
+                               style="width:75%; padding:6px;">
+
+                        <input type="checkbox"
+                               name="correct_{{ c['id'] }}"
+                               {% if c["is_correct"] %}checked{% endif %}>
+                        Correct
+
+                        {% if c["is_correct"] %}
+                            <span style="color:#00ff80;"> ✅ Correct</span>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+                </ul>
+            </div>
+        {% endfor %}
+
+        <br>
+<button type="submit" name="action" value="add_question">
+    ➕ Add New Question
+</button>
+
+<button type="submit">💾 Save Changes</button>
+        </form>
+
+        <!-- ✅ OUTSIDE FORMS (SAFE DELETE HANDLING) -->
+        {% for q in questions %}
+        <form id="delete-question-{{ q.id }}"
+              method="POST"
+              action="/delete_question/{{ quiz['id'] }}/{{ q.id }}">
+        </form>
+        {% endfor %}
+
+        <button onclick="location.href='/library'">⬅ Back to Library</button>
+    </div>
+</div>
+</body>
+</html>
+""", quiz=quiz, questions=question_list)
+
+
+
+def rebuild_quiz_json_from_db(quiz_id):
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    registry = load_registry()
+    quiz_entry = next((q for q in registry if q.get("id") == quiz_id), None)
+
+    if not quiz_entry or not quiz_entry.get("html"):
+        conn.close()
+        print("[EDIT] Could not find quiz registry entry for JSON rebuild:", quiz_id)
+        return False
+
+    json_name = quiz_entry["html"].replace(".html", ".json")
+    json_path = os.path.join(DATA_FOLDER, json_name)
+
+    questions = cur.execute(
+        """
+        SELECT id, question_number, question_text
+        FROM questions
+        WHERE quiz_id = ?
+        ORDER BY question_number, id
+        """,
+        (quiz_id,)
+    ).fetchall()
+
+    quiz_data = []
+
+    for q in questions:
+        choices = cur.execute(
+            """
+            SELECT label, text, is_correct
+            FROM choices
+            WHERE question_id = ?
+            ORDER BY label
+            """,
+            (q["id"],)
+        ).fetchall()
+
+        correct_letters = [
+            c["label"]
+            for c in choices
+            if c["is_correct"]
+        ]
+
+        quiz_data.append({
+            "number": q["question_number"],
+            "question": q["question_text"],
+            "choices": [
+                {
+                    "label": c["label"],
+                    "text": c["text"],
+                    "is_correct": bool(c["is_correct"])
+                }
+                for c in choices
+            ],
+            "correct": correct_letters
+        })
+
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(quiz_data, f, indent=4)
+
+    conn.close()
+    print("[EDIT] Rebuilt quiz JSON:", json_path)
+    return True
+
+
+
+def rebuild_quiz_html_from_registry(quiz_id):
+    registry = load_registry()
+    quiz_entry = next((q for q in registry if q.get("id") == quiz_id), None)
+
+    if not quiz_entry or not quiz_entry.get("html"):
+        print("[EDIT] Could not find quiz registry entry for HTML rebuild:", quiz_id)
+        return False
+
+    html_name = quiz_entry["html"]
+    json_name = html_name.replace(".html", ".json")
+
+    html_path = os.path.join(QUIZ_FOLDER, html_name)
+
+    build_quiz_html(
+        html_name,
+        json_name,
+        html_path,
+        get_portal_title(),
+        quiz_entry.get("title") or "Edited Quiz",
+        quiz_entry.get("logo"),
+        quiz_id
+    )
+
+    print("[EDIT] Rebuilt quiz HTML:", html_path)
+    return True
+
+
+
+# =========================
+# EDIT QUIZ - SAVE CHANGES
+# =========================
+@app.route("/edit_quiz/<int:quiz_id>", methods=["POST"])
+def save_edited_quiz(quiz_id):
+    conn = get_db()
+    cur = conn.cursor()
+
+    action = request.form.get("action")
+
+    if action == "add_question":
+        row = cur.execute(
+            "SELECT MAX(question_number) FROM questions WHERE quiz_id = ?",
+            (quiz_id,)
+        ).fetchone()
+
+        next_qnum = (row[0] or 0) + 1
+
+        cur.execute(
+            """
+            INSERT INTO questions (quiz_id, question_number, question_text)
+            VALUES (?, ?, ?)
+            """,
+            (quiz_id, next_qnum, "New question")
+        )
+
+        question_id = cur.lastrowid
+
+        for label in ["A", "B", "C", "D"]:
+            cur.execute(
+                """
+                INSERT INTO choices (question_id, label, text, is_correct)
+                VALUES (?, ?, ?, ?)
+                """,
+                (question_id, label, f"Option {label}", 0)
+            )
+
+        conn.commit()
+        conn.close()
+
+        rebuild_quiz_json_from_db(quiz_id)
+        rebuild_quiz_html_from_registry(quiz_id)
+
+        return redirect(f"/edit_quiz/{quiz_id}")
+
+    new_title = request.form.get("quiz_title", "").strip()
+
+    if new_title:
+        cur.execute(
+            "UPDATE quizzes SET title = ? WHERE id = ?",
+            (new_title, quiz_id)
+        )
+
+        registry = load_registry()
+        for q in registry:
+            if q.get("id") == quiz_id:
+                q["title"] = new_title
+        save_registry(registry)
+
+    questions = cur.execute(
+        "SELECT id FROM questions WHERE quiz_id = ?",
+        (quiz_id,)
+    ).fetchall()
+
+    for q in questions:
+        question_id = q[0]
+        new_question_text = request.form.get(f"question_{question_id}", "").strip()
+
+        cur.execute(
+            "UPDATE questions SET question_text = ? WHERE id = ?",
+            (new_question_text, question_id)
+        )
+
+    choices = cur.execute(
+        """
+        SELECT c.id
+        FROM choices c
+        JOIN questions q ON q.id = c.question_id
+        WHERE q.quiz_id = ?
+        """,
+        (quiz_id,)
+    ).fetchall()
+
+    for c in choices:
+        choice_id = c[0]
+        new_choice_text = request.form.get(f"choice_{choice_id}", "").strip()
+        is_correct = 1 if request.form.get(f"correct_{choice_id}") else 0
+
+        cur.execute(
+            """
+            UPDATE choices
+            SET text = ?, is_correct = ?
+            WHERE id = ?
+            """,
+            (new_choice_text, is_correct, choice_id)
+        )
+
+    # =========================
+    # VALIDATION: each question must have at least one correct answer
+    # =========================
+    questions = cur.execute(
+        """
+        SELECT id, question_number
+        FROM questions
+        WHERE quiz_id = ?
+        ORDER BY question_number
+        """,
+        (quiz_id,)
+    ).fetchall()
+
+    for q in questions:
+        correct_count = cur.execute(
+            """
+            SELECT COUNT(*)
+            FROM choices
+            WHERE question_id = ?
+            AND is_correct = 1
+            """,
+            (q["id"],)
+        ).fetchone()[0]
+
+        if correct_count == 0:
+            conn.rollback()
+            conn.close()
+            flash(f"Question {q['question_number']} must have at least one correct answer.", "error")
+            return redirect(url_for("edit_quiz", quiz_id=quiz_id))
+
+
+    conn.commit()
+    conn.close()
+
+    rebuild_quiz_json_from_db(quiz_id)
+    rebuild_quiz_html_from_registry(quiz_id)
+
+    return redirect(f"/edit_quiz/{quiz_id}")
+
+
+
+
+# =========================
+# DELETE QUESTION FROM QUIZ
+# =========================
+@app.route("/delete_question/<int:quiz_id>/<int:question_id>", methods=["POST"])
+def delete_question_from_quiz(quiz_id, question_id):
+    conn = get_db()
+    conn.execute("PRAGMA foreign_keys = ON")
+    cur = conn.cursor()
+
+    # Delete the question
+    cur.execute(
+        "DELETE FROM questions WHERE id = ? AND quiz_id = ?",
+        (question_id, quiz_id)
+    )
+
+    # 🔑 Resequence question numbers
+    questions = cur.execute(
+        "SELECT id FROM questions WHERE quiz_id = ? ORDER BY question_number, id",
+        (quiz_id,)
+    ).fetchall()
+
+    for idx, q in enumerate(questions, start=1):
+        cur.execute(
+            "UPDATE questions SET question_number = ? WHERE id = ?",
+            (idx, q["id"])
+        )
+
+    conn.commit()
+    conn.close()
+
+    rebuild_quiz_json_from_db(quiz_id)
+    rebuild_quiz_html_from_registry(quiz_id)
+
+    return redirect(f"/edit_quiz/{quiz_id}")
+
+
+
+# =========================
 # DELETE QUIZ (AUTHORITATIVE)
 # =========================
 @app.route("/delete_quiz/<int:quiz_id>", methods=["POST"])
@@ -1144,6 +1557,10 @@ def quiz_library():
                 <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
                     <button onclick="location.href='/quizzes/{{ q['html'] }}'">
                         ▶ Open Quiz
+                    </button>
+                                  
+                    <button onclick="location.href='/edit_quiz/{{ q['id'] }}'">
+                         ✏️ Edit Quiz
                     </button>
 
                     <!-- HIDE / UNHIDE -->
@@ -4491,19 +4908,7 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
 
 <body>
 
-<!-- 🔹 Load background dynamically -->
-# <script>
-# fetch("/config/portal.json")
-#   .then(r => r.json())
-#   .then(cfg => {{
-#       if (cfg.background_image) {{
-#           document.documentElement.style.setProperty(
-#               "--portal-bg",
-#               `url(${{cfg.background_image}})`
-#           );
-#       }}
-#   }});
-# </script>
+<!-- 🔹 Background is handled by /static/style.css importing /dynamic.css -->
 
 <!-- 🔹 Overlay shown when exam is paused -->
 <div id="pauseOverlay" class="pause-overlay">

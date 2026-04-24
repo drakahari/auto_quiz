@@ -206,7 +206,6 @@ function selectChoice(i) {
         }
 
         userAnswers[key] = arr;
-        applyStudyFeedback();
         renderQuestion();
         return;
     }
