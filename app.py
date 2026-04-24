@@ -836,7 +836,7 @@ def edit_quiz(quiz_id):
             <p><b>Source file:</b> {{ quiz["source_file"] }}</p>
 
         {% for q in questions %}
-            <div class="card" style="margin-top:18px;">
+            <div class="card question-block" style="margin-top:18px;">
                 <h3>Question {{ q.number }}</h3>
 
                 <!-- ✅ FIXED DELETE BUTTON (NO NESTED FORM) -->
@@ -892,6 +892,23 @@ def edit_quiz(quiz_id):
         <button onclick="location.href='/library'">⬅ Back to Library</button>
     </div>
 </div>
+<script>
+document.querySelector("form").addEventListener("submit", function(e) {
+    const questions = document.querySelectorAll(".question-block");
+
+    for (let i = 0; i < questions.length; i++) {
+        const checked = questions[i].querySelectorAll('input[type="checkbox"]:checked');
+
+        if (checked.length === 0) {
+            e.preventDefault();
+            alert(`Question ${i + 1} must have at least one correct answer.`);
+            questions[i].scrollIntoView({ behavior: "smooth", block: "center" });
+            return;
+        }
+    }
+});
+</script>
+                                  
 </body>
 </html>
 """, quiz=quiz, questions=question_list)
