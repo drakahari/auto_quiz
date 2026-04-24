@@ -829,17 +829,17 @@ def edit_quiz(quiz_id):
     {% endwith %}
 
     <div class="card">
-        <form method="POST" action="/edit_quiz/{{ quiz['id'] }}">
+        <form id="edit-quiz-form" method="POST" action="/edit_quiz/{{ quiz['id'] }}">
             <label><b>Quiz Title</b></label><br>
             <input type="text" name="quiz_title" value="{{ quiz['title'] }}" style="width:100%; padding:8px;">
+
             <p><b>Quiz ID:</b> {{ quiz["id"] }}</p>
             <p><b>Source file:</b> {{ quiz["source_file"] }}</p>
 
-        {% for q in questions %}
+            {% for q in questions %}
             <div class="card question-block" style="margin-top:18px;">
                 <h3>Question {{ q.number }}</h3>
 
-                <!-- ✅ FIXED DELETE BUTTON (NO NESTED FORM) -->
                 <button type="submit"
                         form="delete-question-{{ q.id }}"
                         class="btn-delete"
@@ -854,6 +854,7 @@ def edit_quiz(quiz_id):
                 {% for c in q.choices %}
                     <li>
                         <b>{{ c["label"] }}.</b>
+
                         <input type="text"
                                name="choice_{{ c['id'] }}"
                                value="{{ c['text'] }}"
@@ -870,30 +871,55 @@ def edit_quiz(quiz_id):
                     </li>
                 {% endfor %}
                 </ul>
+
+                <div style="margin-top:10px;">
+                    <label>
+                        Add answer choices:
+                        <input type="number"
+                               name="choice_count"
+                               value="1"
+                               min="1"
+                               max="10"
+                               form="add-choices-{{ q.id }}"
+                               style="width:70px; padding:5px;">
+                    </label>
+
+                    <button type="submit"
+                            form="add-choices-{{ q.id }}">
+                        ➕ Add Choices
+                    </button>
+                </div>
             </div>
-        {% endfor %}
+            {% endfor %}
 
-        <br>
-<button type="submit" name="action" value="add_question">
-    ➕ Add New Question
-</button>
+            <br>
 
-<button type="submit">💾 Save Changes</button>
+            <button type="submit" name="action" value="add_question">
+                ➕ Add New Question
+            </button>
+
+            <button type="submit">💾 Save Changes</button>
         </form>
 
-        <!-- ✅ OUTSIDE FORMS (SAFE DELETE HANDLING) -->
+        <!-- ✅ OUTSIDE FORMS: SAFE DELETE + ADD CHOICES -->
         {% for q in questions %}
         <form id="delete-question-{{ q.id }}"
               method="POST"
               action="/delete_question/{{ quiz['id'] }}/{{ q.id }}">
+        </form>
+
+        <form id="add-choices-{{ q.id }}"
+              method="POST"
+              action="/add_choices/{{ quiz['id'] }}/{{ q.id }}">
         </form>
         {% endfor %}
 
         <button onclick="location.href='/library'">⬅ Back to Library</button>
     </div>
 </div>
+
 <script>
-document.querySelector("form").addEventListener("submit", function(e) {
+document.getElementById("edit-quiz-form").addEventListener("submit", function(e) {
     const questions = document.querySelectorAll(".question-block");
 
     for (let i = 0; i < questions.length; i++) {
@@ -908,7 +934,7 @@ document.querySelector("form").addEventListener("submit", function(e) {
     }
 });
 </script>
-                                  
+
 </body>
 </html>
 """, quiz=quiz, questions=question_list)
@@ -1184,6 +1210,58 @@ def delete_question_from_quiz(quiz_id, question_id):
     rebuild_quiz_html_from_registry(quiz_id)
 
     return redirect(f"/edit_quiz/{quiz_id}")
+
+
+# =========================
+# ADD CHOICES TO QUESTION
+# =========================
+@app.route("/add_choices/<int:quiz_id>/<int:question_id>", methods=["POST"])
+def add_choices_to_question(quiz_id, question_id):
+    conn = get_db()
+    cur = conn.cursor()
+
+    try:
+        count = int(request.form.get("choice_count", 1))
+    except ValueError:
+        count = 1
+
+    # Safety limits
+    if count < 1:
+        count = 1
+    if count > 10:
+        count = 10
+
+    existing = cur.execute(
+        """
+        SELECT label
+        FROM choices
+        WHERE question_id = ?
+        ORDER BY label
+        """,
+        (question_id,)
+    ).fetchall()
+
+    start_index = len(existing)
+
+    for i in range(count):
+        label = chr(ord("A") + start_index + i)
+
+        cur.execute(
+            """
+            INSERT INTO choices (question_id, label, text, is_correct)
+            VALUES (?, ?, ?, ?)
+            """,
+            (question_id, label, f"Option {label}", 0)
+        )
+
+    conn.commit()
+    conn.close()
+
+    rebuild_quiz_json_from_db(quiz_id)
+    rebuild_quiz_html_from_registry(quiz_id)
+
+    return redirect(f"/edit_quiz/{quiz_id}")
+
 
 
 
