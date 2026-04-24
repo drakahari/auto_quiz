@@ -575,6 +575,19 @@ def load_portal_config():
         "ai_provider": "chatgpt",
         "ai_custom_url": "",
         "ai_auto_copy_prompt": True,
+        "ai_prompt_template": """You are a technical tutor helping a student learn from mistakes.
+
+        For each question:
+        1. Explain why the correct answer is correct
+        2. Explain why the selected answer is incorrect
+        3. Give a short memory tip
+        4. Keep explanations concise but clear
+        5. Return your answer in clearly separated sections per question.
+
+        ---
+
+        {{questions}}
+        """,
     }
 
     # Ensure config directory exists
@@ -3467,29 +3480,30 @@ def settings_page():
     cfg.setdefault("enable_show_invisibles", True)
 
     return render_template_string("""
+<!DOCTYPE html>
 <html>
 <head>
 <title>Portal Settings</title>
 <link rel="stylesheet" href="/static/style.css">
-<link rel="icon" href="/static/favicon.ico">                                 
+<link rel="icon" href="/static/favicon.ico">
 </head>
 
 <body>
-                                  
-# <script>
-# fetch("/config/portal.json")
-#   .then(r => r.json())
-#   .then(cfg => {
-#       if (cfg.background_image) {
-#           document.documentElement.style.setProperty(
-#               "--portal-bg",
-#               `url(${cfg.background_image})`
-#           );
-#       }
-#   });
-# </script>
 
-
+<!--
+<script>
+fetch("/config/portal.json")
+  .then(r => r.json())
+  .then(cfg => {
+      if (cfg.background_image) {
+          document.documentElement.style.setProperty(
+              "--portal-bg",
+              `url(${cfg.background_image})`
+          );
+      }
+  });
+</script>
+-->
 
 <div class="container">
 
@@ -3508,7 +3522,7 @@ def settings_page():
             <h3>Training Portal Title</h3>
             <input type="text"
                    name="portal_title"
-                   value="{{cfg.title}}"
+                   value="{{ cfg.title }}"
                    required style="width:100%; padding:6px">
 
             <br><br>
@@ -3611,48 +3625,72 @@ def settings_page():
 
             <hr style="margin:25px 0; opacity:.5">
 
-<h3>🤖 AI Explanation Helper</h3>
+            <h3>🤖 AI Explanation Helper</h3>
 
-<label>
-    <input type="checkbox"
-           name="ai_helper_enabled"
-           {% if cfg.ai_helper_enabled %}checked{% endif %}>
-    Enable AI helper buttons on missed-question review
-</label>
+            <label>
+                <input type="checkbox"
+                       name="ai_helper_enabled"
+                       {% if cfg.ai_helper_enabled %}checked{% endif %}>
+                Enable AI helper buttons on missed-question review
+            </label>
 
-<br><br>
+            <br><br>
 
-<label><b>AI Provider</b></label><br>
-<select name="ai_provider" style="width:100%; padding:6px;">
-    <option value="chatgpt" {% if cfg.ai_provider == "chatgpt" %}selected{% endif %}>ChatGPT</option>
-    <option value="claude" {% if cfg.ai_provider == "claude" %}selected{% endif %}>Claude</option>
-    <option value="gemini" {% if cfg.ai_provider == "gemini" %}selected{% endif %}>Gemini</option>
-    <option value="local" {% if cfg.ai_provider == "local" %}selected{% endif %}>Local / Custom URL</option>
-</select>
+            <label><b>AI Provider</b></label><br>
+            <select name="ai_provider" style="width:100%; padding:6px;">
+                <option value="chatgpt" {% if cfg.ai_provider == "chatgpt" %}selected{% endif %}>ChatGPT</option>
+                <option value="claude" {% if cfg.ai_provider == "claude" %}selected{% endif %}>Claude</option>
+                <option value="gemini" {% if cfg.ai_provider == "gemini" %}selected{% endif %}>Gemini</option>
+                <option value="local" {% if cfg.ai_provider == "local" %}selected{% endif %}>Local / Custom URL</option>
+            </select>
 
-<br><br>
+            <br><br>
 
-<label><b>Custom AI URL</b></label><br>
-<input type="text"
-       name="ai_custom_url"
-       value="{{ cfg.ai_custom_url }}"
-       placeholder="Example: http://192.168.1.50:3000"
-       style="width:100%; padding:6px;">
+            <label><b>Custom AI URL</b></label><br>
+            <input type="text"
+                   name="ai_custom_url"
+                   value="{{ cfg.ai_custom_url }}"
+                   placeholder="Example: http://192.168.1.50:3000"
+                   style="width:100%; padding:6px;">
 
-<p style="opacity:.75; font-size:12px;">
-    Used only when provider is Local / Custom URL.
-</p>
+            <p style="opacity:.75; font-size:12px;">
+                Used only when provider is Local / Custom URL.
+            </p>
 
-<label>
-    <input type="checkbox"
-           name="ai_auto_copy_prompt"
-           {% if cfg.ai_auto_copy_prompt %}checked{% endif %}>
-    Copy explanation prompt before opening AI site
-</label>
+            <label>
+                <input type="checkbox"
+                       name="ai_auto_copy_prompt"
+                       {% if cfg.ai_auto_copy_prompt %}checked{% endif %}>
+                Copy explanation prompt before opening AI site
+            </label>
 
-<br><br>
+            <br><br>
 
-<button type="submit">💾 Save Settings</button>
+            <h3>📝 AI Prompt Template</h3>
+
+            <p style="opacity:.75; font-size:13px;">
+                Customize how DLMS asks the selected AI to explain missed questions.
+                Use <code>{&#123;&#123;questions&#125;&#125;}</code> where the missed questions should be inserted.
+            </p>
+
+            <textarea id="aiPromptTemplate"
+                      name="ai_prompt_template"
+                      rows="12"
+                      style="width:100%; padding:10px; font-size:13px;">{{ cfg.ai_prompt_template }}</textarea>
+
+            <br><br>
+
+            <button type="button" id="resetAIPromptBtn">
+                🔄 Reset to Default Prompt
+            </button>
+
+            <p style="opacity:.65; font-size:12px;">
+                Leave blank to use the built-in DLMS default prompt. Click reset to restore the default text into this box.
+            </p>
+
+            <br><br>
+
+            <button type="submit">💾 Save Settings</button>
         </form>
 
         <br>
@@ -3682,48 +3720,90 @@ def settings_page():
         <button onclick="location.href='/'">⬅ Back To Portal</button>
 
     </div>
-                                  
-        <hr style="margin:20px 0">
 
-        <h3 style="color:#b30000">⚠️ Factory Reset</h3>
-        <p style="opacity:.75">
-            This will permanently delete <b>ALL quizzes</b>, <b>ALL attempts</b>,
-            and <b>reset quiz IDs back to 1</b>.
-        </p>
+    <hr style="margin:20px 0">
 
-        <button id="wipeDBBtn" style="background:#b30000;color:white">
-            🧨 Clear ALL DATABASE AND QUIZ RECORDS (FULL RESET)
-        </button>
+    <h3 style="color:#b30000">⚠️ Factory Reset</h3>
+    <p style="opacity:.75">
+        This will permanently delete <b>ALL quizzes</b>, <b>ALL attempts</b>,
+        and <b>reset quiz IDs back to 1</b>.
+    </p>
 
-        <div id="wipeDBStatus" style="margin-top:8px;font-size:13px;"></div>
+    <button id="wipeDBBtn" style="background:#b30000;color:white">
+        🧨 Clear ALL DATABASE AND QUIZ RECORDS (FULL RESET)
+    </button>
 
+    <div id="wipeDBStatus" style="margin-top:8px;font-size:13px;"></div>
 
+</div>
 
-    <script>
-    // Toggle Advanced Parsing Panel
-    (function() {
-        const btn  = document.getElementById("toggleAdvancedBtn");
-        const panel = document.getElementById("advParsingPanel");
-        if (!btn || !panel) return;
+<script>
+// =========================
+// ADVANCED PARSING PANEL
+// =========================
+(function() {
+    const btn  = document.getElementById("toggleAdvancedBtn");
+    const panel = document.getElementById("advParsingPanel");
+    if (!btn || !panel) return;
 
-        let open = false;
-        btn.addEventListener("click", () => {
-            open = !open;
-            panel.style.display = open ? "block" : "none";
-            btn.textContent = open
-                ? "🔧 Hide Advanced Parsing Settings"
-                : "🔧 Show Advanced Parsing Settings";
-        });
-    })();
+    let open = false;
+    btn.addEventListener("click", () => {
+        open = !open;
+        panel.style.display = open ? "block" : "none";
+        btn.textContent = open
+            ? "🔧 Hide Advanced Parsing Settings"
+            : "🔧 Show Advanced Parsing Settings";
+    });
+})();
 
-    // Clear DB history button (KNOWN WORKING STYLE)
-    document.getElementById("clearDBBtn").addEventListener("click", async () => {
+// =========================
+// AI PROMPT TEMPLATE RESET
+// =========================
+// IMPORTANT:
+// Do not type the literal placeholder with double curly braces in this template.
+// This page is rendered by Flask/Jinja, so we construct it from pieces in JavaScript.
+const AI_QUESTIONS_PLACEHOLDER = "{" + "{questions}" + "}";
 
-        if (!confirm(
-            "⚠ This will permanently delete ALL saved exam results and missed question records.\\n\\n" +
-            "This cannot be undone.\\n\\n" +
-            "Continue?"
-        )) return;
+const DEFAULT_AI_PROMPT =
+`You are a technical tutor helping a student learn from mistakes.
+
+For each question:
+1. Explain why the correct answer is correct
+2. Explain why the selected answer is incorrect
+3. Give a short memory tip
+4. Keep explanations concise but clear
+5. Return your answer in clearly separated sections per question.
+
+---
+
+${AI_QUESTIONS_PLACEHOLDER}
+`;
+
+const resetAIPromptBtn = document.getElementById("resetAIPromptBtn");
+if (resetAIPromptBtn) {
+    resetAIPromptBtn.addEventListener("click", () => {
+        const box = document.getElementById("aiPromptTemplate");
+        if (!box) {
+            alert("AI prompt template box not found.");
+            return;
+        }
+
+        box.value = DEFAULT_AI_PROMPT;
+        box.focus();
+    });
+}
+
+// =========================
+// CLEAR DB HISTORY BUTTON
+// =========================
+const clearDBBtn = document.getElementById("clearDBBtn");
+if (clearDBBtn) {
+    clearDBBtn.addEventListener("click", async () => {
+        if (!confirm(`⚠ This will permanently delete ALL saved exam results and missed question records.
+
+This cannot be undone.
+
+Continue?`)) return;
 
         try {
             const res = await fetch("/api/clear_db_history", { method: "POST" });
@@ -3735,51 +3815,60 @@ def settings_page():
                 alert("Persistent DB history cleared!");
                 location.reload();
             } else {
-                throw new Error();
+                throw new Error("Clear DB history returned non-ok status");
             }
 
         } catch (err) {
+            console.error("[SETTINGS] Clear DB history failed:", err);
             document.getElementById("clearDBStatus").innerText =
                 "⚠️ Failed to clear persistent history.";
         }
     });
+}
 
-    // FULL RESET button — REAL ROUTE
-document.getElementById("wipeDBBtn").addEventListener("click", async () => {
+// =========================
+// FULL FACTORY RESET BUTTON
+// =========================
+const wipeDBBtn = document.getElementById("wipeDBBtn");
+if (wipeDBBtn) {
+    wipeDBBtn.addEventListener("click", async () => {
+        if (!confirm(`⚠ FACTORY RESET ⚠
 
-    if (!confirm(
-        "⚠ FACTORY RESET ⚠\\n\\n" +
-        "This will permanently delete ALL quizzes, attempts, and history.\\n\\n" +
-        "Quiz IDs will be reset back to 1.\\n\\n" +
-        "This cannot be undone.\\n\\n" +
-        "Continue?"
-    )) return;
+This will permanently delete ALL quizzes, attempts, and history.
 
-    try {
-        const res = await fetch("/api/wipe_database", { method: "POST" });
-        const data = await res.json();
+Quiz IDs will be reset back to 1.
 
-        if (data.status === "ok") {
+This cannot be undone.
+
+Continue?`)) return;
+
+        try {
+            const res = await fetch("/api/wipe_database", { method: "POST" });
+            const data = await res.json();
+
+            if (data.status === "ok") {
+                const el = document.getElementById("wipeDBStatus");
+                if (el) el.innerText = "✅ FULL RESET completed successfully.";
+                alert("Factory reset completed. Application will reload.");
+                location.reload();
+            } else {
+                throw new Error("Factory reset returned non-ok status");
+            }
+
+        } catch (err) {
+            console.error("[SETTINGS] Factory reset failed:", err);
             const el = document.getElementById("wipeDBStatus");
-            if (el) el.innerText = "✅ FULL RESET completed successfully.";
-            alert("Factory reset completed. Application will reload.");
-            location.reload();
-        } else {
-            throw new Error();
+            if (el) el.innerText = "❌ FULL RESET failed.";
         }
-
-    } catch (err) {
-        const el = document.getElementById("wipeDBStatus");
-        if (el) el.innerText = "❌ FULL RESET failed.";
-    }
-});
-
+    });
+}
 </script>
 
-
-</div>
 </body>
 </html>
+
+
+
     """, cfg=cfg)
 
 
@@ -3856,7 +3945,14 @@ def save_settings():
     cfg["ai_provider"] = provider if provider in valid_ai_providers else "chatgpt"
 
     cfg["ai_custom_url"] = request.form.get("ai_custom_url", "").strip()
+    # =========================
+    # AI PROMPT TEMPLATE
+    # =========================
+    template = request.form.get("ai_prompt_template", "").strip()
 
+    # Always save whatever the user entered (including blank)
+    cfg["ai_prompt_template"] = template
+    
     dprint("[SETTINGS] Toggles:", {
         "show_confidence": cfg["show_confidence"],
         "enable_regex_replace": cfg["enable_regex_replace"],

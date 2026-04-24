@@ -79,14 +79,14 @@ small { color:#ccc; }
     </div>
 
     <div style="margin-top:20px; display:flex; gap:10px; flex-wrap:wrap;">
-        <button onclick="exportMissedAnkiApkg()">
-            📦 Export Missed to Anki (APKG)
-        </button>
+    <button onclick="exportMissedAnkiApkg()">
+        📦 Export Missed to Anki (APKG)
+    </button>
 
-        <button type="button" onclick="explainSelectedWithAI()">
-            🤖 Explain Selected with AI
-        </button>
-    </div>
+    <button type="button" onclick="explainSelectedWithAI()">
+        🤖 Explain Selected with AI
+    </button>
+</div>
 
     <br>
     <button onclick="location.href='/'">⬅ Back to Portal</button>
@@ -243,7 +243,6 @@ async function loadReview() {
                         onchange="syncSelectAllAnki()">
                     <span>Add to Anki deck</span>
                 </div>
-
                 <div class="ankiRow">
                     <input type="checkbox"
                         class="ai-select"
@@ -289,10 +288,20 @@ async function loadReview() {
 /* =====================================================
    AI FUNCTIONS
 ===================================================== */
-function getDefaultAIPromptTemplate() {
+function buildPrompt(index) {
+    const item = missedCache[index];
+
+    if (!item) {
+        throw new Error("Missing missed-question data for index " + index);
+    }
+
+    const question = item.question_text || "";
+    const correct = item.correct_text || "(No correct answer recorded)";
+    const user = item.selected_text || "(No answer recorded)";
+
     return `You are a technical tutor helping a student learn from mistakes.
 
-For each question:
+For this question:
 1. Explain why the correct answer is correct
 2. Explain why the selected answer is incorrect
 3. Give a short memory tip
@@ -301,35 +310,7 @@ For each question:
 
 ---
 
-{{questions}}
-`;
-}
-
-function applyPromptTemplate(questionBlock) {
-    let template = (aiConfig && typeof aiConfig.ai_prompt_template === "string")
-        ? aiConfig.ai_prompt_template.trim()
-        : "";
-
-    if (!template) {
-        template = getDefaultAIPromptTemplate();
-    }
-
-    // If a user removes the placeholder, keep their prompt but append questions safely.
-    if (!template.includes("{{questions}}")) {
-        template += "\n\n---\n\n{{questions}}";
-    }
-
-    return template.replace("{{questions}}", questionBlock.trim());
-}
-
-function buildQuestionBlock(items) {
-    return items.map((item, i) => {
-        const label = items.length === 1 ? "Question" : `Question ${i + 1}`;
-        const question = item.question_text || "";
-        const correct = item.correct_text || "(No correct answer recorded)";
-        const user = item.selected_text || "(No answer recorded)";
-
-        return `${label}
+Question
 ---------------------
 ${question}
 
@@ -337,18 +318,8 @@ Correct Answer:
 ${correct}
 
 My Answer:
-${user}`;
-    }).join("\n\n");
-}
-
-function buildPrompt(index) {
-    const item = missedCache[index];
-
-    if (!item) {
-        throw new Error("Missing missed-question data for index " + index);
-    }
-
-    return applyPromptTemplate(buildQuestionBlock([item]));
+${user}
+`;
 }
 
 window.copyAIExplainPrompt = async function(index, btn) {
@@ -385,8 +356,8 @@ window.openAIExplain = async function(index, btn) {
                 btn.innerText = "✅ Prompt Copied";
                 setTimeout(() => btn.innerText = oldText, 1500);
             } catch (copyErr) {
-                console.warn("[AI Helper] Could not auto-copy prompt:", copyErr);
-            }
+    console.warn("[AI Helper] Could not auto-copy prompt:", copyErr);
+}
         }
 
         const url = getAIProviderUrl();
@@ -407,6 +378,7 @@ window.openAIExplain = async function(index, btn) {
         alert("AI Helper failed. Check the browser console for details.");
     }
 };
+
 
 window.explainSelectedWithAI = async function() {
     try {
@@ -440,7 +412,32 @@ window.explainSelectedWithAI = async function() {
             return;
         }
 
-        const prompt = applyPromptTemplate(buildQuestionBlock(selectedQuestions));
+        let prompt = `You are a technical tutor helping a student learn from mistakes.
+
+        For each question:
+        1. Explain why the correct answer is correct
+        2. Explain why the selected answer is incorrect
+        3. Give a short memory tip
+        4. Keep explanations concise but clear
+        5. Return your answer in clearly separated sections per question.
+
+        ---
+
+        `;
+
+        selectedQuestions.forEach((q, i) => {
+            prompt += `Question ${i + 1}
+        ---------------------
+        ${q.question_text}
+
+        Correct Answer:
+        ${q.correct_text}
+
+        My Answer:
+        ${q.selected_text || "(No answer)"}
+
+        `;
+        });
 
         if (aiConfig.ai_auto_copy_prompt) {
             try {
@@ -468,6 +465,9 @@ window.explainSelectedWithAI = async function() {
         alert("AI Helper failed. Check the browser console for details.");
     }
 };
+
+
+
 
 /* =====================================================
    ANKI + UTIL FUNCTIONS
@@ -501,6 +501,7 @@ window.syncSelectAllAI = function() {
 
     master.checked = boxes.length > 0 && boxes.length === checked.length;
 };
+
 
 window.exportMissedAnkiApkg = function() {
     const params = new URLSearchParams(window.location.search);
