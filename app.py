@@ -568,7 +568,13 @@ def load_portal_config():
         "title": "Training & Practice Center",
         "show_confidence": False,
         "enable_regex_replace": False,
-        "background_image": None,   # ← REQUIRED (safe default)
+        "background_image": None,
+
+        # AI Explanation Helper
+        "ai_helper_enabled": False,
+        "ai_provider": "chatgpt",
+        "ai_custom_url": "",
+        "ai_auto_copy_prompt": True,
     }
 
     # Ensure config directory exists
@@ -604,6 +610,15 @@ def load_portal_config():
         # Normalize background
         bg = cfg.get("background_image")
         cfg["background_image"] = bg.strip() if isinstance(bg, str) and bg.strip() else None
+
+        cfg["ai_helper_enabled"] = bool(cfg.get("ai_helper_enabled", False))
+        cfg["ai_auto_copy_prompt"] = bool(cfg.get("ai_auto_copy_prompt", True))
+
+        valid_ai_providers = {"chatgpt", "claude", "gemini", "local"}
+        provider = str(cfg.get("ai_provider") or "chatgpt").strip().lower()
+        cfg["ai_provider"] = provider if provider in valid_ai_providers else "chatgpt"
+
+        cfg["ai_custom_url"] = str(cfg.get("ai_custom_url") or "").strip()
 
         return cfg
 
@@ -1927,7 +1942,7 @@ def upload_page():
                 <button type="submit">📤 Upload & Build Quiz</button>
             </form>
 
-            <hr style="margin:25px 0; opacity:.5">
+            <hr style="margin:30px 0; opacity:.5">
 
             <h2>Option 2 — Paste Questions Instead</h2>
             <p style="opacity:.8">
@@ -3594,7 +3609,50 @@ def settings_page():
 
             <br><br>
 
-            <button type="submit">💾 Save Settings</button>
+            <hr style="margin:25px 0; opacity:.5">
+
+<h3>🤖 AI Explanation Helper</h3>
+
+<label>
+    <input type="checkbox"
+           name="ai_helper_enabled"
+           {% if cfg.ai_helper_enabled %}checked{% endif %}>
+    Enable AI helper buttons on missed-question review
+</label>
+
+<br><br>
+
+<label><b>AI Provider</b></label><br>
+<select name="ai_provider" style="width:100%; padding:6px;">
+    <option value="chatgpt" {% if cfg.ai_provider == "chatgpt" %}selected{% endif %}>ChatGPT</option>
+    <option value="claude" {% if cfg.ai_provider == "claude" %}selected{% endif %}>Claude</option>
+    <option value="gemini" {% if cfg.ai_provider == "gemini" %}selected{% endif %}>Gemini</option>
+    <option value="local" {% if cfg.ai_provider == "local" %}selected{% endif %}>Local / Custom URL</option>
+</select>
+
+<br><br>
+
+<label><b>Custom AI URL</b></label><br>
+<input type="text"
+       name="ai_custom_url"
+       value="{{ cfg.ai_custom_url }}"
+       placeholder="Example: http://192.168.1.50:3000"
+       style="width:100%; padding:6px;">
+
+<p style="opacity:.75; font-size:12px;">
+    Used only when provider is Local / Custom URL.
+</p>
+
+<label>
+    <input type="checkbox"
+           name="ai_auto_copy_prompt"
+           {% if cfg.ai_auto_copy_prompt %}checked{% endif %}>
+    Copy explanation prompt before opening AI site
+</label>
+
+<br><br>
+
+<button type="submit">💾 Save Settings</button>
         </form>
 
         <br>
@@ -3787,6 +3845,17 @@ def save_settings():
     cfg["enable_regex_replace"]   = ("enable_regex_replace" in request.form)
     cfg["auto_bom_clean"]         = ("auto_bom_clean" in request.form)
     cfg["enable_show_invisibles"] = ("enable_show_invisibles" in request.form)
+    # =========================
+    # AI EXPLANATION HELPER SETTINGS
+    # =========================
+    cfg["ai_helper_enabled"] = ("ai_helper_enabled" in request.form)
+    cfg["ai_auto_copy_prompt"] = ("ai_auto_copy_prompt" in request.form)
+
+    valid_ai_providers = {"chatgpt", "claude", "gemini", "local"}
+    provider = request.form.get("ai_provider", "chatgpt").strip().lower()
+    cfg["ai_provider"] = provider if provider in valid_ai_providers else "chatgpt"
+
+    cfg["ai_custom_url"] = request.form.get("ai_custom_url", "").strip()
 
     dprint("[SETTINGS] Toggles:", {
         "show_confidence": cfg["show_confidence"],

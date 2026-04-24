@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Review Missed Questions</title>
+<link rel="stylesheet" href="/static/style.css">
+<link rel="icon" href="/static/favicon.ico">
+
+<style>
+.review-container {
+    max-width: 980px;
+    margin: auto;
+}
+
+.info-box {
+    background: rgba(0,0,0,.75);
+    border: 1px solid rgba(255,255,255,.3);
+    padding: 14px;
+    border-radius: 8px;
+    margin-bottom: 14px;
+}
+
+.reviewCard {
+    background: rgba(0,0,0,.85);
+    padding: 12px;
+    margin: 12px 0;
+    border-radius: 8px;
+    border-left: 8px solid #ff4d4d;
+}
+
+.correctBox {
+    color: #00ff80;
+    margin-top: 6px;
+}
+
+.userBox {
+    color: #ff6b6b;
+    margin-top: 6px;
+}
+
+.ankiRow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+small { color:#ccc; }
+</style>
+</head>
+
+<body>
+
+<div class="container review-container">
+
+    <h1 class="hero-title">🔁 Review Missed Questions</h1>
+
+    <div id="info" class="info-box">Loading…</div>
+    <div id="reviewArea"></div>
+
+    <div style="margin: 14px 0;">
+        <label style="cursor:pointer;">
+            <input type="checkbox" id="ankiSelectAll" onclick="toggleSelectAllAnki(this)">
+            <b>Select all missed questions for Anki</b>
+        </label>
+    </div>
+
+    <div style="margin-top:20px;">
+        <button onclick="exportMissedAnkiApkg()">📦 Export Missed to Anki (APKG)</button>
+    </div>
+
+    <br>
+    <button onclick="location.href='/'">⬅ Back to Portal</button>
+    <button onclick="location.href='/history.html'">📜 Back to History</button>
+
+</div>
+
+<script>
+let aiConfig = null;
+
+// Load AI config
+fetch("/config/portal.json")
+    .then(r => r.json())
+    .then(cfg => {
+        aiConfig = cfg;
+    });
+
+async function loadReview() {
+    const info = document.getElementById("info");
+    const box  = document.getElementById("reviewArea");
+
+    const params = new URLSearchParams(window.location.search);
+    const attemptId = params.get("attempt");
+
+    if (!attemptId) {
+        info.innerHTML = "❌ No attempt specified.";
+        return;
+    }
+
+    try {
+        const res = await fetch("/api/attempts");
+        const data = await res.json();
+        const attempt = (data.attempts || []).find(
+            a => String(a.id) === String(attemptId)
+        );
+
+        if (!attempt) {
+            info.innerHTML = "❌ Attempt not found.";
+            return;
+        }
+
+        info.innerHTML = `
+            <b>Quiz:</b> ${attempt.quiz_title}<br>
+            <b>Score:</b> ${attempt.score}/${attempt.total} (${attempt.percent}%)<br>
+            <b>Date:</b> ${attempt.completed_at}<br>
+            <b>Mode:</b> ${attempt.mode}
+        `;
+
+        const mqRes = await fetch(`/api/missed_questions?attempt=${encodeURIComponent(attemptId)}`);
+        if (!mqRes.ok) {
+            box.innerHTML = "<p>⚠️ Failed to load missed questions.</p>";
+            return;
+        }
+
+        const missed = await mqRes.json();
+
+        if (!Array.isArray(missed) || missed.length === 0) {
+            box.innerHTML = "<p>🎉 No missed questions!</p>";
+            return;
+        }
+
+        let html = "";
+
+        missed.forEach(m => {
+            html += `
+            <div class="reviewCard"
+                data-question="${(m.question_text || "").replace(/"/g, '&quot;')}"
+                data-correct="${(m.correct_text || "").replace(/"/g, '&quot;')}"
+                data-user="${(m.selected_text || "").replace(/"/g, '&quot;')}">
+
+                <div class="ankiRow">
+                    <input type="checkbox"
+                        class="anki-select"
+                        data-qnum="${m.attempt_question_number}"
+                        onchange="syncSelectAllAnki()">
+                    <span>Add to Anki deck</span>
+                </div>
+
+                <h3>Question ${m.attempt_question_number}</h3>
+
+                <div>${m.question_text || ""}</div>
+
+                <div class="correctBox">
+                    <b>Correct Answer</b><br>
+                    ${m.correct_text || "(No correct answer recorded)"}
+                </div>
+
+                <div class="userBox">
+                    <b>Your Answer</b><br>
+                    ${m.selected_text || "<i>(No answer recorded)</i>"}
+                </div>
+
+                <!-- AI Buttons -->
+                <div style="margin-top:10px;">
+                    <button onclick="copyAIExplainPrompt(this)">
+                        📋 Copy Explain Prompt
+                    </button>
+
+                    <button onclick="openAIExplain(this)">
+                        🤖 Explain with AI
+                    </button>
+                </div>
+
+            </div>`;
+        });
+
+        box.innerHTML = html;
+
+    } catch (err) {
+        console.error(err);
+        info.innerHTML = "⚠️ Failed to load review data.";
+    }
+}
+
+/* =========================
+   AI FUNCTIONS
+========================= */
+
+function buildPrompt(el) {
+    const container = el.closest(".reviewCard");
+
+    const question = container.dataset.question || "";
+    const correct = container.dataset.correct || "";
+    const user = container.dataset.user || "";
+
+    return `I missed this quiz question.
+
+Question:
+${question}
+
+Correct answer:
+${correct}
+
+My answer:
+${user}
+
+Explain why my answer is incorrect, why the correct answer is correct, and give me a simple memory tip.`;
+}
+
+function copyAIExplainPrompt(btn) {
+    const prompt = buildPrompt(btn);
+
+    navigator.clipboard.writeText(prompt).then(() => {
+        btn.innerText = "✅ Copied!";
+        setTimeout(() => btn.innerText = "📋 Copy Explain Prompt", 1500);
+    });
+}
+
+function openAIExplain(btn) {
+    if (!aiConfig || !aiConfig.ai_helper_enabled) {
+        alert("AI Helper is disabled in settings.");
+        return;
+    }
+
+    const prompt = buildPrompt(btn);
+
+    if (aiConfig.ai_auto_copy_prompt) {
+        navigator.clipboard.writeText(prompt);
+    }
+
+    const providers = {
+        chatgpt: "https://chatgpt.com/",
+        claude: "https://claude.ai/",
+        gemini: "https://gemini.google.com/"
+    };
+
+    let url = providers[aiConfig.ai_provider];
+
+    if (aiConfig.ai_provider === "local" && aiConfig.ai_custom_url) {
+        url = aiConfig.ai_custom_url;
+    }
+
+    if (!url) {
+        alert("No AI provider configured.");
+        return;
+    }
+
+    window.open(url, "_blank");
+}
+
+/* =========================
+   ANKI + UTIL FUNCTIONS
+========================= */
+
+function toggleSelectAllAnki(master) {
+    const checkboxes = document.querySelectorAll(".anki-select");
+    checkboxes.forEach(cb => cb.checked = master.checked);
+}
+
+function syncSelectAllAnki() {
+    const boxes = document.querySelectorAll(".anki-select");
+    const checked = document.querySelectorAll(".anki-select:checked");
+
+    const master = document.getElementById("ankiSelectAll");
+    if (!master) return;
+
+    master.checked = boxes.length > 0 && boxes.length === checked.length;
+}
+
+function exportMissedAnkiApkg() {
+    const params = new URLSearchParams(window.location.search);
+    const attemptId = params.get("attempt");
+
+    if (!attemptId) {
+        alert("Missing attempt ID.");
+        return;
+    }
+
+    const selected = Array.from(
+        document.querySelectorAll(".anki-select:checked")
+    ).map(cb => Number(cb.dataset.qnum));
+
+    if (!selected.length) {
+        alert("Please select at least one missed question.");
+        return;
+    }
+
+    fetch("/export/anki", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            attempt_id: attemptId,
+            attempt_question_numbers: selected
+        })
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("APKG export failed");
+        return res.blob();
+    })
+    .then(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "missed_questions.apkg";
+        a.click();
+        URL.revokeObjectURL(url);
+    })
+    .catch(err => {
+        console.error(err);
+        alert("Failed to generate APKG.");
+    });
+}
+
+loadReview();
+</script>
+
+</body>
+</html>

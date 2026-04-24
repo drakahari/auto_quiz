@@ -299,27 +299,18 @@ function buildPrompt(index) {
     const correct = item.correct_text || "(No correct answer recorded)";
     const user = item.selected_text || "(No answer recorded)";
 
-    return `You are a technical tutor helping a student learn from mistakes.
+    return `I missed this quiz question.
 
-For this question:
-1. Explain why the correct answer is correct
-2. Explain why the selected answer is incorrect
-3. Give a short memory tip
-4. Keep explanations concise but clear
-5. Return your answer in clearly separated sections per question.
-
----
-
-Question
----------------------
+Question:
 ${question}
 
-Correct Answer:
+Correct answer:
 ${correct}
 
-My Answer:
+My answer:
 ${user}
-`;
+
+Explain why my answer is incorrect, why the correct answer is correct, and give me a simple memory tip.`;
 }
 
 window.copyAIExplainPrompt = async function(index, btn) {
@@ -380,91 +371,60 @@ window.openAIExplain = async function(index, btn) {
 };
 
 
-window.explainSelectedWithAI = async function() {
-    try {
-        if (!aiConfig) {
-            await loadAIConfig();
-        }
+function explainSelectedWithAI() {
+    // Get all checked questions
+    const selectedIndexes = Array.from(
+        document.querySelectorAll(".ai-select:checked")
+    ).map(cb => Number(cb.dataset.qnum));
 
-        if (!aiConfig || !aiConfig.ai_helper_enabled) {
-            alert("AI Helper is disabled in Settings.");
-            return;
-        }
-
-        // AI selection uses data-index, not data-qnum.
-        const selectedIndexes = Array.from(
-            document.querySelectorAll(".ai-select:checked")
-        )
-        .map(cb => Number(cb.dataset.index))
-        .filter(index => Number.isInteger(index) && index >= 0);
-
-        if (!selectedIndexes.length) {
-            alert("Please select at least one missed question for AI.");
-            return;
-        }
-
-        const selectedQuestions = selectedIndexes
-            .map(index => missedCache[index])
-            .filter(Boolean);
-
-        if (!selectedQuestions.length) {
-            alert("No matching AI questions found.");
-            return;
-        }
-
-        let prompt = `You are a technical tutor helping a student learn from mistakes.
-
-        For each question:
-        1. Explain why the correct answer is correct
-        2. Explain why the selected answer is incorrect
-        3. Give a short memory tip
-        4. Keep explanations concise but clear
-        5. Return your answer in clearly separated sections per question.
-
-        ---
-
-        `;
-
-        selectedQuestions.forEach((q, i) => {
-            prompt += `Question ${i + 1}
-        ---------------------
-        ${q.question_text}
-
-        Correct Answer:
-        ${q.correct_text}
-
-        My Answer:
-        ${q.selected_text || "(No answer)"}
-
-        `;
-        });
-
-        if (aiConfig.ai_auto_copy_prompt) {
-            try {
-                await copyTextToClipboard(prompt);
-            } catch (copyErr) {
-                console.warn("[AI Helper] Clipboard copy failed:", copyErr);
-            }
-        }
-
-        const url = getAIProviderUrl();
-
-        if (!url) {
-            alert("No AI provider URL is configured. Check Settings.");
-            return;
-        }
-
-        const opened = window.open(url, "_blank", "noopener,noreferrer");
-
-        if (!opened) {
-            console.warn("[AI Helper] Popup blocked");
-        }
-
-    } catch (err) {
-        console.error("[AI Helper] Explain selected failed:", err);
-        alert("AI Helper failed. Check the browser console for details.");
+    if (!selectedIndexes.length) {
+        alert("Please select at least one missed question.");
+        return;
     }
-};
+
+    // Map selected question numbers → actual data
+    const selectedQuestions = missedCache.filter(m =>
+        selectedIndexes.includes(Number(m.attempt_question_number))
+    );
+
+    if (!selectedQuestions.length) {
+        alert("No matching questions found.");
+        return;
+    }
+
+    // Build combined prompt
+    let prompt = "I missed the following quiz questions:\n\n";
+
+    selectedQuestions.forEach((q, i) => {
+        prompt += `Question ${i + 1}:\n${q.question_text}\n\n`;
+        prompt += `Correct Answer:\n${q.correct_text}\n\n`;
+        prompt += `My Answer:\n${q.selected_text || "(No answer)"}\n\n`;
+        prompt += "-----\n\n";
+    });
+
+    prompt += "Explain each question, why my answer was wrong, and give simple memory tips.";
+
+    // Copy (optional)
+    if (aiConfig && aiConfig.ai_auto_copy_prompt) {
+        copyTextToClipboard(prompt).catch(() => {
+            console.warn("Clipboard copy failed");
+        });
+    }
+
+    // Open AI
+    const url = getAIProviderUrl();
+
+    if (!url) {
+        alert("No AI provider configured.");
+        return;
+    }
+
+    const opened = window.open(url, "_blank");
+
+    if (!opened) {
+        console.warn("Popup blocked");
+    }
+}
 
 
 
