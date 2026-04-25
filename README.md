@@ -1,9 +1,12 @@
 ## Latest Release
 
-**DLMS v1.2** is now available.
+**DLMS v2.0** is now available.
 
-- Improved quiz library behavior (view state preserved)
-- UI polish for destructive actions (delete hover emphasis)
+- Added ability to edit/delete/add questions and answers
+- Added ability to create quick quizzes as a thrid option of creation.
+- Added ability to copy missed questions/answers to clipboard and go to the AI of your choice (including local models!) to research further
+- Added a customizable AI prompt that can be used when checking missed questions/answers
+- Added Ubuntu 26.04 binaries
 
 👉 Download from the [Releases page](../../releases).
 
