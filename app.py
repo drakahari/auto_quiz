@@ -916,12 +916,13 @@ def edit_quiz(quiz_id):
                                value="1"
                                min="1"
                                max="10"
-                               form="add-choices-{{ q.id }}"
+                               
                                style="width:70px; padding:5px;">
                     </label>
 
                     <button type="submit"
-                            form="add-choices-{{ q.id }}">
+                            name="action"
+                            value="add_choices_{{ q.id }}">
                         ➕ Add Choices
                     </button>
                 </div>
@@ -1088,43 +1089,11 @@ def save_edited_quiz(quiz_id):
     conn = get_db()
     cur = conn.cursor()
 
-    action = request.form.get("action")
+    action = request.form.get("action", "")
 
-    if action == "add_question":
-        row = cur.execute(
-            "SELECT MAX(question_number) FROM questions WHERE quiz_id = ?",
-            (quiz_id,)
-        ).fetchone()
-
-        next_qnum = (row[0] or 0) + 1
-
-        cur.execute(
-            """
-            INSERT INTO questions (quiz_id, question_number, question_text)
-            VALUES (?, ?, ?)
-            """,
-            (quiz_id, next_qnum, "New question")
-        )
-
-        question_id = cur.lastrowid
-
-        for label in ["A", "B", "C", "D"]:
-            cur.execute(
-                """
-                INSERT INTO choices (question_id, label, text, is_correct)
-                VALUES (?, ?, ?, ?)
-                """,
-                (question_id, label, f"Option {label}", 0)
-            )
-
-        conn.commit()
-        conn.close()
-
-        rebuild_quiz_json_from_db(quiz_id)
-        rebuild_quiz_html_from_registry(quiz_id)
-
-        return redirect(f"/edit_quiz/{quiz_id}")
-
+    # =========================
+    # SAVE CURRENT FORM VALUES FIRST
+    # =========================
     new_title = request.form.get("quiz_title", "").strip()
 
     if new_title:
@@ -1178,6 +1147,106 @@ def save_edited_quiz(quiz_id):
         )
 
     # =========================
+    # ADD NEW QUESTION
+    # =========================
+    if action == "add_question":
+        row = cur.execute(
+            "SELECT MAX(question_number) FROM questions WHERE quiz_id = ?",
+            (quiz_id,)
+        ).fetchone()
+
+        next_qnum = (row[0] or 0) + 1
+
+        cur.execute(
+            """
+            INSERT INTO questions (quiz_id, question_number, question_text)
+            VALUES (?, ?, ?)
+            """,
+            (quiz_id, next_qnum, "New question")
+        )
+
+        question_id = cur.lastrowid
+
+        for label in ["A", "B", "C", "D"]:
+            cur.execute(
+                """
+                INSERT INTO choices (question_id, label, text, is_correct)
+                VALUES (?, ?, ?, ?)
+                """,
+                (question_id, label, f"Option {label}", 0)
+            )
+
+        conn.commit()
+        conn.close()
+
+        rebuild_quiz_json_from_db(quiz_id)
+        rebuild_quiz_html_from_registry(quiz_id)
+
+        return redirect(f"/edit_quiz/{quiz_id}")
+
+    # =========================
+    # ADD CHOICES TO EXISTING QUESTION
+    # =========================
+    if action.startswith("add_choices_"):
+        try:
+            question_id = int(action.replace("add_choices_", "", 1))
+        except ValueError:
+            conn.rollback()
+            conn.close()
+            flash("Invalid question selected for adding choices.", "error")
+            return redirect(f"/edit_quiz/{quiz_id}")
+
+        try:
+            count = int(request.form.get(f"choice_count_{question_id}", 1))
+        except ValueError:
+            count = 1
+
+        if count < 1:
+            count = 1
+        if count > 10:
+            count = 10
+
+        existing = cur.execute(
+            """
+            SELECT label
+            FROM choices
+            WHERE question_id = ?
+            ORDER BY label
+            """,
+            (question_id,)
+        ).fetchall()
+
+        used_labels = {row[0] for row in existing}
+
+        added = 0
+        label_index = 0
+
+        while added < count and label_index < 26:
+            label = chr(ord("A") + label_index)
+
+            if label not in used_labels:
+                cur.execute(
+                    """
+                    INSERT INTO choices (question_id, label, text, is_correct)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (question_id, label, f"Option {label}", 0)
+                )
+
+                used_labels.add(label)
+                added += 1
+
+            label_index += 1
+
+        conn.commit()
+        conn.close()
+
+        rebuild_quiz_json_from_db(quiz_id)
+        rebuild_quiz_html_from_registry(quiz_id)
+
+        return redirect(f"/edit_quiz/{quiz_id}")
+
+    # =========================
     # VALIDATION: each question must have at least one correct answer
     # =========================
     questions = cur.execute(
@@ -1198,15 +1267,14 @@ def save_edited_quiz(quiz_id):
             WHERE question_id = ?
             AND is_correct = 1
             """,
-            (q["id"],)
+            (q[0],)
         ).fetchone()[0]
 
         if correct_count == 0:
             conn.rollback()
             conn.close()
-            flash(f"Question {q['question_number']} must have at least one correct answer.", "error")
+            flash(f"Question {q[1]} must have at least one correct answer.", "error")
             return redirect(url_for("edit_quiz", quiz_id=quiz_id))
-
 
     conn.commit()
     conn.close()
@@ -1840,6 +1908,7 @@ def quiz_library():
         <br>
         <button onclick="location.href='/upload'">📤 Upload New Quiz</button>
         <button onclick="location.href='/paste'">📋 Paste Questions Instead</button>
+        <button onclick="location.href='/create_short_quiz'">✍️ Create Short Quiz</button>                        
         <button onclick="location.href='/'">⬅ Back To Portal</button>
 
     </div>
@@ -1924,52 +1993,63 @@ def upload_page():
         <div class="card">
 
             <h2>Option 1 — Upload a Text File</h2>
-            <p style="opacity:.8">
-                Use this if you already have a .txt question file.
-            </p>
+<p style="opacity:.8">
+    Use this if you already have a .txt question file.
+</p>
 
-            <form action="/process" method="POST" enctype="multipart/form-data">
+<form action="/process" method="POST" enctype="multipart/form-data">
 
-                <h3>Quiz Display Title</h3>
-                <input type="text" name="quiz_title"
-                       placeholder="Example: Cloud+ Networking Practice"
-                       required style="width:100%;padding:6px">
+    <h3>Quiz Display Title</h3>
+    <input type="text" name="quiz_title"
+           placeholder="Example: Cloud+ Networking Practice"
+           required style="width:100%;padding:6px">
 
-                <br><br>
+    <br><br>
 
-                <h3>Select Quiz Text File</h3>
-                <p style="opacity:.7; font-size:12px">
-                    Upload any properly formatted .txt file
-                </p>
+    <h3>Select Quiz Text File</h3>
+    <p style="opacity:.7; font-size:12px">
+        Upload any properly formatted .txt file
+    </p>
 
-                <input type="file" name="file" accept=".txt" required>
+    <input type="file" name="file" accept=".txt" required>
 
-                <br><br>
+    <br><br>
 
-                <h3>Upload Logo (Optional)</h3>
-                <input type="file" name="quiz_logo" accept="image/*">
-                <p style="opacity:0.7; font-size:12px">
-                    Supported: PNG / JPG / GIF
-                </p>
+    <h3>Upload Logo (Optional)</h3>
+    <input type="file" name="quiz_logo" accept="image/*">
+    <p style="opacity:0.7; font-size:12px">
+        Supported: PNG / JPG / GIF
+    </p>
 
-                <button type="submit">📤 Upload & Build Quiz</button>
-            </form>
+    <button type="submit">📤 Upload & Build Quiz</button>
+</form>
 
-            <hr style="margin:30px 0; opacity:.5">
+<hr style="margin:30px 0; opacity:.5">
 
-            <h2>Option 2 — Paste Questions Instead</h2>
-            <p style="opacity:.8">
-                Use this if you do NOT have a .txt file. Just paste your questions.
-            </p>
+<h2>Option 2 — Paste Questions Instead</h2>
+<p style="opacity:.8">
+    Use this if you do NOT have a .txt file. Just paste your questions.
+</p>
 
-            <button onclick="location.href='/paste'">
-                📋 Paste Questions to Build Quiz
-            </button>
+<button onclick="location.href='/paste'">
+    📋 Paste Questions to Build Quiz
+</button>
 
-            <br><br>
-            <button onclick="location.href='/'">⬅ Back To Portal</button>
+<hr style="margin:30px 0; opacity:.5">
 
-        </div>
+<h2>Option 3 — Create Short Quiz</h2>
+<p style="opacity:.8">
+    Build a quiz manually with guided question and answer entry.
+</p>
+
+<button onclick="location.href='/create_short_quiz'">
+    ✍️ Create Short Quiz
+</button>
+
+<br><br>
+<button onclick="location.href='/'">⬅ Back To Portal</button>
+
+</div>
     </div>
     </body>
     </html>
@@ -2161,6 +2241,7 @@ Question\\s*#\\d+ => "
 
             <br>
             <button onclick="location.href='/upload'">📤 Upload File Instead</button>
+            <button onclick="location.href='/create_short_quiz'">✍️ Create Short Quiz Instead</button>
             <button onclick="location.href='/'">⬅ Back To Portal</button>
 
         </div>
@@ -2169,6 +2250,436 @@ Question\\s*#\\d+ => "
     </body>
     </html>
     """, portal_title=portal_title, cfg=cfg)
+
+
+
+# =========================
+# CREATE SHORT QUIZ PAGE
+# =========================
+@app.route("/create_short_quiz")
+def create_short_quiz_page():
+    portal_title = get_portal_title()
+
+    questions = []
+    for qnum in range(1, 11):
+        questions.append({
+            "number": qnum,
+            "choices": ["A", "B", "C", "D"]
+        })
+
+    return render_template_string("""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Create Short Quiz</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="/static/favicon.ico">
+</head>
+
+<body>
+<div class="container">
+
+    <h1 class="hero-title">
+        ✍️ Create Short Quiz
+    </h1>
+
+    <div class="card">
+
+        <form id="create-short-quiz-form" method="POST" action="/create_short_quiz">
+
+            <h3>Quiz Display Title</h3>
+            <input type="text"
+                   name="quiz_title"
+                   placeholder="Example: Quick Practice Quiz"
+                   required
+                   style="width:100%; padding:8px;">
+
+            <br><br>
+
+            <div id="questions-container">
+                {% for q in questions %}
+                <div class="card question-block" data-question-number="{{ q.number }}" style="margin-top:18px;">
+                    <h3 class="question-heading">Question {{ q.number }}</h3>
+
+                    <button type="button"
+                            class="btn-delete"
+                            onclick="deleteQuestion(this)"
+                            style="margin-bottom:10px;">
+                        🗑 Delete Question
+                    </button>
+
+                    <textarea class="question-text"
+                              name="question_{{ q.number }}"
+                              placeholder="Enter question text here..."
+                              style="width:100%; min-height:90px;"></textarea>
+
+                    <ul class="choices-list">
+                    {% for label in q.choices %}
+                        <li style="margin-bottom:6px;">
+                            <b class="choice-label">{{ label }}.</b>
+
+                            <input type="text"
+                                   class="choice-text"
+                                   name="choice_{{ q.number }}_{{ label }}"
+                                   placeholder="Option {{ label }}"
+                                   style="width:65%; padding:6px;">
+
+                            <input type="checkbox"
+                                   class="choice-correct"
+                                   name="correct_{{ q.number }}_{{ label }}">
+                            Correct
+
+                            <button type="button"
+                                    class="btn-delete"
+                                    onclick="deleteChoice(this)"
+                                    style="font-size:11px; padding:4px 6px;">
+                                ❌
+                            </button>
+                        </li>
+                    {% endfor %}
+                    </ul>
+
+                    <button type="button" onclick="addChoice(this)">
+                        ➕ Add Choice
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+
+            <br>
+
+            <button type="button" onclick="addQuestion()">
+                ➕ Add New Question
+            </button>
+
+            <button type="submit">
+                💾 Create Quiz
+            </button>
+
+        </form>
+
+        <br>
+        <button onclick="location.href='/upload'">⬅ Back To Create Options</button>
+        <button onclick="location.href='/'">⬅ Back To Portal</button>
+
+    </div>
+</div>
+
+<script>
+function getChoiceLabel(index) {
+    return String.fromCharCode(65 + index);
+}
+
+function renumberQuestions() {
+    const questions = document.querySelectorAll(".question-block");
+
+    questions.forEach((question, qIndex) => {
+        const qNumber = qIndex + 1;
+        question.dataset.questionNumber = qNumber;
+
+        question.querySelector(".question-heading").textContent = `Question ${qNumber}`;
+
+        const questionText = question.querySelector(".question-text");
+        const savedQuestionText = questionText.value;
+        questionText.name = `question_${qNumber}`;
+        questionText.value = savedQuestionText;
+
+        const choices = question.querySelectorAll(".choices-list li");
+
+        choices.forEach((choice, cIndex) => {
+            const label = getChoiceLabel(cIndex);
+
+            choice.querySelector(".choice-label").textContent = `${label}.`;
+
+            const choiceText = choice.querySelector(".choice-text");
+            const savedChoiceText = choiceText.value;
+            choiceText.name = `choice_${qNumber}_${label}`;
+            choiceText.placeholder = `Option ${label}`;
+            choiceText.value = savedChoiceText;
+
+            const correctBox = choice.querySelector(".choice-correct");
+            const savedChecked = correctBox.checked;
+            correctBox.name = `correct_${qNumber}_${label}`;
+            correctBox.checked = savedChecked;
+        });
+    });
+}
+
+function addQuestion() {
+    const container = document.getElementById("questions-container");
+    const qNumber = document.querySelectorAll(".question-block").length + 1;
+
+    const block = document.createElement("div");
+    block.className = "card question-block";
+    block.dataset.questionNumber = qNumber;
+    block.style.marginTop = "18px";
+
+    block.innerHTML = `
+        <h3 class="question-heading">Question ${qNumber}</h3>
+
+        <button type="button"
+                class="btn-delete"
+                onclick="deleteQuestion(this)"
+                style="margin-bottom:10px;">
+            🗑 Delete Question
+        </button>
+
+        <textarea class="question-text"
+                  name="question_${qNumber}"
+                  placeholder="Enter question text here..."
+                  style="width:100%; min-height:90px;"></textarea>
+
+        <ul class="choices-list">
+            ${["A", "B", "C", "D"].map(label => `
+                <li style="margin-bottom:6px;">
+                    <b class="choice-label">${label}.</b>
+
+                    <input type="text"
+                           class="choice-text"
+                           name="choice_${qNumber}_${label}"
+                           placeholder="Option ${label}"
+                           style="width:65%; padding:6px;">
+
+                    <input type="checkbox"
+                           class="choice-correct"
+                           name="correct_${qNumber}_${label}">
+                    Correct
+
+                    <button type="button"
+                            class="btn-delete"
+                            onclick="deleteChoice(this)"
+                            style="font-size:11px; padding:4px 6px;">
+                        ❌
+                    </button>
+                </li>
+            `).join("")}
+        </ul>
+
+        <button type="button" onclick="addChoice(this)">
+            ➕ Add Choice
+        </button>
+    `;
+
+    container.appendChild(block);
+    renumberQuestions();
+}
+
+function deleteQuestion(button) {
+    const questions = document.querySelectorAll(".question-block");
+
+    if (questions.length <= 1) {
+        alert("A quiz must have at least one question.");
+        return;
+    }
+
+    if (!confirm("Delete this question?")) return;
+
+    button.closest(".question-block").remove();
+    renumberQuestions();
+}
+
+function addChoice(button) {
+    const question = button.closest(".question-block");
+    const choicesList = question.querySelector(".choices-list");
+    const choiceCount = choicesList.querySelectorAll("li").length;
+
+    if (choiceCount >= 26) {
+        alert("Maximum answer choices reached.");
+        return;
+    }
+
+    const label = getChoiceLabel(choiceCount);
+
+    const li = document.createElement("li");
+    li.style.marginBottom = "6px";
+
+    li.innerHTML = `
+        <b class="choice-label">${label}.</b>
+
+        <input type="text"
+               class="choice-text"
+               placeholder="Option ${label}"
+               style="width:65%; padding:6px;">
+
+        <input type="checkbox"
+               class="choice-correct">
+        Correct
+
+        <button type="button"
+                class="btn-delete"
+                onclick="deleteChoice(this)"
+                style="font-size:11px; padding:4px 6px;">
+            ❌
+        </button>
+    `;
+
+    choicesList.appendChild(li);
+    renumberQuestions();
+}
+
+function deleteChoice(button) {
+    const question = button.closest(".question-block");
+    const choices = question.querySelectorAll(".choices-list li");
+
+    if (choices.length <= 1) {
+        alert("A question must have at least one answer choice.");
+        return;
+    }
+
+    button.closest("li").remove();
+    renumberQuestions();
+}
+
+document.getElementById("create-short-quiz-form").addEventListener("submit", function(e) {
+    renumberQuestions();
+
+    const questions = document.querySelectorAll(".question-block");
+
+    for (let i = 0; i < questions.length; i++) {
+        const questionText = questions[i].querySelector(".question-text").value.trim();
+        const choices = questions[i].querySelectorAll(".choice-text");
+        const checked = questions[i].querySelectorAll(".choice-correct:checked");
+
+        if (!questionText) {
+            e.preventDefault();
+            alert(`Question ${i + 1} needs question text.`);
+            questions[i].scrollIntoView({ behavior: "smooth", block: "center" });
+            return;
+        }
+
+        let hasChoiceText = false;
+        choices.forEach(choice => {
+            if (choice.value.trim()) {
+                hasChoiceText = true;
+            }
+        });
+
+        if (!hasChoiceText) {
+            e.preventDefault();
+            alert(`Question ${i + 1} needs at least one answer choice.`);
+            questions[i].scrollIntoView({ behavior: "smooth", block: "center" });
+            return;
+        }
+
+        if (checked.length === 0) {
+            e.preventDefault();
+            alert(`Question ${i + 1} must have at least one correct answer.`);
+            questions[i].scrollIntoView({ behavior: "smooth", block: "center" });
+            return;
+        }
+    }
+});
+</script>
+
+</body>
+</html>
+""", portal_title=portal_title, questions=questions)
+
+
+
+# =========================
+# CREATE SHORT QUIZ - SAVE
+# =========================
+@app.route("/create_short_quiz", methods=["POST"])
+def save_short_quiz():
+    quiz_title = request.form.get("quiz_title", "").strip()
+
+    if not quiz_title:
+        flash("Quiz title is required.", "error")
+        return redirect("/create_short_quiz")
+
+    quiz_data = []
+
+    for qnum in range(1, 11):
+        question_text = request.form.get(f"question_{qnum}", "").strip()
+
+        # Skip completely blank questions
+        if not question_text:
+            continue
+
+        choices = []
+        correct_letters = []
+
+        for label in ["A", "B", "C", "D"]:
+            choice_text = request.form.get(f"choice_{qnum}_{label}", "").strip()
+            is_correct = bool(request.form.get(f"correct_{qnum}_{label}"))
+
+            # Skip blank answer choices
+            if not choice_text:
+                continue
+
+            if is_correct:
+                correct_letters.append(label)
+
+            choices.append({
+                "label": label,
+                "text": choice_text,
+                "is_correct": is_correct
+            })
+
+        if not choices:
+            flash(f"Question {qnum} must have at least one answer choice.", "error")
+            return redirect("/create_short_quiz")
+
+        if not correct_letters:
+            flash(f"Question {qnum} must have at least one correct answer.", "error")
+            return redirect("/create_short_quiz")
+
+        quiz_data.append({
+            "number": len(quiz_data) + 1,
+            "question": question_text,
+            "choices": choices,
+            "correct": correct_letters
+        })
+
+    if not quiz_data:
+        flash("You must enter at least one question.", "error")
+        return redirect("/create_short_quiz")
+
+    ts = int(time.time())
+    safe_title = secure_filename(quiz_title) or "short_quiz"
+
+    html_name = f"short_quiz_{ts}.html"
+    json_name = f"short_quiz_{ts}.json"
+
+    json_path = os.path.join(DATA_FOLDER, json_name)
+    html_path = os.path.join(QUIZ_FOLDER, html_name)
+
+    # Save JSON file
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(quiz_data, f, indent=4)
+
+    # Save quiz into DB using existing helper
+    quiz_id = save_quiz_to_db(
+        quiz_title=quiz_title,
+        source_file=html_name,
+        quiz_data=quiz_data,
+        logo_filename=None
+    )
+
+    # Add to library registry
+    add_quiz_to_registry(
+        quiz_id=quiz_id,
+        html=html_name,
+        title=quiz_title,
+        logo=None
+    )
+
+    # Build playable quiz HTML
+    build_quiz_html(
+        html_name,
+        json_name,
+        html_path,
+        get_portal_title(),
+        quiz_title,
+        None,
+        quiz_id
+    )
+
+    flash("Short quiz created successfully.", "success")
+    return redirect(f"/edit_quiz/{quiz_id}")
+
 
 
 
