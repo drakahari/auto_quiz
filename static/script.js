@@ -427,9 +427,14 @@ function startQuiz(isExam) {
     userAnswers = {};
 
     if (examMode) {
-    examStartTime = new Date().toISOString();
+        examStartTime = new Date().toISOString();
     } else {
         examStartTime = null;
+    }
+
+    const studyAiBtn = document.getElementById("studyAiBtn");
+    if (studyAiBtn) {
+        studyAiBtn.style.display = examMode ? "none" : "inline-block";
     }
 
 
@@ -846,3 +851,144 @@ function resetDatabase() {
     });
 }
 
+/* =====================================================
+   Review Study Question with AI (NEW FEATURE)
+===================================================== */
+window.reviewCurrentQuestionWithAI = async function() {
+    try {
+        const res = await fetch("/config/portal.json", { cache: "no-store" });
+        const aiConfig = await res.json();
+
+        if (!aiConfig || !aiConfig.ai_helper_enabled) {
+            alert("AI Helper is disabled in Settings.");
+            return;
+        }
+
+        // =========================
+        // READ CURRENT QUESTION FROM DOM
+        // =========================
+        const questionEl = document.getElementById("qText");
+        if (!questionEl) {
+            throw new Error("Could not find question text on page");
+        }
+
+        const questionText = questionEl.innerText.trim();
+
+        // Get all answer choices
+        const choiceEls = document.querySelectorAll("#choices label, #choices div, #choices button");
+        let choicesText = "";
+
+        choiceEls.forEach(el => {
+            const txt = el.innerText.trim();
+            if (txt) {
+                choicesText += txt + "\n";
+            }
+        });
+
+        // Try to find correct answer (Study Mode usually shows it)
+        let correctText = "(Correct answer not visible)";
+        const correctEl = document.querySelector(".correct, .correct-answer");
+        if (correctEl) {
+            correctText = correctEl.innerText.trim();
+        }
+
+        let userAnswer = "Not answered yet — I am studying this question and want help understanding it.";
+
+        // Study Mode marks the chosen answer visually.
+        // Look for the selected/highlighted answer inside #choices.
+        const selectedChoice = Array.from(document.querySelectorAll("#choices button, #choices div, #choices label"))
+            .find(el => {
+                const cls = (el.className || "").toString().toLowerCase();
+                const style = (el.getAttribute("style") || "").toLowerCase();
+
+                return (
+                    cls.includes("selected") ||
+                    cls.includes("wrong") ||
+                    cls.includes("incorrect") ||
+                    cls.includes("correct") ||
+                    style.includes("green") ||
+                    style.includes("red") ||
+                    style.includes("00ff80") ||
+                    style.includes("ff4d4d")
+                );
+            });
+
+        if (selectedChoice) {
+            userAnswer = selectedChoice.innerText.trim();
+        }
+
+        const questionBlock = `Question
+---------------------
+${questionText}
+
+Answer Choices:
+${choicesText.trim()}
+
+Correct Answer:
+${correctText}
+
+My Answer:
+${userAnswer}`;
+
+// =========================
+// STUDY MODE AI PROMPT
+// =========================
+const finalPrompt = `I am studying this question and want help understanding it.
+
+Please:
+1. Explain the core concept being tested in simple terms.
+2. Identify the correct answer.
+3. Explain why the correct answer is correct.
+4. Briefly explain why the other answer choices are not the best answer.
+5. Keep the explanation concise and beginner-friendly, and offer to go deeper if I ask.
+
+---
+
+${questionBlock.trim()}`;
+
+        // =========================
+        // COPY TO CLIPBOARD
+        // =========================
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(finalPrompt);
+            } else {
+                const textarea = document.createElement("textarea");
+                textarea.value = finalPrompt;
+                textarea.style.position = "fixed";
+                textarea.style.left = "-9999px";
+                document.body.appendChild(textarea);
+                textarea.focus();
+                textarea.select();
+                document.execCommand("copy");
+                document.body.removeChild(textarea);
+            }
+        } catch (copyErr) {
+            console.warn("[AI Study Mode] Clipboard copy failed:", copyErr);
+        }
+
+        // =========================
+        // OPEN AI
+        // =========================
+        const providers = {
+            chatgpt: "https://chatgpt.com/",
+            claude: "https://claude.ai/",
+            gemini: "https://gemini.google.com/"
+        };
+
+        const url = aiConfig.ai_provider === "local"
+            ? (aiConfig.ai_custom_url || "").trim()
+            : providers[aiConfig.ai_provider];
+
+        if (!url) {
+            alert("No AI provider configured in Settings.");
+            return;
+        }
+
+        window.open(url, "_blank", "noopener,noreferrer");
+
+    } catch (err) {
+        console.error("[AI Study Mode] Failed:", err);
+        alert("AI feature failed:\n\n" + err.message);
+    }
+};

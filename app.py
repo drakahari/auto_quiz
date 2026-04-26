@@ -5827,6 +5827,12 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
             <div class="controls">
                 <button onclick="prev()">Prev</button>
                 <button onclick="next()">Next</button>
+                <button id="studyAiBtn"
+                        type="button"
+                        class="hidden"
+                        onclick="reviewCurrentQuestionWithAI()">
+                    🤖 Review This Question with AI
+                </button>
             </div>
         </div>
 
