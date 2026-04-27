@@ -857,12 +857,20 @@ def edit_quiz(quiz_id):
     {% endwith %}
 
     <div class="card">
-        <form id="edit-quiz-form" method="POST" action="/edit_quiz/{{ quiz['id'] }}">
+        <form id="edit-quiz-form" method="POST" action="/edit_quiz/{{ quiz['id'] }}" enctype="multipart/form-data">
             <label><b>Quiz Title</b></label><br>
             <input type="text" name="quiz_title" value="{{ quiz['title'] }}" style="width:100%; padding:8px;">
 
             <p><b>Quiz ID:</b> {{ quiz["id"] }}</p>
             <p><b>Source file:</b> {{ quiz["source_file"] }}</p>
+
+             <br>
+
+            <h3>Quiz Logo</h3>
+            <input type="file" name="quiz_logo" accept="image/*">
+            <p style="opacity:0.7; font-size:12px">
+                Optional. Uploading a new logo will replace the current quiz logo.
+            </p>                     
 
             {% for q in questions %}
             <div class="card question-block" style="margin-top:18px;">
@@ -1091,6 +1099,16 @@ def save_edited_quiz(quiz_id):
 
     action = request.form.get("action", "")
 
+    ts = int(time.time())
+
+    quiz_logo = request.files.get("quiz_logo")
+
+    logo_filename = finalize_logo_from_request(
+        app,
+        ts,
+        logo_file=quiz_logo
+    )
+
     # =========================
     # SAVE CURRENT FORM VALUES FIRST
     # =========================
@@ -1106,6 +1124,10 @@ def save_edited_quiz(quiz_id):
         for q in registry:
             if q.get("id") == quiz_id:
                 q["title"] = new_title
+
+                if logo_filename:
+                    q["logo"] = logo_filename
+
         save_registry(registry)
 
     questions = cur.execute(
@@ -2286,7 +2308,7 @@ def create_short_quiz_page():
 
     <div class="card">
 
-        <form id="create-short-quiz-form" method="POST" action="/create_short_quiz">
+        <form id="create-short-quiz-form" method="POST" action="/create_short_quiz" enctype="multipart/form-data">
 
             <h3>Quiz Display Title</h3>
             <input type="text"
@@ -2296,6 +2318,12 @@ def create_short_quiz_page():
                    style="width:100%; padding:8px;">
 
             <br><br>
+
+            <h3>Upload Logo (Optional)</h3>
+            <input type="file" name="quiz_logo" accept="image/*">
+            <p style="opacity:0.7; font-size:12px">
+                Supported: PNG / JPG / GIF / WEBP
+            </p>
 
             <div id="questions-container">
                 {% for q in questions %}
@@ -2674,6 +2702,14 @@ def save_short_quiz():
 
     ts = int(time.time())
 
+    quiz_logo = request.files.get("quiz_logo")
+
+    logo_filename = finalize_logo_from_request(
+        app,
+        ts,
+        logo_file=quiz_logo
+    )
+
     html_name = f"short_quiz_{ts}.html"
     json_name = f"short_quiz_{ts}.json"
 
@@ -2689,7 +2725,7 @@ def save_short_quiz():
         quiz_title=quiz_title,
         source_file=html_name,
         quiz_data=quiz_data,
-        logo_filename=None
+        logo_filename=logo_filename
     )
 
     # Add to library registry
@@ -2697,7 +2733,7 @@ def save_short_quiz():
         quiz_id=quiz_id,
         html=html_name,
         title=quiz_title,
-        logo=None
+        logo=logo_filename
     )
 
     # Build playable quiz HTML
@@ -2707,7 +2743,7 @@ def save_short_quiz():
         html_path,
         get_portal_title(),
         quiz_title,
-        None,
+        logo_filename,
         quiz_id
     )
 
