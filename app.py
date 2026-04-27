@@ -2591,7 +2591,15 @@ def save_short_quiz():
 
     quiz_data = []
 
-    for qnum in range(1, 11):
+    # Dynamically detect all submitted questions
+    question_numbers = sorted(
+        int(key.replace("question_", ""))
+        for key in request.form.keys()
+        if key.startswith("question_")
+        and key.replace("question_", "").isdigit()
+    )
+
+    for qnum in question_numbers:
         question_text = request.form.get(f"question_{qnum}", "").strip()
 
         # Skip completely blank questions
@@ -2601,7 +2609,19 @@ def save_short_quiz():
         choices = []
         correct_letters = []
 
-        for label in ["A", "B", "C", "D"]:
+        # Dynamically detect all submitted choices for this question
+        choice_prefix = f"choice_{qnum}_"
+
+        choice_labels = sorted(
+            [
+                key.replace(choice_prefix, "")
+                for key in request.form.keys()
+                if key.startswith(choice_prefix)
+            ],
+            key=lambda label: ord(label[0]) if label else 999
+        )
+
+        for label in choice_labels:
             choice_text = request.form.get(f"choice_{qnum}_{label}", "").strip()
             is_correct = bool(request.form.get(f"correct_{qnum}_{label}"))
 
@@ -2638,7 +2658,6 @@ def save_short_quiz():
         return redirect("/create_short_quiz")
 
     ts = int(time.time())
-    safe_title = secure_filename(quiz_title) or "short_quiz"
 
     html_name = f"short_quiz_{ts}.html"
     json_name = f"short_quiz_{ts}.json"
