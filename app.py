@@ -2538,7 +2538,7 @@ document.getElementById("create-short-quiz-form").addEventListener("submit", fun
 
     for (let i = 0; i < questions.length; i++) {
         const questionText = questions[i].querySelector(".question-text").value.trim();
-        const choices = questions[i].querySelectorAll(".choice-text");
+        const choiceRows = questions[i].querySelectorAll(".choices-list li");
         const checked = questions[i].querySelectorAll(".choice-correct:checked");
 
         if (!questionText) {
@@ -2549,8 +2549,11 @@ document.getElementById("create-short-quiz-form").addEventListener("submit", fun
         }
 
         let hasChoiceText = false;
-        choices.forEach(choice => {
-            if (choice.value.trim()) {
+
+        choiceRows.forEach(row => {
+            const choiceText = row.querySelector(".choice-text").value.trim();
+
+            if (choiceText) {
                 hasChoiceText = true;
             }
         });
@@ -2564,9 +2567,21 @@ document.getElementById("create-short-quiz-form").addEventListener("submit", fun
 
         if (checked.length === 0) {
             e.preventDefault();
-            alert(`Question ${i + 1} must have at least one correct answer.`);
+            alert(`Question ${i + 1} must have at least one correct answer selected.`);
             questions[i].scrollIntoView({ behavior: "smooth", block: "center" });
             return;
+        }
+
+        for (const box of checked) {
+            const choiceRow = box.closest("li");
+            const choiceText = choiceRow.querySelector(".choice-text").value.trim();
+
+            if (!choiceText) {
+                e.preventDefault();
+                alert(`Question ${i + 1} has a correct answer selected, but that answer choice is blank.`);
+                choiceRow.scrollIntoView({ behavior: "smooth", block: "center" });
+                return;
+            }
         }
     }
 });
