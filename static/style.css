@@ -1048,3 +1048,24 @@ button[onclick*="next"] {
         touch-action: manipulation;
     }
 }
+
+/* =============================
+   BUTTON PRESS ANIMATION
+============================= */
+
+button {
+    transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+
+/* When pressed (click/tap) */
+button:active {
+    transform: scale(0.96);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4) inset;
+}
+
+/* Slight lift on hover (desktop only effect) */
+@media (hover: hover) {
+    button:hover {
+        transform: scale(1.03);
+    }
+}
