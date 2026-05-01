@@ -715,3 +715,336 @@ button {
     color: white;
     border: 1px solid #80ffbf;
 }
+
+/* =============================
+   QUIZ PAGE CLEANUP
+   Equal widths + safer spacing
+============================= */
+
+#qHeader,
+#qText,
+.choice {
+    box-sizing: border-box;
+    width: 100%;
+}
+
+.choice {
+    display: block;
+}
+
+/* Safer spacing between quiz action buttons */
+#prevBtn,
+#nextBtn,
+#reviewAiBtn,
+button[onclick*="prev"],
+button[onclick*="next"] {
+    margin-right: 18px;   /* increased spacing */
+    margin-bottom: 16px;  /* increased spacing */
+}
+
+/* Better tablet/mobile tap spacing */
+@media (max-width: 768px) {
+    .container {
+        width: 100%;
+        max-width: none;
+        padding: 14px;
+        box-sizing: border-box;
+    }
+
+    button {
+        min-height: 48px;     /* larger tap target */
+        margin: 12px 10px;    /* more space between buttons */
+    }
+
+    #qText,
+    .choice {
+        font-size: 17px;
+    }
+}
+
+
+
+
+
+/* =============================
+   MOBILE QUIZ SCALING (XL MODE)
+============================= */
+
+@media (max-width: 600px) {
+
+    html {
+        font-size: 18px; /* 🔥 scales EVERYTHING up */
+    }
+
+    body {
+        background-attachment: scroll;
+    }
+
+    .container {
+        padding: 12px;
+    }
+
+    .hero-title {
+        font-size: 28px;
+        padding: 16px;
+    }
+
+    /* QUESTION AREA */
+    #qHeader {
+        font-size: 24px;
+    }
+
+    #qText {
+        font-size: 24px;
+        padding: 20px;
+    }
+
+    /* ANSWERS */
+    .choice {
+        font-size: 22px;
+        padding: 20px;
+        border-radius: 10px;
+    }
+
+    /* 🔥 ALL BUTTONS — LARGE & TOUCH FRIENDLY */
+    button {
+        width: 100%;
+        font-size: 22px;
+        font-weight: 700;
+        padding: 20px;
+        min-height: 70px;
+        margin: 14px 0;
+        border-radius: 12px;
+    }
+
+    /* Force quiz buttons EVEN BIGGER */
+    #prevBtn,
+    #nextBtn,
+    #reviewAiBtn {
+        font-size: 24px;
+        min-height: 75px;
+    }
+
+    /* TOP BAR STACK */
+    .top-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 14px;
+    }
+
+    .top-right {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    /* MODE BANNER */
+    .mode-banner {
+        flex-direction: column;
+        gap: 18px;
+    }
+
+    .mode-center {
+        position: static;
+        transform: none;
+    }
+
+    .mode-badge {
+        height: 80px;
+        max-width: 130px;
+    }
+}
+
+/* =============================
+   MOBILE LIBRARY VIEW
+   Keeps desktop unchanged
+============================= */
+
+@media (max-width: 700px) {
+
+    /* Library quiz cards */
+    #quizList .quiz-card {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 14px !important;
+        margin: 14px 0 !important;
+        padding: 18px !important;
+    }
+
+    #quizList .quiz-card h3 {
+        font-size: 26px !important;
+        line-height: 1.2 !important;
+        text-align: center;
+    }
+
+    /* Library action buttons */
+    #quizList button,
+    .card > button {
+        width: 100% !important;
+        font-size: 22px !important;
+        font-weight: 700 !important;
+        min-height: 64px !important;
+        padding: 18px !important;
+        margin: 10px 0 !important;
+        border-radius: 12px !important;
+    }
+
+    /* Logo area */
+    #quizList .quiz-card > div:last-child {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    #quizList .quiz-card img {
+        max-height: 120px !important;
+        max-width: 100% !important;
+    }
+
+    /* View radio controls */
+    form[action="/library"] {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        font-size: 20px !important;
+    }
+
+    form[action="/library"] label {
+        padding: 10px 0;
+    }
+}
+
+/* =============================
+   MODE BANNER FIX
+   Keep Study/Exam centered on PC and mobile
+============================= */
+
+.mode-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.mode-center {
+    position: static !important;
+    transform: none !important;
+    left: auto !important;
+    flex: 1;
+    text-align: center;
+    z-index: 50;
+}
+
+.mode-badge,
+.badge {
+    pointer-events: none !important;
+}
+
+
+
+/* =============================
+   QUIZ NAV BUTTONS (CANONICAL)
+============================= */
+
+.quiz-nav-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+/* Base button behavior */
+.quiz-nav-buttons button {
+    margin: 0;
+    touch-action: manipulation;
+    user-select: none;
+}
+
+/* =============================
+   DESKTOP QUIZ NAV SPACING
+============================= */
+
+@media (min-width: 601px) {
+    .quiz-nav-buttons {
+        gap: 40px;   /* ← increase this */
+    }
+}
+
+
+/* =============================
+   MOBILE STICKY NAV (FINAL)
+============================= */
+
+@media (max-width: 600px) {
+
+    /* Prevent content from being hidden behind sticky bar */
+    body {
+        padding-bottom: 180px;
+    }
+
+    .quiz-nav-buttons {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+
+        padding: 12px;
+        background: rgba(0, 0, 0, 0.92);
+        border-top: 1px solid rgba(255,255,255,0.25);
+        box-shadow: 0 -6px 24px rgba(0,0,0,0.85);
+
+        z-index: 5000;
+    }
+
+    .quiz-nav-buttons button {
+        font-size: 22px;
+        font-weight: 800;
+        min-height: 66px;
+        border-radius: 12px;
+    }
+
+    /* Prev / Next side-by-side */
+    .quiz-nav-half {
+        flex: 1 1 calc(50% - 5px);
+    }
+
+    /* AI button full width below */
+    .quiz-nav-full {
+        flex: 1 1 100%;
+    }
+}
+
+/* =============================
+   MOBILE TAP RELIABILITY FIX
+   Prevent invisible layers from blocking quiz taps
+============================= */
+
+@media (max-width: 600px) {
+    body:not(.blurred) .pause-overlay {
+        display: none !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+
+    body:not(.blurred) .blur-wrapper {
+        filter: none !important;
+        pointer-events: auto !important;
+    }
+
+    #quiz,
+    #choices,
+    .choice,
+    .controls {
+        position: relative;
+        z-index: 1000;
+        pointer-events: auto !important;
+        touch-action: manipulation;
+    }
+
+    .quiz-nav-buttons,
+    .quiz-nav-buttons button {
+        pointer-events: auto !important;
+        touch-action: manipulation;
+    }
+}

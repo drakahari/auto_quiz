@@ -1750,6 +1750,7 @@ def quiz_library():
 <!DOCTYPE html>
 <html>
 <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quiz Library</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="icon" href="/static/favicon.ico">
@@ -1942,7 +1943,7 @@ def quiz_library():
 <script>
 const list = document.getElementById("quizList");
 
-if (list) {
+if (list && window.matchMedia("(min-width: 701px)").matches) {
     Sortable.create(list, {
         animation: 150,
         handle: ".quiz-card",
@@ -5816,6 +5817,7 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
 <html>
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{quiz_title}</title>
 <link rel="stylesheet" href="/static/style.css">
 <link rel="icon" href="/static/favicon.ico">
@@ -5894,12 +5896,13 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
             <div id="qText"></div>
             <div id="choices"></div>
 
-            <div class="controls">
-                <button onclick="prev()">Prev</button>
-                <button onclick="next()">Next</button>
+            <div class="controls quiz-nav-buttons">
+                <button type="button" onclick="prev()" class="quiz-nav-half">Prev</button>
+                <button type="button" onclick="next()" class="quiz-nav-half">Next</button>
+
                 <button id="studyAiBtn"
                         type="button"
-                        class="hidden"
+                        class="hidden quiz-nav-full"
                         onclick="reviewCurrentQuestionWithAI()">
                     🤖 Review This Question with AI
                 </button>
