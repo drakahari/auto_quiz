@@ -958,15 +958,54 @@ button[onclick*="next"] {
 }
 
 /* =============================
-   DESKTOP QUIZ NAV SPACING
+   DESKTOP QUIZ NAV ALIGNMENT
+   Layout:
+   Row 1: Prev | Next | Review AI
+   Row 2:      | Return Portal | Return Quiz Library
 ============================= */
 
 @media (min-width: 601px) {
     .quiz-nav-buttons {
-        gap: 40px;   /* ← increase this */
+        display: grid;
+        grid-template-columns: auto auto auto;
+        column-gap: 18px;
+        row-gap: 16px;
+        justify-content: start;
+        align-items: center;
+        margin-top: 12px;
+    }
+
+    .quiz-nav-buttons button {
+        margin: 0;
+    }
+
+    #prevBtn {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    #nextBtn {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    #reviewAiBtn {
+        grid-column: 3;
+        grid-row: 1;
+    }
+
+    /* Assumes Return To Portal is the 4th button in .quiz-nav-buttons */
+    .quiz-nav-buttons button:nth-of-type(4) {
+        grid-column: 2;
+        grid-row: 2;
+    }
+
+    /* Assumes Return To Quiz Library is the 5th button in .quiz-nav-buttons */
+    .quiz-nav-buttons button:nth-of-type(5) {
+        grid-column: 3;
+        grid-row: 2;
     }
 }
-
 
 /* =============================
    MOBILE STICKY NAV (FINAL)
