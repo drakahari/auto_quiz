@@ -530,6 +530,27 @@ def toggle_hidden():
     return redirect("/library")
 
 
+@app.route("/move_quiz_folder", methods=["POST"])
+def move_quiz_folder():
+    quiz_id = int(request.form.get("id"))
+    folder = str(request.form.get("folder") or "").strip()
+    view = request.form.get("view") or "visible"
+
+    if not folder:
+        folder = "Uncategorized"
+
+    registry = normalize_quiz_folders(load_registry())
+
+    for q in registry:
+        if q.get("id") == quiz_id:
+            q["folder"] = folder
+            break
+
+    save_registry(registry)
+
+    return redirect(f"/library?view={view}")
+
+
 
 
 
@@ -1777,6 +1798,17 @@ def quiz_library():
 
         grouped_quizzes.setdefault(folder, []).append(q)
 
+    folder_names = sorted({
+        str(q.get("folder") or "Uncategorized").strip() or "Uncategorized"
+        for q in registry
+    })
+
+    default_folders = ["Uncategorized", "A+", "Network+", "Security+", "Data+"]
+
+    for folder in default_folders:
+        if folder not in folder_names:
+            folder_names.append(folder)
+
 
     return render_template_string("""
 <!DOCTYPE html>
@@ -1946,6 +1978,34 @@ def quiz_library():
                                 {% endif %}
                             </button>
                         </form>
+                                  
+                                                   <!-- MOVE TO FOLDER -->
+                        <form method="POST"
+                              action="/move_quiz_folder"
+                              style="display:inline-flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                            <input type="hidden" name="id" value="{{ q['id'] }}">
+                            <input type="hidden"
+                                   name="view"
+                                   value="{{ request.args.get('view', 'visible') }}">
+
+                            <select name="folder"
+                                    style="
+                                        padding:6px;
+                                        border-radius:6px;
+                                        font-size:12px;
+                                    ">
+                                {% for folder in folder_names %}
+                                    <option value="{{ folder }}"
+                                            {% if q.get('folder', 'Uncategorized') == folder %}selected{% endif %}>
+                                        {{ folder }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+
+                            <button type="submit" style="font-size:12px;">
+                                📁 Move
+                            </button>
+                        </form>       
 
                     </div>
                 </div>
@@ -2043,7 +2103,7 @@ def quiz_library():
 
 
 
-        """, quizzes=quizzes, grouped_quizzes=grouped_quizzes, portal_title=portal_title)
+            """, quizzes=quizzes, grouped_quizzes=grouped_quizzes, folder_names=folder_names, portal_title=portal_title)
 
 
 
