@@ -569,6 +569,48 @@ def add_quiz_folder():
 
     return redirect(f"/library?view={view}")
 
+@app.route("/rename_quiz_folder", methods=["POST"])
+def rename_quiz_folder():
+    old_folder = str(request.form.get("old_folder") or "").strip()
+    new_folder = str(request.form.get("new_folder") or "").strip()
+    view = request.form.get("view") or "visible"
+
+    if not old_folder or not new_folder:
+        return redirect(f"/library?view={view}")
+
+    # Keep Uncategorized stable for safety
+    if old_folder.lower() == "uncategorized":
+        return redirect(f"/library?view={view}")
+
+    folders = get_quiz_folders()
+
+    # Do not rename into an existing folder name
+    existing = {f.lower() for f in folders if f.lower() != old_folder.lower()}
+    if new_folder.lower() in existing:
+        return redirect(f"/library?view={view}")
+
+    renamed_folders = []
+    for folder in folders:
+        if folder.lower() == old_folder.lower():
+            renamed_folders.append(new_folder)
+        else:
+            renamed_folders.append(folder)
+
+    save_quiz_folders(renamed_folders)
+
+    # Update existing quizzes that were assigned to the old folder
+    registry = normalize_quiz_folders(load_registry())
+
+    for q in registry:
+        current_folder = str(q.get("folder") or "Uncategorized").strip()
+
+        if current_folder.lower() == old_folder.lower():
+            q["folder"] = new_folder
+
+    save_registry(registry)
+
+    return redirect(f"/library?view={view}")
+
 
 
 
@@ -2032,6 +2074,40 @@ def quiz_library():
                 ">
                     {{ folder_quizzes|length }} quiz{% if folder_quizzes|length != 1 %}zes{% endif %}
                 </span>
+                                 {% if folder_name|lower != "uncategorized" %}
+                <form method="POST"
+                      action="/rename_quiz_folder"
+                      style="
+                        display:inline-flex;
+                        gap:6px;
+                        align-items:center;
+                        flex-wrap:wrap;
+                        margin-left:auto;
+                      ">
+                    <input type="hidden"
+                           name="old_folder"
+                           value="{{ folder_name }}">
+
+                    <input type="hidden"
+                           name="view"
+                           value="{{ request.args.get('view', 'visible') }}">
+
+                    <input type="text"
+                           name="new_folder"
+                           placeholder="Rename folder"
+                           style="
+                                padding:6px;
+                                border-radius:6px;
+                                border:1px solid rgba(255,255,255,.25);
+                                font-size:12px;
+                                width:140px;
+                           ">
+
+                    <button type="submit" style="font-size:12px;">
+                        ✏️ Rename
+                    </button>
+                </form>
+                {% endif %}                 
             </div>
 
             {% for q in folder_quizzes %}
