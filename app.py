@@ -646,7 +646,42 @@ def delete_quiz_folder():
     return redirect(f"/library?view={view}")
 
 
+@app.route("/save_folder_order", methods=["POST"])
+def save_folder_order():
+    data = request.get_json() or {}
+    ordered_folders = data.get("folders", [])
 
+    if not isinstance(ordered_folders, list):
+        return jsonify(status="error", error="Invalid folder order"), 400
+
+    current_folders = get_quiz_folders()
+
+    # Keep only valid folder names from the request
+    cleaned_order = []
+    seen = set()
+
+    for folder in ordered_folders:
+        name = str(folder or "").strip()
+
+        if not name:
+            continue
+
+        key = name.lower()
+
+        if key in seen:
+            continue
+
+        cleaned_order.append(name)
+        seen.add(key)
+
+    # Preserve any folders that were not included in the request
+    for folder in current_folders:
+        if folder.lower() not in seen:
+            cleaned_order.append(folder)
+
+    save_quiz_folders(cleaned_order)
+
+    return jsonify(status="ok")
 
 
 # =========================
@@ -2100,8 +2135,9 @@ def quiz_library():
         {% for folder_name, folder_quizzes in grouped_quizzes.items() %}
 
         <div class="library-folder"
-            data-folder-name="{{ folder_name }}"
-            style="
+                data-folder-name="{{ folder_name }}"
+                data-folder-draggable="true"
+                style="
                 margin:18px 0;
                 padding:12px;
                 border-radius:12px;
@@ -2545,7 +2581,33 @@ function hideAddFolderForm(event, button) {
             setLibraryFolderCollapsed(folder, true);
         }
     });
-});                                                                             
+});     
+
+   document.addEventListener("DOMContentLoaded", function() {
+    const folderList = document.getElementById("quizList");
+
+    if (!folderList || !window.Sortable) return;
+
+    Sortable.create(folderList, {
+        animation: 150,
+        draggable: ".library-folder",
+        handle: ".library-folder-header",
+        filter: "form, input, button, select, textarea",
+        preventOnFilter: false,
+
+        onEnd: function() {
+            const folders = [...document.querySelectorAll(".library-folder")]
+                .map(folder => folder.getAttribute("data-folder-name"))
+                .filter(Boolean);
+
+            fetch("/save_folder_order", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ folders })
+            });
+        }
+    });
+});                                                                                                       
 </script>
 </script>
 </body>
