@@ -2188,7 +2188,14 @@ def quiz_library():
                         Cancel
                     </button>
                 </form>
-</div>
+            </div>
+            <p style="
+                margin: 0 0 14px 0;
+                font-size: 13px;
+                opacity: .75;
+            ">
+                Tip: Drag folder headers to reorder folders. Drag quiz cards to reorder quizzes inside a folder.
+            </p>                    
 
         {% if quizzes %}
 
