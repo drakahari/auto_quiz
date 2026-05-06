@@ -684,6 +684,71 @@ def save_folder_order():
     return jsonify(status="ok")
 
 
+@app.route("/save_quiz_order_in_folder", methods=["POST"])
+def save_quiz_order_in_folder():
+    data = request.get_json() or {}
+
+    folder = str(data.get("folder") or "").strip()
+    ordered_html = data.get("order", [])
+
+    if not folder:
+        folder = "Uncategorized"
+
+    if not isinstance(ordered_html, list):
+        return jsonify(status="error", error="Invalid quiz order"), 400
+
+    registry = normalize_quiz_folders(load_registry())
+
+    # Quizzes currently in this folder
+    folder_quizzes = [
+        q for q in registry
+        if str(q.get("folder") or "Uncategorized").strip().lower() == folder.lower()
+    ]
+
+    # Lookup quizzes in this folder by HTML filename
+    folder_lookup = {
+        q.get("html"): q
+        for q in folder_quizzes
+        if q.get("html")
+    }
+
+    reordered_folder_quizzes = []
+    used_html = set()
+
+    # Add quizzes in the requested order
+    for html in ordered_html:
+        if html in folder_lookup and html not in used_html:
+            reordered_folder_quizzes.append(folder_lookup[html])
+            used_html.add(html)
+
+    # Preserve any folder quizzes missing from the request
+    for q in folder_quizzes:
+        html = q.get("html")
+        if html not in used_html:
+            reordered_folder_quizzes.append(q)
+
+    # Rebuild full registry:
+    # - Replace quizzes from this folder with the reordered version
+    # - Leave quizzes from other folders untouched
+    new_registry = []
+    inserted_folder = False
+
+    for q in registry:
+        current_folder = str(q.get("folder") or "Uncategorized").strip()
+
+        if current_folder.lower() == folder.lower():
+            if not inserted_folder:
+                new_registry.extend(reordered_folder_quizzes)
+                inserted_folder = True
+            continue
+
+        new_registry.append(q)
+
+    save_registry(new_registry)
+
+    return jsonify(status="ok")
+
+
 # =========================
 # Auto Logo Removal
 # =========================
@@ -2271,7 +2336,8 @@ def quiz_library():
 {% endif %}                
             </div>
 
-            <div class="library-folder-body">                     
+            <div class="library-folder-body"
+                    data-folder-name="{{ folder_name }}">                     
             {% for q in folder_quizzes %}
             <div class="quiz-card"
                  data-id="{{ q['html'] }}"
@@ -2607,7 +2673,36 @@ function hideAddFolderForm(event, button) {
             });
         }
     });
-});                                                                                                       
+});         
+
+ document.addEventListener("DOMContentLoaded", function() {
+    if (!window.Sortable) return;
+
+    document.querySelectorAll(".library-folder-body").forEach(body => {
+        Sortable.create(body, {
+            animation: 150,
+            draggable: ".quiz-card",
+            handle: ".quiz-card",
+
+            onEnd: function() {
+                const folderName = body.getAttribute("data-folder-name") || "Uncategorized";
+
+                const order = [...body.querySelectorAll(".quiz-card")]
+                    .map(card => card.getAttribute("data-id"))
+                    .filter(Boolean);
+
+                fetch("/save_quiz_order_in_folder", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        folder: folderName,
+                        order: order
+                    })
+                });
+            }
+        });
+    });
+});                                                                                                                              
 </script>
 </script>
 </body>
