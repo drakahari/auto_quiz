@@ -6647,13 +6647,12 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
             <div id="qText"></div>
             <div id="choices"></div>
 
-            <div class="controls quiz-nav-buttons">
-                <button type="button" onclick="prev()" class="quiz-nav-half">Prev</button>
-                <button type="button" onclick="next()" class="quiz-nav-half">Next</button>
-
+                        <div class="controls">
+                <button onclick="prev()">Prev</button>
+                <button onclick="next()">Next</button>
                 <button id="studyAiBtn"
                         type="button"
-                        class="hidden quiz-nav-full"
+                        class="hidden"
                         onclick="reviewCurrentQuestionWithAI()">
                     🤖 Review This Question with AI
                 </button>
@@ -6663,8 +6662,17 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
         <div id="result" class="hidden"></div>
 
         <br>
-        <button onclick="location.href='/'">🏠 Return To Portal</button>
-        <button onclick="location.href='/library'">📚 Return To Quiz Library</button>
+        <button id="returnPortalBtn" onclick="location.href='/'">
+            🏠 Return To Portal
+        </button>
+
+        <button id="returnLibraryBtn" onclick="location.href='/library'">
+            📚 Return To Quiz Library
+        </button>
+</div>
+</div>
+
+<div id="result" class="hidden"></div>
 
 <!-- 🔹 Tell script.js which quiz + JSON file to load -->
 <script>
