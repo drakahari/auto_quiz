@@ -684,6 +684,29 @@ def save_registry(registry):
     except Exception as e:
         print(f"[REGISTRY ERROR] save_registry failed: {e}")
 
+
+def normalize_quiz_folders(registry):
+    """
+    Backward-compatible folder support for the Quiz Library.
+
+    Existing quizzes may not have a folder field yet.
+    This guarantees every quiz has one without changing quiz files,
+    quiz IDs, history, results, or generated HTML/JSON.
+    """
+    changed = False
+
+    for q in registry:
+        folder = str(q.get("folder") or "").strip()
+
+        if not folder:
+            q["folder"] = "Uncategorized"
+            changed = True
+
+    if changed:
+        save_registry(registry)
+
+    return registry
+
 def add_quiz_to_registry(quiz_id, html, title, logo=None):
     """
     Canonical registry update:
@@ -1692,7 +1715,7 @@ def save_quiz_to_db(quiz_title, source_file, quiz_data, logo_filename=None):
 # =========================
 @app.route("/library")
 def quiz_library():
-    registry = load_registry()   # ← MUST come first
+    registry = normalize_quiz_folders(load_registry())   # ← folder-safe registry
 
     dprint("[REGISTRY DEBUG] Using registry file:", QUIZ_REGISTRY)
     dprint("[REGISTRY DEBUG] Registry size:", len(registry))
@@ -1744,6 +1767,15 @@ def quiz_library():
         for q in filtered
     ]
 
+    grouped_quizzes = {}
+
+    for q in quizzes:
+        folder = str(q.get("folder") or "Uncategorized").strip()
+
+        if not folder:
+            folder = "Uncategorized"
+
+        grouped_quizzes.setdefault(folder, []).append(q)
 
 
     return render_template_string("""
@@ -1818,106 +1850,150 @@ def quiz_library():
         <!-- =============================
              QUIZ LIST
         ============================== -->
-        <div id="quizList">
+                <div id="quizList">
 
-        {% for q in quizzes %}
-        <div class="quiz-card"
-             data-id="{{ q['html'] }}"
+        {% for folder_name, folder_quizzes in grouped_quizzes.items() %}
+
+        <div class="library-folder"
              style="
-                padding:14px;
-                margin:10px;
-                background:rgba(0,0,0,.6);
-                border-radius:8px;
-                display:flex;
-                justify-content:space-between;
-                gap:20px;
-                cursor:grab;
+                margin:18px 0;
+                padding:12px;
+                border-radius:12px;
+                background:rgba(255,255,255,.06);
+                border:1px solid rgba(255,255,255,.16);
              ">
 
-            <!-- LEFT -->
-            <div style="flex:1;">
-                <h3 style="
-                    margin-top:0;
-                    margin-bottom:6px;
-                    font-size:24px;
+            <div class="library-folder-header"
+                 style="
+                    display:flex;
+                    align-items:center;
+                    gap:10px;
+                    margin-bottom:10px;
+                    padding:6px 4px;
+                 ">
+                <span style="font-size:24px;">📁</span>
+
+                <h2 style="
+                    margin:0;
+                    font-size:22px;
                     font-weight:900;
                 ">
-                    {{ q['title'] }}
-                    {% if q.get('hidden') %}
-                        <span style="font-size:14px;opacity:.6;">(Hidden)</span>
+                    {{ folder_name }}
+                </h2>
+
+                <span style="
+                    font-size:13px;
+                    opacity:.75;
+                    padding:4px 8px;
+                    border-radius:999px;
+                    background:rgba(255,255,255,.12);
+                ">
+                    {{ folder_quizzes|length }} quiz{% if folder_quizzes|length != 1 %}zes{% endif %}
+                </span>
+            </div>
+
+            {% for q in folder_quizzes %}
+            <div class="quiz-card"
+                 data-id="{{ q['html'] }}"
+                 style="
+                    padding:14px;
+                    margin:10px;
+                    background:rgba(0,0,0,.6);
+                    border-radius:8px;
+                    display:flex;
+                    justify-content:space-between;
+                    gap:20px;
+                    cursor:default;
+                 ">
+
+                <!-- LEFT -->
+                <div style="flex:1;">
+                    <h3 style="
+                        margin-top:0;
+                        margin-bottom:6px;
+                        font-size:24px;
+                        font-weight:900;
+                    ">
+                        {{ q['title'] }}
+                        {% if q.get('hidden') %}
+                            <span style="font-size:14px;opacity:.6;">(Hidden)</span>
+                        {% endif %}
+                    </h3>
+
+                    <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+                        <button onclick="location.href='/quizzes/{{ q['html'] }}'">
+                            ▶ Open Quiz
+                        </button>
+                                      
+                        <button onclick="location.href='/edit_quiz/{{ q['id'] }}'">
+                             ✏️ Edit Quiz
+                        </button>
+
+                        <!-- HIDE / UNHIDE -->
+                        <form method="POST"
+                            action="/toggle_hidden"
+                            style="display:inline;">
+                            <input type="hidden" name="id" value="{{ q['id'] }}">
+                            <input type="hidden"
+                                    name="view"
+                                    value="{{ request.args.get('view', 'visible') }}">
+
+                            <button type="submit" style="font-size:12px;">
+                                {% if q.get('hidden') %}
+                                    👁 Unhide
+                                {% else %}
+                                    🙈 Hide
+                                {% endif %}
+                            </button>
+                        </form>
+
+                    </div>
+                </div>
+
+                <!-- RIGHT -->
+                <div style="
+                    width:150px;
+                    min-width:150px;
+                    flex-shrink:0;
+                    display:flex;
+                    flex-direction:column;
+                    justify-content:space-between;
+                    align-items:center;
+                ">
+
+                    {% if q['logo'] %}
+                    <img src="/user-static/logos/{{ q['logo'] }}"
+                         style="max-height:90px; width:auto;">
+                    {% else %}
+                    <div style="height:90px;"></div>
                     {% endif %}
-                </h3>
 
-                <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
-                    <button onclick="location.href='/quizzes/{{ q['html'] }}'">
-                        ▶ Open Quiz
-                    </button>
-                                  
-                    <button onclick="location.href='/edit_quiz/{{ q['id'] }}'">
-                         ✏️ Edit Quiz
-                    </button>
-
-                    <!-- HIDE / UNHIDE -->
                     <form method="POST"
-                        action="/toggle_hidden"
-                        style="display:inline;">
-                        <input type="hidden" name="id" value="{{ q['id'] }}">
-                        <input type="hidden"
-                                name="view"
-                                value="{{ request.args.get('view', 'visible') }}">
+                          action="/delete_quiz/{{ q['id'] }}"
+                          onsubmit="return confirm('Delete this quiz permanently?');"
+                          style="margin-top:12px; width:100%; text-align:center;">
 
-                        <button type="submit" style="font-size:12px;">
-                            {% if q.get('hidden') %}
-                                👁 Unhide
-                            {% else %}
-                                🙈 Hide
-                            {% endif %}
+                        <button type="submit"
+                                class="btn-delete"
+                                style="
+                                    width:100%;
+                                    background:#7a0000;
+                                    color:white;
+                                    border:none;
+                                    padding:7px 0;
+                                    font-size:13px;
+                                    border-radius:6px;
+                                ">
+                            🗑 Delete
                         </button>
                     </form>
 
                 </div>
             </div>
+            {% endfor %}
 
-            <!-- RIGHT -->
-            <div style="
-                width:150px;
-                min-width:150px;
-                flex-shrink:0;
-                display:flex;
-                flex-direction:column;
-                justify-content:space-between;
-                align-items:center;
-            ">
-
-                {% if q['logo'] %}
-                <img src="/user-static/logos/{{ q['logo'] }}"
-                     style="max-height:90px; width:auto;">
-                {% else %}
-                <div style="height:90px;"></div>
-                {% endif %}
-
-                <form method="POST"
-                      action="/delete_quiz/{{ q['id'] }}"
-                      onsubmit="return confirm('Delete this quiz permanently?');"
-                      style="margin-top:12px; width:100%; text-align:center;">
-
-                    <button type="submit"
-                            class="btn-delete"
-                            style="
-                                width:100%;
-                                background:#7a0000;
-                                color:white;
-                                border:none;
-                                padding:7px 0;
-                                font-size:13px;
-                                border-radius:6px;
-                            ">
-                        🗑 Delete
-                    </button>
-                </form>
-
-            </div>
         </div>
+
         {% endfor %}
 
         </div>
@@ -1937,29 +2013,29 @@ def quiz_library():
     </div>
 </div>
 
-<!-- =============================
-     DRAG + DROP (SAFE)
-============================= -->
-<script>
-const list = document.getElementById("quizList");
+# <!-- =============================
+#      DRAG + DROP (SAFE)
+# ============================= -->
+# <script>
+# const list = document.getElementById("quizList");
 
-if (list && window.matchMedia("(min-width: 701px)").matches) {
-    Sortable.create(list, {
-        animation: 150,
-        handle: ".quiz-card",
-        onEnd: () => {
-            const order = [...document.querySelectorAll(".quiz-card")]
-                .map(card => card.getAttribute("data-id"));
+# if (list && window.matchMedia("(min-width: 701px)").matches) {
+#     Sortable.create(list, {
+#         animation: 150,
+#         handle: ".quiz-card",
+#         onEnd: () => {
+#             const order = [...document.querySelectorAll(".quiz-card")]
+#                 .map(card => card.getAttribute("data-id"));
 
-            fetch("/save_order", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({ order })
-            });
-        }
-    });
-}
-</script>
+#             fetch("/save_order", {
+#                 method: "POST",
+#                 headers: {"Content-Type": "application/json"},
+#                 body: JSON.stringify({ order })
+#             });
+#         }
+#     });
+# }
+# </script>
 
 </body>
 </html>
@@ -1967,7 +2043,7 @@ if (list && window.matchMedia("(min-width: 701px)").matches) {
 
 
 
-    """, quizzes=quizzes, portal_title=portal_title)
+        """, quizzes=quizzes, grouped_quizzes=grouped_quizzes, portal_title=portal_title)
 
 
 
