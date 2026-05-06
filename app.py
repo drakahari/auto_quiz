@@ -2047,14 +2047,18 @@ def quiz_library():
                 border:1px solid rgba(255,255,255,.16);
              ">
 
-            <div class="library-folder-header"
+                <div class="library-folder-header"
+                 onclick="toggleLibraryFolder(this)"
                  style="
                     display:flex;
                     align-items:center;
                     gap:10px;
                     margin-bottom:10px;
                     padding:6px 4px;
+                    cursor:pointer;
+                    user-select:none;
                  ">
+                <span class="folder-toggle-icon" style="font-size:18px;">▼</span>
                 <span style="font-size:24px;">📁</span>
 
                 <h2 style="
@@ -2110,6 +2114,7 @@ def quiz_library():
                 {% endif %}                 
             </div>
 
+            <div class="library-folder-body">                     
             {% for q in folder_quizzes %}
             <div class="quiz-card"
                  data-id="{{ q['html'] }}"
@@ -2236,7 +2241,9 @@ def quiz_library():
 
                 </div>
             </div>
-            {% endfor %}
+                        {% endfor %}
+
+            </div>
 
         </div>
 
@@ -2283,6 +2290,25 @@ def quiz_library():
 # }
 # </script>
 
+<script>
+function toggleLibraryFolder(header) {
+    const folder = header.closest(".library-folder");
+    const body = folder.querySelector(".library-folder-body");
+    const icon = folder.querySelector(".folder-toggle-icon");
+
+    if (!body || !icon) return;
+
+    const isCollapsed = body.style.display === "none";
+
+    if (isCollapsed) {
+        body.style.display = "";
+        icon.textContent = "▼";
+    } else {
+        body.style.display = "none";
+        icon.textContent = "▶";
+    }
+}
+</script>
 </body>
 </html>
 
