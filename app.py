@@ -2100,13 +2100,14 @@ def quiz_library():
         {% for folder_name, folder_quizzes in grouped_quizzes.items() %}
 
         <div class="library-folder"
-             style="
+            data-folder-name="{{ folder_name }}"
+            style="
                 margin:18px 0;
                 padding:12px;
                 border-radius:12px;
                 background:rgba(255,255,255,.06);
                 border:1px solid rgba(255,255,255,.16);
-             ">
+            ">
 
                 <div class="library-folder-header"
                     onclick="toggleLibraryFolder(event, this)"
@@ -2411,6 +2412,36 @@ def quiz_library():
 # </script>
 
 <script>
+function getCollapsedLibraryFolders() {
+    try {
+        return JSON.parse(localStorage.getItem("dlmsCollapsedLibraryFolders") || "[]");
+    } catch {
+        return [];
+    }
+}
+
+function saveCollapsedLibraryFolders(folders) {
+    localStorage.setItem(
+        "dlmsCollapsedLibraryFolders",
+        JSON.stringify(folders)
+    );
+}
+
+function setLibraryFolderCollapsed(folder, collapsed) {
+    const body = folder.querySelector(".library-folder-body");
+    const icon = folder.querySelector(".folder-toggle-icon");
+
+    if (!body || !icon) return;
+
+    if (collapsed) {
+        body.style.display = "none";
+        icon.textContent = "▶";
+    } else {
+        body.style.display = "";
+        icon.textContent = "▼";
+    }
+}
+
 function toggleLibraryFolder(event, header) {
     if (
         event.target.closest("form") ||
@@ -2423,19 +2454,22 @@ function toggleLibraryFolder(event, header) {
     }
 
     const folder = header.closest(".library-folder");
-    const body = folder.querySelector(".library-folder-body");
-    const icon = folder.querySelector(".folder-toggle-icon");
+    const folderName = folder.getAttribute("data-folder-name");
 
-    if (!body || !icon) return;
+    if (!folderName) return;
 
-    const isCollapsed = body.style.display === "none";
+    const collapsedFolders = getCollapsedLibraryFolders();
+    const isCurrentlyCollapsed = collapsedFolders.includes(folderName);
 
-    if (isCollapsed) {
-        body.style.display = "";
-        icon.textContent = "▼";
+    if (isCurrentlyCollapsed) {
+        setLibraryFolderCollapsed(folder, false);
+        saveCollapsedLibraryFolders(
+            collapsedFolders.filter(name => name !== folderName)
+        );
     } else {
-        body.style.display = "none";
-        icon.textContent = "▶";
+        setLibraryFolderCollapsed(folder, true);
+        collapsedFolders.push(folderName);
+        saveCollapsedLibraryFolders(collapsedFolders);
     }
 }
                                   
@@ -2499,7 +2533,19 @@ function hideAddFolderForm(event, button) {
 
     form.style.display = "none";
     newFolderButton.style.display = "";
-}                                                
+}  
+
+   document.addEventListener("DOMContentLoaded", function() {
+    const collapsedFolders = getCollapsedLibraryFolders();
+
+    document.querySelectorAll(".library-folder").forEach(folder => {
+        const folderName = folder.getAttribute("data-folder-name");
+
+        if (folderName && collapsedFolders.includes(folderName)) {
+            setLibraryFolderCollapsed(folder, true);
+        }
+    });
+});                                                                             
 </script>
 </script>
 </body>
