@@ -2400,33 +2400,55 @@ def quiz_library():
                             </button>
                         </form>
                                   
-                                                   <!-- MOVE TO FOLDER -->
-                        <form method="POST"
-                              action="/move_quiz_folder"
-                              style="display:inline-flex; gap:6px; align-items:center; flex-wrap:wrap;">
-                            <input type="hidden" name="id" value="{{ q['id'] }}">
-                            <input type="hidden"
-                                   name="view"
-                                   value="{{ request.args.get('view', 'visible') }}">
+                        <!-- MOVE TO FOLDER -->
+            <div class="quiz-move-control"
+                style="display:inline-flex; gap:6px; align-items:center; flex-wrap:wrap;">
 
-                            <select name="folder"
-                                    style="
-                                        padding:6px;
-                                        border-radius:6px;
-                                        font-size:12px;
-                                    ">
-                                {% for folder in folder_names %}
-                                    <option value="{{ folder }}"
-                                            {% if q.get('folder', 'Uncategorized') == folder %}selected{% endif %}>
-                                        {{ folder }}
-                                    </option>
-                                {% endfor %}
-                            </select>
+                <button type="button"
+                        onclick="showMoveQuizForm(event, this)"
+                        style="font-size:12px;">
+                    📁 Move
+                </button>
 
-                            <button type="submit" style="font-size:12px;">
-                                📁 Move
-                            </button>
-                        </form>       
+                <form method="POST"
+                    action="/move_quiz_folder"
+                    class="move-quiz-form"
+                    style="
+                        display:none;
+                        gap:6px;
+                        align-items:center;
+                        flex-wrap:wrap;
+                    ">
+                    <input type="hidden" name="id" value="{{ q['id'] }}">
+                    <input type="hidden"
+                        name="view"
+                        value="{{ request.args.get('view', 'visible') }}">
+
+                    <select name="folder"
+                            style="
+                                padding:6px;
+                                border-radius:6px;
+                                font-size:12px;
+                            ">
+                        {% for folder in folder_names %}
+                            <option value="{{ folder }}"
+                                    {% if q.get('folder', 'Uncategorized') == folder %}selected{% endif %}>
+                                {{ folder }}
+                            </option>
+                        {% endfor %}
+                    </select>
+
+                    <button type="submit" style="font-size:12px;">
+                        💾 Save
+                    </button>
+
+                    <button type="button"
+                            onclick="hideMoveQuizForm(event, this)"
+                            style="font-size:12px;">
+                        Cancel
+                    </button>
+                </form>
+            </div>
 
                     </div>
                 </div>
@@ -2655,6 +2677,36 @@ function hideAddFolderForm(event, button) {
         }
     });
 });     
+
+       function showMoveQuizForm(event, button) {
+    event.stopPropagation();
+
+    const control = button.closest(".quiz-move-control");
+    const form = control.querySelector(".move-quiz-form");
+
+    if (!form) return;
+
+    button.style.display = "none";
+    form.style.display = "inline-flex";
+
+    const select = form.querySelector('select[name="folder"]');
+    if (select) {
+        select.focus();
+    }
+}
+
+function hideMoveQuizForm(event, button) {
+    event.stopPropagation();
+
+    const form = button.closest(".move-quiz-form");
+    const control = form.closest(".quiz-move-control");
+    const moveButton = control.querySelector('button[onclick*="showMoveQuizForm"]');
+
+    if (!form || !moveButton) return;
+
+    form.style.display = "none";
+    moveButton.style.display = "";
+}                           
 
    document.addEventListener("DOMContentLoaded", function() {
     const folderList = document.getElementById("quizList");
