@@ -551,6 +551,25 @@ def move_quiz_folder():
     return redirect(f"/library?view={view}")
 
 
+@app.route("/add_quiz_folder", methods=["POST"])
+def add_quiz_folder():
+    folder = str(request.form.get("folder") or "").strip()
+    view = request.form.get("view") or "visible"
+
+    if not folder:
+        return redirect(f"/library?view={view}")
+
+    folders = get_quiz_folders()
+
+    existing = {f.lower() for f in folders}
+
+    if folder.lower() not in existing:
+        folders.append(folder)
+        save_quiz_folders(folders)
+
+    return redirect(f"/library?view={view}")
+
+
 
 
 
@@ -590,6 +609,7 @@ def load_portal_config():
         "show_confidence": False,
         "enable_regex_replace": False,
         "background_image": None,
+        "quiz_folders": ["Uncategorized", "A+", "Network+", "Security+", "Data+", "Cloud+", "Linux+"],
 
         # AI Explanation Helper
         "ai_helper_enabled": False,
@@ -673,6 +693,64 @@ def save_portal_config(title, show_confidence=False, enable_regex_replace=False,
 
     with open(PORTAL_CONFIG, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2)
+
+
+def get_quiz_folders():
+    cfg = load_portal_config()
+
+    folders = cfg.get("quiz_folders") or []
+
+    cleaned = []
+    seen = set()
+
+    for folder in folders:
+        name = str(folder or "").strip()
+
+        if not name:
+            continue
+
+        key = name.lower()
+
+        if key in seen:
+            continue
+
+        cleaned.append(name)
+        seen.add(key)
+
+    if "uncategorized" not in seen:
+        cleaned.insert(0, "Uncategorized")
+
+    return cleaned
+
+
+def save_quiz_folders(folders):
+    cfg = load_portal_config()
+
+    cleaned = []
+    seen = set()
+
+    for folder in folders:
+        name = str(folder or "").strip()
+
+        if not name:
+            continue
+
+        key = name.lower()
+
+        if key in seen:
+            continue
+
+        cleaned.append(name)
+        seen.add(key)
+
+    if "uncategorized" not in seen:
+        cleaned.insert(0, "Uncategorized")
+
+    cfg["quiz_folders"] = cleaned
+
+    with open(PORTAL_CONFIG, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, indent=2)
+
 
 
 def get_portal_title():
@@ -1798,14 +1876,14 @@ def quiz_library():
 
         grouped_quizzes.setdefault(folder, []).append(q)
 
-    folder_names = sorted({
+    folder_names = get_quiz_folders()
+
+    registry_folder_names = sorted({
         str(q.get("folder") or "Uncategorized").strip() or "Uncategorized"
         for q in registry
     })
 
-    default_folders = ["Uncategorized", "A+", "Network+", "Security+", "Data+"]
-
-    for folder in default_folders:
+    for folder in registry_folder_names:
         if folder not in folder_names:
             folder_names.append(folder)
 
@@ -1875,6 +1953,38 @@ def quiz_library():
                 All
             </label>
 
+        </form>
+                                  
+        <!-- =============================
+             ADD FOLDER CONTROL
+        ============================== -->
+        <form method="POST"
+              action="/add_quiz_folder"
+              style="
+                margin-bottom:18px;
+                display:flex;
+                gap:8px;
+                align-items:center;
+                flex-wrap:wrap;
+              ">
+
+            <input type="hidden"
+                   name="view"
+                   value="{{ request.args.get('view', 'visible') }}">
+
+            <input type="text"
+                   name="folder"
+                   placeholder="New folder name"
+                   style="
+                        padding:8px;
+                        border-radius:8px;
+                        border:1px solid rgba(255,255,255,.25);
+                        min-width:220px;
+                   ">
+
+            <button type="submit">
+                📁 Add Folder
+            </button>
         </form>
 
         {% if quizzes %}
