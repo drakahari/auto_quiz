@@ -2089,7 +2089,7 @@ def quiz_library():
              ">
 
                 <div class="library-folder-header"
-                 onclick="toggleLibraryFolder(this)"
+                 onclick="toggleLibraryFolder(event, this)"
                  style="
                     display:flex;
                     align-items:center;
@@ -2363,7 +2363,17 @@ def quiz_library():
 # </script>
 
 <script>
-function toggleLibraryFolder(header) {
+function toggleLibraryFolder(event, header) {
+    if (
+        event.target.closest("form") ||
+        event.target.closest("input") ||
+        event.target.closest("button") ||
+        event.target.closest("select") ||
+        event.target.closest("textarea")
+    ) {
+        return;
+    }
+
     const folder = header.closest(".library-folder");
     const body = folder.querySelector(".library-folder-body");
     const icon = folder.querySelector(".folder-toggle-icon");
@@ -2380,6 +2390,7 @@ function toggleLibraryFolder(header) {
         icon.textContent = "▶";
     }
 }
+</script>
 </script>
 </body>
 </html>
