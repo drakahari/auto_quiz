@@ -2124,39 +2124,61 @@ def quiz_library():
                     {{ folder_quizzes|length }} quiz{% if folder_quizzes|length != 1 %}zes{% endif %}
                 </span>
                 {% if folder_name|lower != "uncategorized" %}
-                <form method="POST"
-                        action="/rename_quiz_folder"
-                        style="
-                            display:inline-flex;
-                            gap:6px;
-                            align-items:center;
-                            flex-wrap:wrap;
-                            margin-left:auto;
-                            justify-content:flex-end;
-                        ">
-                    <input type="hidden"
-                           name="old_folder"
-                           value="{{ folder_name }}">
+               <div class="folder-actions"
+     style="
+        display:inline-flex;
+        gap:6px;
+        align-items:center;
+        flex-wrap:wrap;
+        margin-left:auto;
+        justify-content:flex-end;
+     ">
 
-                    <input type="hidden"
-                           name="view"
-                           value="{{ request.args.get('view', 'visible') }}">
-
-                    <input type="text"
-                           name="new_folder"
-                           placeholder="New folder name"
-                           style="
-                                padding:6px;
-                                border-radius:6px;
-                                border:1px solid rgba(255,255,255,.25);
-                                font-size:12px;
-                                width:140px;
-                           ">
-
-                        <button type="submit" style="font-size:12px;">
+    <button type="button"
+            onclick="showRenameFolderForm(event, this)"
+            style="font-size:12px;">
         ✏️ Rename
     </button>
-</form>
+
+    <form method="POST"
+          action="/rename_quiz_folder"
+          class="rename-folder-form"
+          style="
+            display:none;
+            gap:6px;
+            align-items:center;
+            flex-wrap:wrap;
+          ">
+        <input type="hidden"
+               name="old_folder"
+               value="{{ folder_name }}">
+
+        <input type="hidden"
+               name="view"
+               value="{{ request.args.get('view', 'visible') }}">
+
+        <input type="text"
+               name="new_folder"
+               value="{{ folder_name }}"
+               style="
+                    padding:6px;
+                    border-radius:6px;
+                    border:1px solid rgba(255,255,255,.25);
+                    font-size:12px;
+                    width:150px;
+               ">
+
+        <button type="submit" style="font-size:12px;">
+            💾 Save
+        </button>
+
+        <button type="button"
+                onclick="hideRenameFolderForm(event, this)"
+                style="font-size:12px;">
+            Cancel
+        </button>
+    </form>
+</div>
 
 <form method="POST"
       action="/delete_quiz_folder"
@@ -2396,6 +2418,37 @@ function toggleLibraryFolder(event, header) {
         icon.textContent = "▶";
     }
 }
+                                  
+     function showRenameFolderForm(event, button) {
+    event.stopPropagation();
+
+    const actions = button.closest(".folder-actions");
+    const form = actions.querySelector(".rename-folder-form");
+
+    if (!form) return;
+
+    button.style.display = "none";
+    form.style.display = "inline-flex";
+
+    const input = form.querySelector('input[name="new_folder"]');
+    if (input) {
+        input.focus();
+        input.select();
+    }
+}
+
+function hideRenameFolderForm(event, button) {
+    event.stopPropagation();
+
+    const form = button.closest(".rename-folder-form");
+    const actions = form.closest(".folder-actions");
+    const renameButton = actions.querySelector('button[onclick*="showRenameFolderForm"]');
+
+    if (!form || !renameButton) return;
+
+    form.style.display = "none";
+    renameButton.style.display = "";
+}                             
 </script>
 </script>
 </body>
