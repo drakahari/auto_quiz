@@ -612,6 +612,39 @@ def rename_quiz_folder():
     return redirect(f"/library?view={view}")
 
 
+@app.route("/delete_quiz_folder", methods=["POST"])
+def delete_quiz_folder():
+    folder = str(request.form.get("folder") or "").strip()
+    view = request.form.get("view") or "visible"
+
+    if not folder:
+        return redirect(f"/library?view={view}")
+
+    # Never delete Uncategorized
+    if folder.lower() == "uncategorized":
+        return redirect(f"/library?view={view}")
+
+    # Remove folder from saved folder list
+    folders = get_quiz_folders()
+    folders = [
+        f for f in folders
+        if f.lower() != folder.lower()
+    ]
+    save_quiz_folders(folders)
+
+    # Move quizzes from deleted folder back to Uncategorized
+    registry = normalize_quiz_folders(load_registry())
+
+    for q in registry:
+        current_folder = str(q.get("folder") or "Uncategorized").strip()
+
+        if current_folder.lower() == folder.lower():
+            q["folder"] = "Uncategorized"
+
+    save_registry(registry)
+
+    return redirect(f"/library?view={view}")
+
 
 
 
@@ -1908,7 +1941,12 @@ def quiz_library():
         for q in filtered
     ]
 
-    grouped_quizzes = {}
+    folder_names = get_quiz_folders()
+
+    grouped_quizzes = {
+        folder: []
+        for folder in folder_names
+    }
 
     for q in quizzes:
         folder = str(q.get("folder") or "Uncategorized").strip()
@@ -1916,8 +1954,10 @@ def quiz_library():
         if not folder:
             folder = "Uncategorized"
 
-        grouped_quizzes.setdefault(folder, []).append(q)
+        if folder not in grouped_quizzes:
+            grouped_quizzes[folder] = []
 
+        grouped_quizzes[folder].append(q)
     folder_names = get_quiz_folders()
 
     registry_folder_names = sorted({
@@ -1928,6 +1968,7 @@ def quiz_library():
     for folder in registry_folder_names:
         if folder not in folder_names:
             folder_names.append(folder)
+            grouped_quizzes[folder] = []
 
 
     return render_template_string("""
@@ -2078,7 +2119,7 @@ def quiz_library():
                 ">
                     {{ folder_quizzes|length }} quiz{% if folder_quizzes|length != 1 %}zes{% endif %}
                 </span>
-                                 {% if folder_name|lower != "uncategorized" %}
+                {% if folder_name|lower != "uncategorized" %}
                 <form method="POST"
                       action="/rename_quiz_folder"
                       style="
@@ -2107,11 +2148,42 @@ def quiz_library():
                                 width:140px;
                            ">
 
-                    <button type="submit" style="font-size:12px;">
-                        ✏️ Rename
-                    </button>
-                </form>
-                {% endif %}                 
+                        <button type="submit" style="font-size:12px;">
+        ✏️ Rename
+    </button>
+</form>
+
+<form method="POST"
+      action="/delete_quiz_folder"
+      onsubmit="return confirm('Delete this folder? Quizzes inside it will move to Uncategorized.');"
+      style="
+        display:inline-flex;
+        gap:6px;
+        align-items:center;
+        flex-wrap:wrap;
+      ">
+    <input type="hidden"
+           name="folder"
+           value="{{ folder_name }}">
+
+    <input type="hidden"
+           name="view"
+           value="{{ request.args.get('view', 'visible') }}">
+
+    <button type="submit"
+            class="btn-delete"
+            style="
+                font-size:12px;
+                background:#7a0000;
+                color:white;
+                border:none;
+                border-radius:6px;
+                padding:6px 10px;
+            ">
+        🗑 Delete Folder
+    </button>
+</form>
+{% endif %}                
             </div>
 
             <div class="library-folder-body">                     
