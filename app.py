@@ -2089,16 +2089,17 @@ def quiz_library():
              ">
 
                 <div class="library-folder-header"
-                 onclick="toggleLibraryFolder(event, this)"
-                 style="
-                    display:flex;
-                    align-items:center;
-                    gap:10px;
-                    margin-bottom:10px;
-                    padding:6px 4px;
-                    cursor:pointer;
-                    user-select:none;
-                 ">
+                    onclick="toggleLibraryFolder(event, this)"
+                    style="
+                        display:flex;
+                        align-items:center;
+                        gap:10px;
+                        margin-bottom:10px;
+                        padding:6px 4px;
+                        cursor:pointer;
+                        user-select:none;
+                        flex-wrap:wrap;
+                    ">
                 <span class="folder-toggle-icon" style="font-size:18px;">▼</span>
                 <span style="font-size:24px;">📁</span>
 
@@ -2106,29 +2107,33 @@ def quiz_library():
                     margin:0;
                     font-size:22px;
                     font-weight:900;
+                    flex:1;
+                    min-width:180px;
                 ">
                     {{ folder_name }}
                 </h2>
 
                 <span style="
                     font-size:13px;
-                    opacity:.75;
-                    padding:4px 8px;
+                    opacity:.85;
+                    padding:5px 10px;
                     border-radius:999px;
-                    background:rgba(255,255,255,.12);
+                    background:rgba(255,255,255,.14);
+                    white-space:nowrap;
                 ">
                     {{ folder_quizzes|length }} quiz{% if folder_quizzes|length != 1 %}zes{% endif %}
                 </span>
                 {% if folder_name|lower != "uncategorized" %}
                 <form method="POST"
-                      action="/rename_quiz_folder"
-                      style="
-                        display:inline-flex;
-                        gap:6px;
-                        align-items:center;
-                        flex-wrap:wrap;
-                        margin-left:auto;
-                      ">
+                        action="/rename_quiz_folder"
+                        style="
+                            display:inline-flex;
+                            gap:6px;
+                            align-items:center;
+                            flex-wrap:wrap;
+                            margin-left:auto;
+                            justify-content:flex-end;
+                        ">
                     <input type="hidden"
                            name="old_folder"
                            value="{{ folder_name }}">
@@ -2139,7 +2144,7 @@ def quiz_library():
 
                     <input type="text"
                            name="new_folder"
-                           placeholder="Rename folder"
+                           placeholder="New folder name"
                            style="
                                 padding:6px;
                                 border-radius:6px;
@@ -2161,6 +2166,7 @@ def quiz_library():
         gap:6px;
         align-items:center;
         flex-wrap:wrap;
+        justify-content:flex-end;
       ">
     <input type="hidden"
            name="folder"
