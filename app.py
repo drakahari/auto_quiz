@@ -2039,36 +2039,56 @@ def quiz_library():
         </form>
                                   
         <!-- =============================
-             ADD FOLDER CONTROL
-        ============================== -->
-        <form method="POST"
-              action="/add_quiz_folder"
-              style="
-                margin-bottom:18px;
-                display:flex;
-                gap:8px;
-                align-items:center;
-                flex-wrap:wrap;
-              ">
+                ADD FOLDER CONTROL
+            ============================== -->
+            <div class="add-folder-control"
+                style="
+                    margin-bottom:18px;
+                    display:flex;
+                    gap:8px;
+                    align-items:center;
+                    flex-wrap:wrap;
+                ">
 
-            <input type="hidden"
-                   name="view"
-                   value="{{ request.args.get('view', 'visible') }}">
+                <button type="button"
+                        onclick="showAddFolderForm(event, this)">
+                    📁 New Folder
+                </button>
 
-            <input type="text"
-                   name="folder"
-                   placeholder="New folder name"
-                   style="
-                        padding:8px;
-                        border-radius:8px;
-                        border:1px solid rgba(255,255,255,.25);
-                        min-width:220px;
-                   ">
+                <form method="POST"
+                    action="/add_quiz_folder"
+                    class="add-folder-form"
+                    style="
+                        display:none;
+                        gap:8px;
+                        align-items:center;
+                        flex-wrap:wrap;
+                    ">
 
-            <button type="submit">
-                📁 Add Folder
-            </button>
-        </form>
+                    <input type="hidden"
+                        name="view"
+                        value="{{ request.args.get('view', 'visible') }}">
+
+                    <input type="text"
+                        name="folder"
+                        placeholder="New folder name"
+                        style="
+                                padding:8px;
+                                border-radius:8px;
+                                border:1px solid rgba(255,255,255,.25);
+                                min-width:220px;
+                        ">
+
+                    <button type="submit">
+                        💾 Save Folder
+                    </button>
+
+                    <button type="button"
+                            onclick="hideAddFolderForm(event, this)">
+                        Cancel
+                    </button>
+                </form>
+</div>
 
         {% if quizzes %}
 
@@ -2448,7 +2468,38 @@ function hideRenameFolderForm(event, button) {
 
     form.style.display = "none";
     renameButton.style.display = "";
-}                             
+}        
+
+       function showAddFolderForm(event, button) {
+    event.stopPropagation();
+
+    const control = button.closest(".add-folder-control");
+    const form = control.querySelector(".add-folder-form");
+
+    if (!form) return;
+
+    button.style.display = "none";
+    form.style.display = "flex";
+
+    const input = form.querySelector('input[name="folder"]');
+    if (input) {
+        input.focus();
+        input.select();
+    }
+}
+
+function hideAddFolderForm(event, button) {
+    event.stopPropagation();
+
+    const form = button.closest(".add-folder-form");
+    const control = form.closest(".add-folder-control");
+    const newFolderButton = control.querySelector('button[onclick*="showAddFolderForm"]');
+
+    if (!form || !newFolderButton) return;
+
+    form.style.display = "none";
+    newFolderButton.style.display = "";
+}                                                
 </script>
 </script>
 </body>
