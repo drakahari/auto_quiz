@@ -1779,11 +1779,12 @@ button:hover {
 
 /* =========================================
    STEP 5 - RESTORE HIDDEN STATE
-   Keeps quiz/timer/AI controls hidden until JS shows them
+   Keeps hidden sections hidden, but allows JS
+   to show buttons like Review with AI
 ========================================= */
 
 .hidden {
-    display: none !important;
+    display: none;
 }
 
 /* =========================================
