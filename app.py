@@ -6655,58 +6655,99 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
             <span style="font-size:20px;opacity:.85">{quiz_title}</span>
         </h1>
 
-        <!-- Mode Select -->
-        <div id="modeSelect" class="card">
+                <!-- Mode Select -->
+        <div id="modeSelect" class="card quiz-mode-card">
             <div class="mode-banner">
-                {mode_logo}
+                <div class="mode-logo-slot">
+                    {mode_logo}
+                </div>
+
                 <div class="mode-center">
                     <h2>Select Mode</h2>
-                    <button onclick="startQuiz(false)">Study Mode</button>
-                    <button onclick="startQuiz(true)">Exam Mode</button>
+
+                    <div class="mode-button-row">
+                        <button class="mode-btn study-mode-btn" onclick="startQuiz(false)">
+                            📖 Study Mode
+                        </button>
+
+                        <button class="mode-btn exam-mode-btn" onclick="startQuiz(true)">
+                            🛡️ Exam Mode
+                        </button>
+                    </div>
                 </div>
-                {mode_logo}
+
+                <div class="mode-logo-slot">
+                    {mode_logo}
+                </div>
             </div>
         </div>
 
-        <!-- Quiz Area -->
-        <div id="quiz" class="hidden">
+                <!-- Quiz Area -->
+        <div id="quiz" class="hidden quiz-shell">
+                        <!-- Active Quiz Logo Banner -->
+            <div class="active-quiz-logo-banner">
+                <div class="active-logo-slot">
+                    {mode_logo}
+                </div>
 
-            <!-- Progress Bar -->
-            <div id="progressBarOuter">
-                <div id="progressBarInner"></div>
+                <div class="active-quiz-title">
+                    {quiz_title}
+                </div>
+
+                <div class="active-logo-slot">
+                    {mode_logo}
+                </div>
             </div>
 
             <!-- TOP BAR -->
-            <div class="top-bar">
+            <div class="top-bar quiz-toolbar">
 
                 <!-- LEFT -->
                 <div class="top-left">
                     <button onclick="submitQuiz()" id="submitBtn" class="danger">
-                        Submit Exam
+                        📄 Submit Exam
                     </button>
                 </div>
 
                 <!-- RIGHT -->
-                <div id="timer" class="hidden timerBox top-right">
-                    <b>Time Remaining:</b>
+                <div id="timer" class="hidden timerBox top-right quiz-timer-group">
+                    <span id="timerLabel">Time Remaining:</span>
                     <span id="timeDisplay">--:--</span>
-                    <button id="pauseBtn" onclick="pauseExam()">Pause</button>
+                    <button id="pauseBtn" onclick="pauseExam()">⏸ Pause</button>
                 </div>
 
             </div>
 
-            <div id="qHeader"></div>
-            <div id="qText"></div>
-            <div id="choices"></div>
+            <!-- Progress Bar -->
+            <div class="quiz-progress-card">
+                <div class="quiz-progress-meta">
+                    <span>Question Progress</span>
+                    <span></span>
+                </div>
 
-                        <div class="controls">
-                <button onclick="prev()">Prev</button>
-                <button onclick="next()">Next</button>
+                <div id="progressBarOuter">
+                    <div id="progressBarInner"></div>
+                </div>
+            </div>
+
+            <!-- Question Area -->
+            <div class="quiz-question-card">
+                <div id="qHeader"></div>
+                <div id="qText"></div>
+                <div id="choices"></div>
+            </div>
+
+            <!-- Navigation Controls -->
+            <div class="controls quiz-nav-buttons">
+                <button id="prevBtn" onclick="prev()">← Previous Question</button>
+
+                <button id="nextBtn" onclick="next()">Next Question →</button>
+
                 <button id="studyAiBtn"
                         type="button"
                         class="hidden"
                         onclick="reviewCurrentQuestionWithAI()">
-                    🤖 Review This Question with AI
+                    ✨ Review This Question with AI
                 </button>
             </div>
         </div>
@@ -6714,17 +6755,18 @@ def build_quiz_html(name, jsonfile, outpath, portal_title, quiz_title, logo_file
         <div id="result" class="hidden"></div>
 
         <br>
-        <button id="returnPortalBtn" onclick="location.href='/'">
-            🏠 Return To Portal
-        </button>
 
-        <button id="returnLibraryBtn" onclick="location.href='/library'">
-            📚 Return To Quiz Library
-        </button>
+        <div class="quiz-return-buttons">
+            <button id="returnPortalBtn" onclick="location.href='/'">
+                🏠 Return To Portal
+            </button>
+
+            <button id="returnLibraryBtn" onclick="location.href='/library'">
+                📚 Return To Quiz Library
+            </button>
+        </div>
 </div>
 </div>
-
-<div id="result" class="hidden"></div>
 
 <!-- 🔹 Tell script.js which quiz + JSON file to load -->
 <script>
