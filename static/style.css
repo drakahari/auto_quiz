@@ -1861,3 +1861,27 @@ button:hover {
         font-size: 18px;
     }
 }
+
+
+/* =============================
+   DELETE BUTTON REFINEMENT
+   Less aggressive by default,
+   stronger warning on hover
+============================= */
+
+.btn-delete,
+button[onclick*="delete"],
+button[type="submit"].btn-delete {
+    background: linear-gradient(135deg, #7f1d1d, #991b1b) !important;
+    border: 1px solid rgba(248, 113, 113, 0.35) !important;
+    color: #fff !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+}
+
+.btn-delete:hover,
+button[onclick*="delete"]:hover,
+button[type="submit"].btn-delete:hover {
+    background: linear-gradient(135deg, #dc2626, #b91c1c) !important;
+    border-color: rgba(248, 113, 113, 0.75) !important;
+    box-shadow: 0 0 14px rgba(220, 38, 38, 0.35);
+}
