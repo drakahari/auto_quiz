@@ -1036,6 +1036,7 @@ button[onclick*="next"] {
         grid-row: 1;
         justify-self: stretch;
         width: 100%;
+        margin-top: 36px;   /* move Review with AI down slightly */
     }
 
     #returnPortalBtn {
