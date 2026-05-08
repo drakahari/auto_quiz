@@ -2013,6 +2013,7 @@ def export_all_quizzes_txt():
 
     lines = []
     lines.append("# DLMS Quiz Export")
+    lines.append(f"# Exported from DLMS v{APP_VERSION}")
     lines.append("# Format: DLMS text")
     lines.append(f"# Total quizzes: {len(quizzes)}")
     lines.append("")
@@ -2128,6 +2129,7 @@ def export_single_quiz_txt(quiz_id):
 
     lines = []
     lines.append("# DLMS Single Quiz Export")
+    lines.append(f"# Exported from DLMS v{APP_VERSION}")
     lines.append("# Format: DLMS text")
     lines.append("")
 
