@@ -2618,7 +2618,8 @@ def quiz_library():
                             ✏️ Edit Quiz
                         </button>
 
-                        <button onclick="location.href='/export/quiz/{{ q['id'] }}.txt'">
+                        <button onclick="location.href='/export/quiz/{{ q['id'] }}.txt'"
+                                title="Exports this quiz as an import-friendly DLMS text file.">
                             📥 Export Quiz
                         </button>
 
@@ -2756,7 +2757,8 @@ def quiz_library():
 
         <hr style="margin:24px 0; opacity:.35;">
 
-        <button onclick="location.href='/export/all_quizzes.txt'">
+        <button onclick="location.href='/export/all_quizzes.txt'"
+                title="Export All creates a backup/reference file. Use Export Quiz on an individual quiz for an import-friendly file.">
             📥 Export All Quizzes
         </button>
 
