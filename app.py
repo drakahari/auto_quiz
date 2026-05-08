@@ -1982,6 +1982,113 @@ def save_quiz_to_db(quiz_title, source_file, quiz_data, logo_filename=None):
 
 
 
+# =========================
+# EXPORT ALL QUIZZES
+# =========================
+@app.route("/export/all_quizzes.txt")
+def export_all_quizzes_txt():
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    registry = normalize_quiz_folders(load_registry())
+    registry_by_id = {
+        int(q.get("id")): q
+        for q in registry
+        if q.get("id") is not None
+    }
+
+    quizzes = cur.execute(
+        """
+        SELECT id, title, source_file
+        FROM quizzes
+        ORDER BY title COLLATE NOCASE, id
+        """
+    ).fetchall()
+
+    lines = []
+    lines.append("# DLMS Quiz Export")
+    lines.append("# Format: DLMS text")
+    lines.append(f"# Total quizzes: {len(quizzes)}")
+    lines.append("")
+
+    for quiz in quizzes:
+        quiz_id = quiz["id"]
+        quiz_title = quiz["title"] or "Untitled Quiz"
+        folder = registry_by_id.get(quiz_id, {}).get("folder", "Uncategorized")
+
+        lines.append("=" * 60)
+        lines.append(f"QUIZ: {quiz_title}")
+        lines.append(f"QUIZ ID: {quiz_id}")
+        lines.append(f"FOLDER: {folder}")
+        lines.append("=" * 60)
+        lines.append("")
+
+        questions = cur.execute(
+            """
+            SELECT id, question_number, question_text
+            FROM questions
+            WHERE quiz_id = ?
+            ORDER BY question_number, id
+            """,
+            (quiz_id,)
+        ).fetchall()
+
+        for question in questions:
+            question_id = question["id"]
+            question_number = question["question_number"]
+            question_text = question["question_text"] or ""
+
+            lines.append(f"{question_number}. {question_text}")
+            lines.append("")
+
+            choices = cur.execute(
+                """
+                SELECT label, text, is_correct
+                FROM choices
+                WHERE question_id = ?
+                ORDER BY label
+                """,
+                (question_id,)
+            ).fetchall()
+
+            correct_labels = []
+
+            for choice in choices:
+                label = choice["label"]
+                text = choice["text"] or ""
+                is_correct = bool(choice["is_correct"])
+
+                lines.append(f"{label}. {text}")
+
+                if is_correct:
+                    correct_labels.append(label)
+
+            lines.append("")
+
+            if len(correct_labels) == 1:
+                lines.append(f"Correct Answer: {correct_labels[0]}")
+            else:
+                lines.append(f"Correct Answer: {', '.join(correct_labels)}")
+
+            lines.append("")
+            lines.append("")
+
+        lines.append("")
+
+    conn.close()
+
+    export_text = "\n".join(lines)
+
+    return Response(
+        export_text,
+        mimetype="text/plain",
+        headers={
+            "Content-Disposition": "attachment; filename=dlms_all_quizzes_export.txt"
+        }
+    )
+
+
 
 
 # =========================
@@ -2513,7 +2620,14 @@ def quiz_library():
         <br>
         <button onclick="location.href='/upload'">📤 Upload New Quiz</button>
         <button onclick="location.href='/paste'">📋 Paste Questions Instead</button>
-        <button onclick="location.href='/create_short_quiz'">✍️ Create Short Quiz</button>                        
+        <button onclick="location.href='/create_short_quiz'">✍️ Create Short Quiz</button>
+
+        <hr style="margin:24px 0; opacity:.35;">
+
+        <button onclick="location.href='/export/all_quizzes.txt'">
+            📥 Export All Quizzes
+        </button>
+
         <button onclick="location.href='/'">⬅ Back To Portal</button>
 
     </div>
