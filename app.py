@@ -87,6 +87,7 @@ def get_app_data_dir(app_name: str = "DLMS") -> str:
     return path
 
 APP_NAME = "DLMS"
+APP_VERSION = "2.0.6"
 APP_DATA_DIR = get_app_data_dir(APP_NAME)
 
 # =========================
@@ -1062,7 +1063,11 @@ def home():
     with open(index_path, "r", encoding="utf-8") as f:
         html = f.read()
 
-    return render_template_string(html, portal_title=portal_title)
+    return render_template_string(
+    html,
+    portal_title=portal_title,
+    app_version=APP_VERSION
+)
 
 
 
@@ -2748,29 +2753,7 @@ def quiz_library():
     </div>
 </div>
 
-# <!-- =============================
-#      DRAG + DROP (SAFE)
-# ============================= -->
-# <script>
-# const list = document.getElementById("quizList");
 
-# if (list && window.matchMedia("(min-width: 701px)").matches) {
-#     Sortable.create(list, {
-#         animation: 150,
-#         handle: ".quiz-card",
-#         onEnd: () => {
-#             const order = [...document.querySelectorAll(".quiz-card")]
-#                 .map(card => card.getAttribute("data-id"));
-
-#             fetch("/save_order", {
-#                 method: "POST",
-#                 headers: {"Content-Type": "application/json"},
-#                 body: JSON.stringify({ order })
-#             });
-#         }
-#     });
-# }
-# </script>
 
 <script>
 function getCollapsedLibraryFolders() {
