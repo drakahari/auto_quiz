@@ -2019,6 +2019,8 @@ def export_all_quizzes_txt():
     lines.append(f"# Exported from DLMS v{APP_VERSION}")
     lines.append(f"# Exported on: {exported_on}")
     lines.append("# Format: DLMS text")
+    lines.append("# Import compatible: No - contains multiple quizzes")
+    lines.append("# Use Export Quiz for import-friendly single quiz files")
     lines.append(f"# Total quizzes: {len(quizzes)}")
     lines.append("")
 
@@ -2138,6 +2140,7 @@ def export_single_quiz_txt(quiz_id):
     lines.append(f"# Exported from DLMS v{APP_VERSION}")
     lines.append(f"# Exported on: {exported_on}")
     lines.append("# Format: DLMS text")
+    lines.append("# Import compatible: Yes")
     lines.append("")
 
     lines.append("=" * 60)
