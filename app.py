@@ -2089,6 +2089,117 @@ def export_all_quizzes_txt():
     )
 
 
+# =========================
+# EXPORT SINGLE QUIZ
+# =========================
+@app.route("/export/quiz/<int:quiz_id>.txt")
+def export_single_quiz_txt(quiz_id):
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    registry = normalize_quiz_folders(load_registry())
+    registry_by_id = {
+        int(q.get("id")): q
+        for q in registry
+        if q.get("id") is not None
+    }
+
+    quiz = cur.execute(
+        """
+        SELECT id, title, source_file
+        FROM quizzes
+        WHERE id = ?
+        """,
+        (quiz_id,)
+    ).fetchone()
+
+    if not quiz:
+        conn.close()
+        return "Quiz not found", 404
+
+    quiz_title = quiz["title"] or "Untitled Quiz"
+    folder = registry_by_id.get(quiz_id, {}).get("folder", "Uncategorized")
+
+    lines = []
+    lines.append("# DLMS Single Quiz Export")
+    lines.append("# Format: DLMS text")
+    lines.append("")
+
+    lines.append("=" * 60)
+    lines.append(f"QUIZ: {quiz_title}")
+    lines.append(f"QUIZ ID: {quiz_id}")
+    lines.append(f"FOLDER: {folder}")
+    lines.append("=" * 60)
+    lines.append("")
+
+    questions = cur.execute(
+        """
+        SELECT id, question_number, question_text
+        FROM questions
+        WHERE quiz_id = ?
+        ORDER BY question_number, id
+        """,
+        (quiz_id,)
+    ).fetchall()
+
+    for question in questions:
+        question_id = question["id"]
+        question_number = question["question_number"]
+        question_text = question["question_text"] or ""
+
+        lines.append(f"{question_number}. {question_text}")
+        lines.append("")
+
+        choices = cur.execute(
+            """
+            SELECT label, text, is_correct
+            FROM choices
+            WHERE question_id = ?
+            ORDER BY label
+            """,
+            (question_id,)
+        ).fetchall()
+
+        correct_labels = []
+
+        for choice in choices:
+            label = choice["label"]
+            text = choice["text"] or ""
+            is_correct = bool(choice["is_correct"])
+
+            lines.append(f"{label}. {text}")
+
+            if is_correct:
+                correct_labels.append(label)
+
+        lines.append("")
+
+        if len(correct_labels) == 1:
+            lines.append(f"Correct Answer: {correct_labels[0]}")
+        else:
+            lines.append(f"Correct Answer: {', '.join(correct_labels)}")
+
+        lines.append("")
+        lines.append("")
+
+    conn.close()
+
+    export_text = "\n".join(lines)
+
+    safe_title = re.sub(r"[^A-Za-z0-9_-]+", "_", quiz_title).strip("_")
+    if not safe_title:
+        safe_title = f"quiz_{quiz_id}"
+
+    return Response(
+        export_text,
+        mimetype="text/plain",
+        headers={
+            "Content-Disposition": f"attachment; filename=dlms_quiz_{quiz_id}_{safe_title}.txt"
+        }
+    )
+
+
 
 
 # =========================
@@ -2487,7 +2598,11 @@ def quiz_library():
                         </button>
                                       
                         <button onclick="location.href='/edit_quiz/{{ q['id'] }}'">
-                             ✏️ Edit Quiz
+                            ✏️ Edit Quiz
+                        </button>
+
+                        <button onclick="location.href='/export/quiz/{{ q['id'] }}.txt'">
+                            📥 Export Quiz
                         </button>
 
                         <!-- HIDE / UNHIDE -->
