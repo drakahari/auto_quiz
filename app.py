@@ -2152,7 +2152,8 @@ def quiz_library():
 
                 <button type="button"
                         onclick="showAddFolderForm(event, this)">
-                    📁 New Folder
+                    <span class="dlms-folder-icon" aria-hidden="true"></span>
+                    New Folder
                 </button>
 
                 <form method="POST"
@@ -2230,7 +2231,7 @@ def quiz_library():
                         flex-wrap:wrap;
                     ">
                 <span class="folder-toggle-icon" style="font-size:18px;">▼</span>
-                <span style="font-size:24px;">📁</span>
+                <span class="dlms-folder-icon dlms-folder-icon-large" aria-hidden="true"></span>
 
                 <h2 style="
                     margin:0;

@@ -1186,6 +1186,70 @@ body.blurred .blur-wrapper {
     }
 }
 
+
+
+/* =======================
+   CROSS-PLATFORM FOLDER ICON
+   Replaces emoji folder so color is consistent on macOS/Windows/Linux
+======================= */
+
+.dlms-folder-icon {
+    display: inline-block;
+    position: relative;
+    flex: 0 0 auto;
+
+    width: 1.30em;
+    height: 0.84em;
+    margin-right: 0.45em;
+    vertical-align: -0.10em;
+
+    background: transparent;
+    border: 2px solid #facc15;
+    border-radius: 0.16em 0.16em 0.24em 0.24em;
+
+    box-shadow: none;
+}
+
+.dlms-folder-icon::before {
+    content: "";
+    position: absolute;
+
+    left: 0.08em;
+    top: -0.30em;
+
+    width: 0.56em;
+    height: 0.28em;
+
+    background: transparent;
+    border: 2px solid #facc15;
+    border-bottom: none;
+    border-radius: 0.14em 0.14em 0 0;
+}
+
+.dlms-folder-icon-large {
+    font-size: 24px;
+    margin-right: 0;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /* =========================================================
    COMMENTED OUT / REMOVED LEGACY SECTIONS
    These were intentionally consolidated above:
