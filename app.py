@@ -1,5 +1,6 @@
 from flask import Flask, send_from_directory, request, redirect, render_template_string, jsonify, Response, flash, url_for
 import os, re, json, time, sqlite3, sys, shutil, signal
+from datetime import datetime
 from werkzeug.utils import secure_filename
 
 # =========================
@@ -2012,8 +2013,11 @@ def export_all_quizzes_txt():
     ).fetchall()
 
     lines = []
+    exported_on = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
     lines.append("# DLMS Quiz Export")
     lines.append(f"# Exported from DLMS v{APP_VERSION}")
+    lines.append(f"# Exported on: {exported_on}")
     lines.append("# Format: DLMS text")
     lines.append(f"# Total quizzes: {len(quizzes)}")
     lines.append("")
@@ -2127,9 +2131,12 @@ def export_single_quiz_txt(quiz_id):
     quiz_title = quiz["title"] or "Untitled Quiz"
     folder = registry_by_id.get(quiz_id, {}).get("folder", "Uncategorized")
 
+    exported_on = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
     lines = []
     lines.append("# DLMS Single Quiz Export")
     lines.append(f"# Exported from DLMS v{APP_VERSION}")
+    lines.append(f"# Exported on: {exported_on}")
     lines.append("# Format: DLMS text")
     lines.append("")
 
