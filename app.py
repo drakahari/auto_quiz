@@ -1679,6 +1679,56 @@ def safe_law_import_filename(filename):
     return filename
 
 
+
+def parse_law_packet_sections(raw_text):
+    """
+    Lightweight parser for previewing DLMS Law Study import sections.
+    Does not save anything. It only splits recognized headings.
+    """
+    headings = [
+        ("case_brief", "1. Case Brief"),
+        ("socratic_review", "2. Socratic Review"),
+        ("socratic_answer_key", "2A. Socratic Answer Key"),
+        ("irac_drill", "3. IRAC Drill"),
+        ("rule_flashcards", "4. Rule Flashcards"),
+    ]
+
+    found = []
+
+    for key, title in headings:
+        pattern = re.compile(rf"(?im)^\s*{re.escape(title)}\s*$")
+        match = pattern.search(raw_text)
+
+        if match:
+            found.append({
+                "key": key,
+                "title": title,
+                "start": match.start(),
+                "end": match.end()
+            })
+
+    found.sort(key=lambda x: x["start"])
+
+    sections = []
+
+    for idx, item in enumerate(found):
+        content_start = item["end"]
+        content_end = found[idx + 1]["start"] if idx + 1 < len(found) else len(raw_text)
+        content = raw_text[content_start:content_end].strip()
+
+        sections.append({
+            "key": item["key"],
+            "title": item["title"],
+            "content": content,
+            "char_count": len(content),
+            "line_count": len(content.splitlines()) if content else 0
+        })
+
+    return sections
+
+
+
+
 # =========================
 # LAW STUDY MODULE - IMPORT CASE PACKET
 # =========================
@@ -2060,6 +2110,7 @@ def law_view_saved_import(filename):
 
     modified = datetime.fromtimestamp(os.stat(import_path).st_mtime).strftime("%Y-%m-%d %H:%M:%S")
     size = os.stat(import_path).st_size
+    parsed_sections = parse_law_packet_sections(raw_packet)
 
     return render_template_string("""
 <!DOCTYPE html>
@@ -2139,7 +2190,58 @@ def law_view_saved_import(filename):
             </div>
         </div>
 
-        <h3>Raw Packet Text</h3>
+        <h3>Parse Preview</h3>
+
+        {% if parsed_sections %}
+        <div style="
+            display:grid;
+            grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+            gap:12px;
+            margin-bottom:18px;
+        ">
+            {% for section in parsed_sections %}
+            <div class="portal-card" style="text-align:left; cursor:default;">
+                <h3 style="margin-bottom:6px;">✅ {{ section.title }}</h3>
+                <p style="margin:4px 0; opacity:.85;">
+                    <strong>Lines:</strong> {{ section.line_count }}
+                </p>
+                <p style="margin:4px 0; opacity:.85;">
+                    <strong>Characters:</strong> {{ section.char_count }}
+                </p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div style="
+            margin-bottom:18px;
+            padding:14px;
+            border-radius:12px;
+            background:rgba(0,180,100,.12);
+            border:1px solid rgba(0,180,100,.35);
+        ">
+            <strong>Parser preview:</strong>
+            DLMS found {{ parsed_sections|length }} recognized section{% if parsed_sections|length != 1 %}s{% endif %}.
+            This is only a preview. Nothing has been saved as a structured case review yet.
+        </div>
+        {% else %}
+        <div style="
+            margin-bottom:18px;
+            padding:14px;
+            border-radius:12px;
+            background:rgba(255,180,0,.10);
+            border:1px solid rgba(255,180,0,.35);
+        ">
+            <strong>Parser preview:</strong>
+            No recognized Law Study section headings were found. Expected headings include
+            <code>1. Case Brief</code>,
+            <code>2. Socratic Review</code>,
+            <code>2A. Socratic Answer Key</code>,
+            <code>3. IRAC Drill</code>,
+            and <code>4. Rule Flashcards</code>.
+        </div>
+        {% endif %}
+                                  
+            <h3>Raw Packet Text</h3>
 
         <textarea readonly
                   rows="24"
@@ -2181,7 +2283,8 @@ def law_view_saved_import(filename):
     line_count=line_count,
     char_count=char_count,
     modified=modified,
-    size=size
+    size=size,
+    parsed_sections=parsed_sections
     )
 
 
