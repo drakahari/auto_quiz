@@ -2694,6 +2694,16 @@ def law_view_case_review(case_id):
     socratic_answer_key = sections.get("socratic_answer_key", "")
     socratic_questions = parse_socratic_questions(sections.get("socratic_review", ""))
     socratic_student_answers = case_data.get("socratic_student_answers", {}) or {}
+    socratic_total = len(socratic_questions)
+
+    socratic_answered = 0
+    for question in socratic_questions:
+        qid = question.get("id")
+        answer = str(socratic_student_answers.get(qid, "")).strip()
+        if answer:
+            socratic_answered += 1
+
+    socratic_progress_text = f"{socratic_answered} of {socratic_total} answered"
 
     return render_template_string("""
 <!DOCTYPE html>
@@ -2851,11 +2861,34 @@ def law_view_case_review(case_id):
 
 {% if socratic_questions %}
 <div class="portal-card" style="text-align:left; cursor:default; margin-bottom:16px;">
-    <h2 style="margin-top:0;">🎓 Socratic Practice</h2>
+    <div style="
+        display:flex;
+        justify-content:space-between;
+        align-items:flex-start;
+        gap:12px;
+        flex-wrap:wrap;
+    ">
+        <div>
+            <h2 style="margin-top:0;">🎓 Socratic Practice</h2>
 
-    <p style="opacity:.8;">
-        Type your own answer before revealing the answer key. Your answers are saved with this case review.
-    </p>
+            <p style="opacity:.8;">
+                Type your own answer before revealing the answer key. Your answers are saved with this case review.
+            </p>
+        </div>
+
+        <span style="
+            display:inline-block;
+            padding:7px 12px;
+            border-radius:999px;
+            background:rgba(0,120,255,.12);
+            border:1px solid rgba(0,120,255,.35);
+            font-size:13px;
+            font-weight:700;
+            white-space:nowrap;
+        ">
+            {{ socratic_progress_text }}
+        </span>
+    </div>
 
     <form method="POST" action="/law/cases/{{ case_data.id }}/update_socratic_answers">
         <div style="display:grid; gap:12px;">
@@ -2998,6 +3031,9 @@ function toggleSocraticAnswerKey() {
     socratic_answer_key=socratic_answer_key,
     socratic_questions=socratic_questions,
     socratic_student_answers=socratic_student_answers,
+    socratic_total=socratic_total,
+    socratic_answered=socratic_answered,
+    socratic_progress_text=socratic_progress_text,
     law_folders=law_folders
     )
 
