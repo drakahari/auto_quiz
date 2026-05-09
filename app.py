@@ -1665,7 +1665,9 @@ function copyPromptAndOpenAi(url) {
     include_flashcards=include_flashcards
     )
 
-
+# =========================
+# LAW STUDY HELPER FUNCTIONS
+# =========================
 def safe_law_import_filename(filename):
     """
     Restrict Law import filenames to saved .txt files in LAW_IMPORTS_FOLDER.
@@ -1750,6 +1752,25 @@ def extract_law_case_title(raw_text, fallback_filename="Untitled Case Review"):
     name = name.replace("_", " ")
     return name.strip() or "Untitled Case Review"
 
+
+
+def get_law_case_by_id(case_id):
+    """
+    Look up a Law Study case review by ID from law.json.
+    Returns the registry entry or None.
+    """
+    case_id = str(case_id or "").strip()
+
+    if not case_id:
+        return None
+
+    registry = load_law_registry()
+
+    for case in registry.get("cases", []):
+        if str(case.get("id")) == case_id:
+            return case
+
+    return None
 
 
 
@@ -2517,7 +2538,7 @@ def law_case_reviews():
                 </p>
 
                 <button type="button"
-                        onclick="alert('Coming soon: open case review')">
+                        onclick="location.href='/law/cases/{{ case.id }}'">
                     👁 Open Case Review
                 </button>
             </div>
@@ -2574,6 +2595,240 @@ def law_case_reviews():
     portal_title=portal_title,
     cases=cases
     )
+
+
+
+# =========================
+# LAW STUDY MODULE - VIEW CASE REVIEW
+# =========================
+@app.route("/law/cases/<case_id>")
+def law_view_case_review(case_id):
+    portal_title = get_portal_title()
+
+    case_entry = get_law_case_by_id(case_id)
+
+    if not case_entry:
+        return "Law case review not found", 404
+
+    case_file = secure_filename(case_entry.get("file") or "")
+
+    if not case_file.lower().endswith(".json"):
+        return "Invalid case file", 400
+
+    case_path = os.path.join(LAW_CASES_FOLDER, case_file)
+
+    if not os.path.exists(case_path) or not os.path.isfile(case_path):
+        return "Law case file not found", 404
+
+    try:
+        with open(case_path, "r", encoding="utf-8") as f:
+            case_data = json.load(f) or {}
+    except Exception as e:
+        print(f"[LAW CASE ERROR] Failed reading case review: {e}")
+        return "Failed to read case review", 500
+
+    sections = case_data.get("sections", {}) or {}
+
+    section_cards = [
+        {
+            "key": "case_brief",
+            "title": "1. Case Brief",
+            "icon": "📄",
+            "content": sections.get("case_brief", "")
+        },
+        {
+            "key": "socratic_review",
+            "title": "2. Socratic Review",
+            "icon": "🎓",
+            "content": sections.get("socratic_review", "")
+        },
+        {
+            "key": "irac_drill",
+            "title": "3. IRAC Drill",
+            "icon": "🧠",
+            "content": sections.get("irac_drill", "")
+        },
+        {
+            "key": "rule_flashcards",
+            "title": "4. Rule Flashcards",
+            "icon": "🃏",
+            "content": sections.get("rule_flashcards", "")
+        }
+    ]
+
+    socratic_answer_key = sections.get("socratic_answer_key", "")
+
+    return render_template_string("""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{{ case_data.title }} - DLMS Law Study</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="/static/favicon.ico">
+</head>
+
+<body>
+<div class="container">
+
+    <h1 class="hero-title">
+        ⚖️ Case Review<br>
+        <span style="font-size:20px;opacity:.85">
+            {{ case_data.title }}
+        </span>
+    </h1>
+
+    <div class="card">
+
+        <div style="
+            display:flex;
+            justify-content:space-between;
+            align-items:flex-start;
+            gap:16px;
+            flex-wrap:wrap;
+            margin-bottom:20px;
+        ">
+            <div>
+                <h2 style="margin-bottom:6px;">{{ case_data.title }}</h2>
+
+                <p style="opacity:.85; margin-top:0;">
+                    <strong>Course:</strong> {{ case_data.course or "Uncategorized" }}<br>
+                    <strong>Created:</strong> {{ case_data.created_at }}<br>
+                    <strong>Source Import:</strong> {{ case_data.source_import }}
+                </p>
+            </div>
+
+            <span style="
+                display:inline-block;
+                padding:7px 12px;
+                border-radius:999px;
+                background:rgba(0,120,255,.12);
+                border:1px solid rgba(0,120,255,.35);
+                font-size:13px;
+                font-weight:700;
+                white-space:nowrap;
+            ">
+                Structured case review
+            </span>
+        </div>
+
+        <div style="
+            margin-bottom:18px;
+            padding:14px;
+            border-radius:12px;
+            background:rgba(255,180,0,.10);
+            border:1px solid rgba(255,180,0,.35);
+        ">
+            <strong>Reminder:</strong>
+            Verify citations, holdings, quotations, and procedural history against the original opinion or an approved legal research source.
+        </div>
+
+        {% for section in section_cards %}
+            {% if section.content %}
+            <div class="portal-card" style="text-align:left; cursor:default; margin-bottom:16px;">
+                <h2 style="margin-top:0;">{{ section.icon }} {{ section.title }}</h2>
+
+                <pre style="
+                    white-space:pre-wrap;
+                    word-wrap:break-word;
+                    font-family:inherit;
+                    line-height:1.45;
+                    margin-bottom:0;
+                ">{{ section.content }}</pre>
+            </div>
+            {% endif %}
+        {% endfor %}
+
+        {% if socratic_answer_key %}
+        <div class="portal-card" style="text-align:left; cursor:default; margin-bottom:16px;">
+            <h2 style="margin-top:0;">🔒 2A. Socratic Answer Key</h2>
+
+            <p style="opacity:.8;">
+                Hidden by default for active recall. Try answering the Socratic questions first, then reveal the guidance.
+            </p>
+
+            <button type="button" onclick="toggleSocraticAnswerKey()">
+                👁 Reveal / Hide Answer Key
+            </button>
+
+            <div id="socraticAnswerKey" style="display:none; margin-top:14px;">
+                <pre style="
+                    white-space:pre-wrap;
+                    word-wrap:break-word;
+                    font-family:inherit;
+                    line-height:1.45;
+                    margin-bottom:0;
+                ">{{ socratic_answer_key }}</pre>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if case_data.student_notes %}
+        <div class="portal-card" style="text-align:left; cursor:default; margin-bottom:16px;">
+            <h2 style="margin-top:0;">📝 Student Notes</h2>
+            <pre style="
+                white-space:pre-wrap;
+                word-wrap:break-word;
+                font-family:inherit;
+                line-height:1.45;
+                margin-bottom:0;
+            ">{{ case_data.student_notes }}</pre>
+        </div>
+        {% endif %}
+
+        <br>
+
+        <button type="button" onclick="location.href='/law/cases'">
+            ⬅ Back To My Case Reviews
+        </button>
+
+        <button type="button" onclick="location.href='/law/imports'">
+            📁 Saved Imports
+        </button>
+
+        <button type="button" onclick="location.href='/law'">
+            ⚖️ Law Study Hub
+        </button>
+
+    </div>
+
+</div>
+
+<div style="
+    text-align:center;
+    margin-top:18px;
+    font-size:13px;
+    opacity:.65;
+">
+    DLMS Law Study Module Preview
+</div>
+
+<script>
+function toggleSocraticAnswerKey() {
+    const box = document.getElementById("socraticAnswerKey");
+
+    if (!box) {
+        return;
+    }
+
+    if (box.style.display === "none" || box.style.display === "") {
+        box.style.display = "block";
+    } else {
+        box.style.display = "none";
+    }
+}
+</script>
+
+</body>
+</html>
+""",
+    portal_title=portal_title,
+    case_entry=case_entry,
+    case_data=case_data,
+    section_cards=section_cards,
+    socratic_answer_key=socratic_answer_key
+    )
+
 
 
 
