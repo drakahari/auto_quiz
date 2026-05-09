@@ -2604,6 +2604,8 @@ def law_case_reviews():
 @app.route("/law/cases/<case_id>")
 def law_view_case_review(case_id):
     portal_title = get_portal_title()
+    law_registry = load_law_registry()
+    law_folders = law_registry.get("folders", [])
 
     case_entry = get_law_case_by_id(case_id)
 
@@ -2712,6 +2714,19 @@ def law_view_case_review(case_id):
             </span>
         </div>
 
+        {% if request.args.get('updated') %}
+        <div style="
+            margin-bottom:18px;
+            padding:14px;
+            border-radius:12px;
+            background:rgba(0,180,100,.12);
+            border:1px solid rgba(0,180,100,.35);
+        ">
+            <strong>Case details updated.</strong>
+            The title and course were saved successfully.
+        </div>
+        {% endif %}
+
         <div style="
             margin-bottom:18px;
             padding:14px;
@@ -2723,6 +2738,40 @@ def law_view_case_review(case_id):
             Verify citations, holdings, quotations, and procedural history against the original opinion or an approved legal research source.
         </div>
 
+        <div class="portal-card" style="text-align:left; cursor:default; margin-bottom:16px;">
+    <h2 style="margin-top:0;">✏️ Edit Case Details</h2>
+
+    <form method="POST" action="/law/cases/{{ case_data.id }}/update_details">
+        <label><strong>Case Title</strong></label><br>
+        <input type="text"
+               name="title"
+               value="{{ case_data.title }}"
+               style="width:100%; padding:10px; border-radius:8px; box-sizing:border-box;">
+
+        <br><br>
+
+        <label><strong>Course</strong></label><br>
+        <select name="course"
+                style="width:100%; padding:10px; border-radius:8px; box-sizing:border-box;">
+            <option value="Uncategorized" {% if case_data.course == "Uncategorized" %}selected{% endif %}>
+                Uncategorized
+            </option>
+
+            {% for folder in law_folders %}
+            <option value="{{ folder }}" {% if case_data.course == folder %}selected{% endif %}>
+                {{ folder }}
+            </option>
+            {% endfor %}
+        </select>
+
+        <br><br>
+
+        <button type="submit">
+            💾 Save Case Details
+        </button>
+    </form>
+</div>
+                                  
         {% for section in section_cards %}
             {% if section.content %}
             <div class="portal-card" style="text-align:left; cursor:default; margin-bottom:16px;">
@@ -2826,9 +2875,70 @@ function toggleSocraticAnswerKey() {
     case_entry=case_entry,
     case_data=case_data,
     section_cards=section_cards,
-    socratic_answer_key=socratic_answer_key
+    socratic_answer_key=socratic_answer_key,
+    law_folders=law_folders
     )
 
+
+
+# =========================
+# LAW STUDY MODULE - UPDATE CASE REVIEW DETAILS
+# =========================
+@app.route("/law/cases/<case_id>/update_details", methods=["POST"])
+def law_update_case_review_details(case_id):
+    case_entry = get_law_case_by_id(case_id)
+
+    if not case_entry:
+        return "Law case review not found", 404
+
+    case_file = secure_filename(case_entry.get("file") or "")
+
+    if not case_file.lower().endswith(".json"):
+        return "Invalid case file", 400
+
+    case_path = os.path.join(LAW_CASES_FOLDER, case_file)
+
+    if not os.path.exists(case_path) or not os.path.isfile(case_path):
+        return "Law case file not found", 404
+
+    new_title = request.form.get("title", "").strip()
+    new_course = request.form.get("course", "").strip()
+
+    if not new_title:
+        new_title = case_entry.get("title") or "Untitled Case Review"
+
+    if not new_course:
+        new_course = "Uncategorized"
+
+    try:
+        with open(case_path, "r", encoding="utf-8") as f:
+            case_data = json.load(f) or {}
+
+        now = datetime.now().isoformat(timespec="seconds")
+
+        case_data["title"] = new_title
+        case_data["course"] = new_course
+        case_data["updated_at"] = now
+
+        with open(case_path, "w", encoding="utf-8") as f:
+            json.dump(case_data, f, indent=2)
+
+        registry = load_law_registry()
+
+        for case in registry.get("cases", []):
+            if str(case.get("id")) == str(case_id):
+                case["title"] = new_title
+                case["course"] = new_course
+                case["updated_at"] = now
+                break
+
+        save_law_registry(registry)
+
+    except Exception as e:
+        print(f"[LAW CASE ERROR] Failed updating case review details: {e}")
+        return "Failed to update case review details", 500
+
+    return redirect(f"/law/cases/{case_id}?updated=1")
 
 
 
