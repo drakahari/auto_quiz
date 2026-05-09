@@ -1217,6 +1217,11 @@ def law_study_home():
                 <p>Build a case brief, Socratic questions, IRAC drill, and flashcards.</p>
             </div>
 
+            <div class="portal-card" onclick="location.href='/law/import'">
+                <h2>📥 Import Case Packet</h2>
+                <p>Paste AI-generated case study output for preview and future saving.</p>
+            </div>                   
+
             <div class="portal-card" onclick="alert('Coming soon: My Case Reviews')">
                 <h2>⚖️ My Case Reviews</h2>
                 <p>View saved cases organized by course and topic.</p>
@@ -1637,6 +1642,166 @@ function copyPromptAndOpenAi(url) {
     )
 
 
+
+# =========================
+# LAW STUDY MODULE - IMPORT CASE PACKET
+# =========================
+@app.route("/law/import", methods=["GET", "POST"])
+def law_import_case_packet():
+    portal_title = get_portal_title()
+
+    raw_packet = ""
+    packet_submitted = False
+    line_count = 0
+    char_count = 0
+
+    if request.method == "POST":
+        raw_packet = request.form.get("raw_packet", "").strip()
+        packet_submitted = bool(raw_packet)
+
+        if raw_packet:
+            line_count = len(raw_packet.splitlines())
+            char_count = len(raw_packet)
+
+    return render_template_string("""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Import Case Packet - DLMS</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="/static/favicon.ico">
+</head>
+
+<body>
+<div class="container">
+
+    <h1 class="hero-title">
+        📥 Import Case Packet<br>
+        <span style="font-size:20px;opacity:.85">
+            Paste AI Output • Review • Prepare For Saving
+        </span>
+    </h1>
+
+    <div class="card">
+
+        <div style="
+            display:flex;
+            justify-content:space-between;
+            align-items:flex-start;
+            gap:16px;
+            flex-wrap:wrap;
+            margin-bottom:20px;
+        ">
+            <div>
+                <h2 style="margin-bottom:6px;">Paste AI-Generated Study Packet</h2>
+                <p style="opacity:.85; margin-top:0;">
+                    Paste the response from your AI provider here. This step only previews the packet. Saving and parsing will come later.
+                </p>
+            </div>
+
+            <span style="
+                display:inline-block;
+                padding:7px 12px;
+                border-radius:999px;
+                background:rgba(0,180,100,.14);
+                border:1px solid rgba(0,180,100,.35);
+                font-size:13px;
+                font-weight:700;
+                white-space:nowrap;
+            ">
+                🧪 Preview only
+            </span>
+        </div>
+
+        <form method="POST" action="/law/import">
+
+            <h3>Case Packet Text</h3>
+
+            <textarea name="raw_packet"
+                      rows="22"
+                      placeholder="Paste the AI-generated case brief, Socratic review, IRAC drill, and flashcards here..."
+                      style="width:100%; padding:12px; border-radius:10px; box-sizing:border-box;">{{ raw_packet }}</textarea>
+
+            <br><br>
+
+            <button type="submit">
+                🔎 Preview Packet
+            </button>
+
+            <button type="button"
+                    onclick="location.href='/law/create'">
+                ✨ Create Another Prompt
+            </button>
+
+            <button type="button"
+                    onclick="location.href='/law'">
+                ⬅ Back To Law Study
+            </button>
+
+        </form>
+
+        {% if packet_submitted %}
+        <hr style="margin:24px 0;">
+
+        <h2>Packet Preview</h2>
+
+        <div style="
+            display:grid;
+            grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
+            gap:12px;
+            margin-bottom:18px;
+        ">
+            <div class="portal-card" style="text-align:left;">
+                <h3>Lines</h3>
+                <p style="font-size:28px; font-weight:900; margin:0;">{{ line_count }}</p>
+            </div>
+
+            <div class="portal-card" style="text-align:left;">
+                <h3>Characters</h3>
+                <p style="font-size:28px; font-weight:900; margin:0;">{{ char_count }}</p>
+            </div>
+
+            <div class="portal-card" style="text-align:left;">
+                <h3>Status</h3>
+                <p style="margin:0;">Ready for a future parser step.</p>
+            </div>
+        </div>
+
+        <div style="
+            margin-top:18px;
+            padding:14px;
+            border-radius:12px;
+            background:rgba(255,180,0,.10);
+            border:1px solid rgba(255,180,0,.35);
+        ">
+            <strong>Reminder:</strong>
+            This packet is not saved yet. The next feature step will parse or save this content into a Law Case Review file.
+        </div>
+        {% endif %}
+
+    </div>
+
+</div>
+
+<div style="
+    text-align:center;
+    margin-top:18px;
+    font-size:13px;
+    opacity:.65;
+">
+    DLMS Law Study Module Preview
+</div>
+
+</body>
+</html>
+""",
+    portal_title=portal_title,
+    raw_packet=raw_packet,
+    packet_submitted=packet_submitted,
+    line_count=line_count,
+    char_count=char_count
+    )
 
 
 
