@@ -2694,6 +2694,7 @@ def law_view_case_review(case_id):
     socratic_answer_key = sections.get("socratic_answer_key", "")
     socratic_questions = parse_socratic_questions(sections.get("socratic_review", ""))
     socratic_student_answers = case_data.get("socratic_student_answers", {}) or {}
+    irac_student_response = case_data.get("irac_student_response", {}) or {}
     socratic_total = len(socratic_questions)
 
     socratic_answered = 0
@@ -2798,6 +2799,20 @@ def law_view_case_review(case_id):
         </div>
         {% endif %}                     
 
+        {% if request.args.get('irac_updated') %}
+        <div style="
+            margin-bottom:18px;
+            padding:14px;
+            border-radius:12px;
+            background:rgba(0,180,100,.12);
+            border:1px solid rgba(0,180,100,.35);
+        ">
+            <strong>IRAC response updated.</strong>
+            Your practice response was saved successfully.
+        </div>
+        {% endif %}                       
+
+
         <div style="
             margin-bottom:18px;
             padding:14px;
@@ -2859,6 +2874,55 @@ def law_view_case_review(case_id):
             {% endif %}
         {% endfor %}
 
+  {% if case_data.sections.irac_drill %}
+<div class="portal-card" style="text-align:left; cursor:default; margin-bottom:16px;">
+    <h2 style="margin-top:0;">🧠 IRAC Practice Response</h2>
+
+    <p style="opacity:.8;">
+        Write your own IRAC response before comparing it to any model answer in the imported drill.
+    </p>
+
+    <form method="POST" action="/law/cases/{{ case_data.id }}/update_irac_response">
+        <label><strong>Issue</strong></label><br>
+        <textarea name="irac_issue"
+                  rows="4"
+                  placeholder="State the legal issue..."
+                  style="width:100%; padding:12px; border-radius:10px; box-sizing:border-box;">{{ irac_student_response.get("issue", "") }}</textarea>
+
+        <br><br>
+
+        <label><strong>Rule</strong></label><br>
+        <textarea name="irac_rule"
+                  rows="4"
+                  placeholder="State the governing rule..."
+                  style="width:100%; padding:12px; border-radius:10px; box-sizing:border-box;">{{ irac_student_response.get("rule", "") }}</textarea>
+
+        <br><br>
+
+        <label><strong>Analysis / Application</strong></label><br>
+        <textarea name="irac_analysis"
+                  rows="7"
+                  placeholder="Apply the rule to the facts..."
+                  style="width:100%; padding:12px; border-radius:10px; box-sizing:border-box;">{{ irac_student_response.get("analysis", "") }}</textarea>
+
+        <br><br>
+
+        <label><strong>Conclusion</strong></label><br>
+        <textarea name="irac_conclusion"
+                  rows="4"
+                  placeholder="State the likely result..."
+                  style="width:100%; padding:12px; border-radius:10px; box-sizing:border-box;">{{ irac_student_response.get("conclusion", "") }}</textarea>
+
+        <br><br>
+
+        <button type="submit">
+            💾 Save IRAC Response
+        </button>
+    </form>
+</div>
+{% endif %}                                
+                                  
+                                  
 {% if socratic_questions %}
 <div class="portal-card" style="text-align:left; cursor:default; margin-bottom:16px;">
     <div style="
@@ -3034,6 +3098,7 @@ function toggleSocraticAnswerKey() {
     socratic_total=socratic_total,
     socratic_answered=socratic_answered,
     socratic_progress_text=socratic_progress_text,
+    irac_student_response=irac_student_response,
     law_folders=law_folders
     )
 
@@ -3432,6 +3497,61 @@ def law_update_socratic_answers(case_id):
         return "Failed to update Socratic answers", 500
 
     return redirect(f"/law/cases/{case_id}?socratic_answers_updated=1")
+
+
+# =========================
+# LAW STUDY MODULE - UPDATE IRAC RESPONSE
+# =========================
+@app.route("/law/cases/<case_id>/update_irac_response", methods=["POST"])
+def law_update_irac_response(case_id):
+    case_entry = get_law_case_by_id(case_id)
+
+    if not case_entry:
+        return "Law case review not found", 404
+
+    case_file = secure_filename(case_entry.get("file") or "")
+
+    if not case_file.lower().endswith(".json"):
+        return "Invalid case file", 400
+
+    case_path = os.path.join(LAW_CASES_FOLDER, case_file)
+
+    if not os.path.exists(case_path) or not os.path.isfile(case_path):
+        return "Law case file not found", 404
+
+    irac_response = {
+        "issue": request.form.get("irac_issue", "").strip(),
+        "rule": request.form.get("irac_rule", "").strip(),
+        "analysis": request.form.get("irac_analysis", "").strip(),
+        "conclusion": request.form.get("irac_conclusion", "").strip()
+    }
+
+    try:
+        with open(case_path, "r", encoding="utf-8") as f:
+            case_data = json.load(f) or {}
+
+        now = datetime.now().isoformat(timespec="seconds")
+
+        case_data["irac_student_response"] = irac_response
+        case_data["updated_at"] = now
+
+        with open(case_path, "w", encoding="utf-8") as f:
+            json.dump(case_data, f, indent=2)
+
+        registry = load_law_registry()
+
+        for case in registry.get("cases", []):
+            if str(case.get("id")) == str(case_id):
+                case["updated_at"] = now
+                break
+
+        save_law_registry(registry)
+
+    except Exception as e:
+        print(f"[LAW CASE ERROR] Failed updating IRAC response: {e}")
+        return "Failed to update IRAC response", 500
+
+    return redirect(f"/law/cases/{case_id}?irac_updated=1")
 
 
 
