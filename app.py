@@ -196,6 +196,12 @@ QUIZ_FOLDER = os.path.join(APP_DATA_DIR, "quizzes")
 CONFIG_FOLDER = os.path.join(APP_DATA_DIR, "config")
 REGISTRY_FILE = os.path.join(APP_DATA_DIR, "config", "quizzes.json")
 
+# Law Study module storage
+LAW_FOLDER = os.path.join(APP_DATA_DIR, "law")
+LAW_CASES_FOLDER = os.path.join(LAW_FOLDER, "cases")
+LAW_IMPORTS_FOLDER = os.path.join(LAW_FOLDER, "imports")
+LAW_EXPORTS_FOLDER = os.path.join(LAW_FOLDER, "exports")
+LAW_REGISTRY = os.path.join(CONFIG_FOLDER, "law.json")
 
 # App-data logos (used for temp storage / preview)
 LOGO_FOLDER = os.path.join(APP_DATA_DIR, "static", "logos")
@@ -214,6 +220,10 @@ for d in [
     CONFIG_FOLDER,
     BACKGROUND_FOLDER,
     LOGO_FOLDER,
+    LAW_FOLDER,
+    LAW_CASES_FOLDER,
+    LAW_IMPORTS_FOLDER,
+    LAW_EXPORTS_FOLDER,
     #STATIC_LOGO_FOLDER,
 ]:
     os.makedirs(d, exist_ok=True)
@@ -938,6 +948,77 @@ def get_confidence_setting():
     return load_portal_config().get("show_confidence", False)
 
 
+# =========================
+# LAW STUDY REGISTRY
+# =========================
+def load_law_registry():
+    default = {
+        "version": "1",
+        "cases": [],
+        "folders": [
+            "Torts",
+            "Contracts",
+            "Civil Procedure",
+            "Criminal Law",
+            "Property",
+            "Constitutional Law",
+            "Legal Writing"
+        ]
+    }
+
+    os.makedirs(os.path.dirname(LAW_REGISTRY), exist_ok=True)
+
+    if not os.path.exists(LAW_REGISTRY):
+        try:
+            with open(LAW_REGISTRY, "w", encoding="utf-8") as f:
+                json.dump(default, f, indent=2)
+            return default.copy()
+        except Exception as e:
+            print(f"[LAW REGISTRY ERROR] create failed: {e}")
+            return default.copy()
+
+    try:
+        with open(LAW_REGISTRY, "r", encoding="utf-8") as f:
+            data = json.load(f) or {}
+
+        cfg = default.copy()
+        cfg.update(data)
+
+        if not isinstance(cfg.get("cases"), list):
+            cfg["cases"] = []
+
+        if not isinstance(cfg.get("folders"), list):
+            cfg["folders"] = default["folders"]
+
+        return cfg
+
+    except Exception as e:
+        print(f"[LAW REGISTRY ERROR] load failed: {e}")
+        return default.copy()
+
+
+def save_law_registry(registry):
+    try:
+        os.makedirs(os.path.dirname(LAW_REGISTRY), exist_ok=True)
+
+        if not isinstance(registry, dict):
+            registry = {
+                "version": "1",
+                "cases": [],
+                "folders": []
+            }
+
+        registry.setdefault("version", "1")
+        registry.setdefault("cases", [])
+        registry.setdefault("folders", [])
+
+        with open(LAW_REGISTRY, "w", encoding="utf-8") as f:
+            json.dump(registry, f, indent=2)
+
+    except Exception as e:
+        print(f"[LAW REGISTRY ERROR] save failed: {e}")
+
+
 
 # =========================
 # QUIZ REGISTRY
@@ -1069,6 +1150,120 @@ def home():
     portal_title=portal_title,
     app_version=APP_VERSION
 )
+
+
+# =========================
+# LAW STUDY MODULE - LANDING
+# =========================
+@app.route("/law")
+def law_study_home():
+    portal_title = get_portal_title()
+    law_registry = load_law_registry()
+
+    return render_template_string("""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Law Study - DLMS</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="/static/favicon.ico">
+</head>
+
+<body>
+<div class="container">
+
+    <h1 class="hero-title">
+        ⚖️ Law Study<br>
+        <span style="font-size:20px;opacity:.85">
+            Case Briefs • Socratic Review • IRAC Practice
+        </span>
+    </h1>
+
+    <div class="card">
+
+        <div style="
+            display:flex;
+            justify-content:space-between;
+            align-items:flex-start;
+            gap:16px;
+            flex-wrap:wrap;
+            margin-bottom:20px;
+        ">
+            <div>
+                <h2 style="margin-bottom:6px;">Law Study Hub</h2>
+                <p style="opacity:.85; margin-top:0;">
+                    Build structured law-school study packets from cases, notes, and AI-assisted review.
+                </p>
+            </div>
+
+            <span style="
+                display:inline-block;
+                padding:7px 12px;
+                border-radius:999px;
+                background:rgba(0,180,100,.14);
+                border:1px solid rgba(0,180,100,.35);
+                font-size:13px;
+                font-weight:700;
+            ">
+                ✨ AI-ready
+            </span>
+        </div>
+
+        <div class="portal-grid">
+
+            <div class="portal-card" onclick="alert('Coming soon: Create Case Review')">
+                <h2>📄 Create Case Review</h2>
+                <p>Build a case brief, Socratic questions, IRAC drill, and flashcards.</p>
+            </div>
+
+            <div class="portal-card" onclick="alert('Coming soon: My Case Reviews')">
+                <h2>⚖️ My Case Reviews</h2>
+                <p>View saved cases organized by course and topic.</p>
+            </div>
+
+            <div class="portal-card" onclick="alert('Coming soon: IRAC Practice')">
+                <h2>🧠 IRAC Practice</h2>
+                <p>Practice issue spotting, rule statements, analysis, and conclusions.</p>
+            </div>
+
+            <div class="portal-card" onclick="alert('Coming soon: Socratic Prep')">
+                <h2>🎓 Socratic Prep</h2>
+                <p>Review cold-call style questions before class.</p>
+            </div>
+
+            <div class="portal-card" onclick="alert('Coming soon: Rule Flashcards')">
+                <h2>🃏 Rule Flashcards</h2>
+                <p>Study rules and holdings pulled from your saved cases.</p>
+            </div>
+
+            <div class="portal-card" onclick="alert('Coming soon: Case Compare')">
+                <h2>🔎 Case Compare</h2>
+                <p>Compare cases by facts, issue, rule, holding, and reasoning.</p>
+            </div>
+
+        </div>
+
+        <br>
+        <button onclick="location.href='/'">⬅ Back To Portal</button>
+
+    </div>
+
+</div>
+
+<div style="
+    text-align:center;
+    margin-top:18px;
+    font-size:13px;
+    opacity:.65;
+">
+    DLMS Law Study Module Preview
+</div>
+
+</body>
+</html>
+""", portal_title=portal_title, law_registry=law_registry)
+
 
 
 
