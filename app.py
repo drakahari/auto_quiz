@@ -1807,6 +1807,9 @@ def parse_socratic_questions(socratic_text):
 
 
 
+
+
+
 # =========================
 # LAW STUDY MODULE - IMPORT CASE PACKET
 # =========================
@@ -2089,7 +2092,20 @@ def law_saved_imports():
                 {{ imports|length }} saved import{% if imports|length != 1 %}s{% endif %}
             </span>
         </div>
-
+                                  
+        {% if request.args.get('deleted') %}
+        <div style="
+            margin-bottom:18px;
+            padding:14px;
+            border-radius:12px;
+            background:rgba(0,180,100,.12);
+            border:1px solid rgba(0,180,100,.35);
+        ">
+            <strong>Saved import deleted.</strong>
+            The raw import file was removed. Structured case reviews were not changed.
+        </div>
+        {% endif %}
+                                  
         {% if imports %}
 
         <div style="display:grid; gap:12px;">
@@ -2107,6 +2123,15 @@ def law_saved_imports():
                     onclick="location.href='/law/imports/{{ item.filename }}'">
                 👁 Open Import
             </button>
+                                  
+             <form method="POST"
+                action="/law/imports/{{ item.filename }}/delete"
+                style="display:inline-block; margin-left:8px;"
+                onsubmit="return confirm('Delete this saved raw import? This will not delete any structured case reviews already created from it.');">
+                <button type="submit" class="btn-delete">
+                    🗑 Delete Import
+                </button>
+            </form>                     
         </div>
             {% endfor %}
         </div>
@@ -2157,6 +2182,11 @@ def law_saved_imports():
     portal_title=portal_title,
     imports=imports
     )
+
+
+
+
+
 
 
 # =========================
@@ -2387,6 +2417,30 @@ def law_view_saved_import(filename):
     size=size,
     parsed_sections=parsed_sections
     )
+
+
+
+# =========================
+# LAW STUDY MODULE - DELETE SAVED RAW IMPORT
+# =========================
+@app.route("/law/imports/<path:filename>/delete", methods=["POST"])
+def law_delete_saved_import(filename):
+    safe_name = safe_law_import_filename(filename)
+
+    if not safe_name:
+        return "Invalid import filename", 400
+
+    import_path = os.path.join(LAW_IMPORTS_FOLDER, safe_name)
+
+    try:
+        if os.path.exists(import_path) and os.path.isfile(import_path):
+            os.remove(import_path)
+
+    except Exception as e:
+        print(f"[LAW IMPORT ERROR] Failed deleting saved import: {e}")
+        return "Failed to delete saved import", 500
+
+    return redirect("/law/imports?deleted=1")
 
 
 
