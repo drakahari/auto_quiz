@@ -1773,6 +1773,39 @@ def get_law_case_by_id(case_id):
     return None
 
 
+def parse_socratic_questions(socratic_text):
+    """
+    Best-effort parser for numbered Socratic questions.
+    Returns a list of question dictionaries for preview/practice display.
+    """
+    questions = []
+
+    if not socratic_text:
+        return questions
+
+    # Match common formats:
+    # 1. Question text
+    # 1) Question text
+    # Q1. Question text
+    pattern = re.compile(
+        r"(?im)^\s*(?:Q)?(\d+)[\.\)]\s+(.+?)(?=^\s*(?:Q)?\d+[\.\)]\s+|\Z)",
+        re.DOTALL | re.MULTILINE
+    )
+
+    for match in pattern.finditer(socratic_text):
+        number = match.group(1).strip()
+        text = match.group(2).strip()
+
+        if text:
+            questions.append({
+                "id": f"q{number}",
+                "number": number,
+                "text": text
+            })
+
+    return questions
+
+
 
 # =========================
 # LAW STUDY MODULE - IMPORT CASE PACKET
@@ -2659,6 +2692,7 @@ def law_view_case_review(case_id):
     ]
 
     socratic_answer_key = sections.get("socratic_answer_key", "")
+    socratic_questions = parse_socratic_questions(sections.get("socratic_review", ""))
 
     return render_template_string("""
 <!DOCTYPE html>
@@ -2801,6 +2835,37 @@ def law_view_case_review(case_id):
             {% endif %}
         {% endfor %}
 
+{% if socratic_questions %}
+<div class="portal-card" style="text-align:left; cursor:default; margin-bottom:16px;">
+    <h2 style="margin-top:0;">🎓 Socratic Practice</h2>
+
+    <p style="opacity:.8;">
+        Try answering each question before revealing the answer key. Student answer boxes will be added in the next step.
+    </p>
+
+    <div style="display:grid; gap:12px;">
+        {% for question in socratic_questions %}
+        <div style="
+            padding:14px;
+            border-radius:12px;
+            background:rgba(255,255,255,.06);
+            border:1px solid rgba(255,255,255,.16);
+        ">
+            <h3 style="margin-top:0;">Question {{ question.number }}</h3>
+
+            <pre style="
+                white-space:pre-wrap;
+                word-wrap:break-word;
+                font-family:inherit;
+                line-height:1.45;
+                margin-bottom:0;
+            ">{{ question.text }}</pre>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+                                                                    
         {% if socratic_answer_key %}
         <div class="portal-card" style="text-align:left; cursor:default; margin-bottom:16px;">
             <h2 style="margin-top:0;">🔒 2A. Socratic Answer Key</h2>
@@ -2901,6 +2966,7 @@ function toggleSocraticAnswerKey() {
     case_data=case_data,
     section_cards=section_cards,
     socratic_answer_key=socratic_answer_key,
+    socratic_questions=socratic_questions,
     law_folders=law_folders
     )
 
