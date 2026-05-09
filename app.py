@@ -1227,7 +1227,7 @@ def law_study_home():
                 <p>View raw AI-generated case packets saved for future parsing.</p>
             </div>                                    
 
-            <div class="portal-card" onclick="alert('Coming soon: My Case Reviews')">
+            <div class="portal-card" onclick="location.href='/law/cases'">
                 <h2>⚖️ My Case Reviews</h2>
                 <p>View saved cases organized by course and topic.</p>
             </div>
@@ -2422,6 +2422,159 @@ def law_create_case_from_import(filename):
         return "Failed to create case review", 500
 
     return redirect(f"/law/imports/{safe_name}?created_case={case_id}")
+
+
+
+# =========================
+# LAW STUDY MODULE - SAVED CASE REVIEWS
+# =========================
+@app.route("/law/cases")
+def law_case_reviews():
+    portal_title = get_portal_title()
+    registry = load_law_registry()
+
+    cases = registry.get("cases", [])
+
+    # newest first
+    cases = sorted(
+        cases,
+        key=lambda c: str(c.get("created_at", "")),
+        reverse=True
+    )
+
+    return render_template_string("""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>My Case Reviews - DLMS</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="/static/favicon.ico">
+</head>
+
+<body>
+<div class="container">
+
+    <h1 class="hero-title">
+        ⚖️ My Case Reviews<br>
+        <span style="font-size:20px;opacity:.85">
+            Saved Case Briefs • Socratic Review • IRAC Practice
+        </span>
+    </h1>
+
+    <div class="card">
+
+        <div style="
+            display:flex;
+            justify-content:space-between;
+            align-items:flex-start;
+            gap:16px;
+            flex-wrap:wrap;
+            margin-bottom:20px;
+        ">
+            <div>
+                <h2 style="margin-bottom:6px;">Saved Law Case Reviews</h2>
+                <p style="opacity:.85; margin-top:0;">
+                    These are structured case reviews created from saved Law Study imports.
+                </p>
+            </div>
+
+            <span style="
+                display:inline-block;
+                padding:7px 12px;
+                border-radius:999px;
+                background:rgba(0,120,255,.12);
+                border:1px solid rgba(0,120,255,.35);
+                font-size:13px;
+                font-weight:700;
+                white-space:nowrap;
+            ">
+                {{ cases|length }} case review{% if cases|length != 1 %}s{% endif %}
+            </span>
+        </div>
+
+        {% if cases %}
+
+        <div style="display:grid; gap:12px;">
+            {% for case in cases %}
+            <div class="portal-card" style="text-align:left; cursor:default;">
+                <h3 style="margin-bottom:6px;">📘 {{ case.title }}</h3>
+
+                <p style="margin:4px 0; opacity:.85;">
+                    <strong>Course:</strong> {{ case.course or "Uncategorized" }}
+                </p>
+
+                <p style="margin:4px 0; opacity:.85;">
+                    <strong>Created:</strong> {{ case.created_at }}
+                </p>
+
+                <p style="margin:4px 0; opacity:.85;">
+                    <strong>Source Import:</strong> {{ case.source_import }}
+                </p>
+
+                <p style="margin:4px 0; opacity:.85;">
+                    <strong>Case File:</strong> {{ case.file }}
+                </p>
+
+                <button type="button"
+                        onclick="alert('Coming soon: open case review')">
+                    👁 Open Case Review
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% else %}
+
+        <div style="
+            padding:18px;
+            border-radius:12px;
+            background:rgba(255,255,255,.06);
+            border:1px solid rgba(255,255,255,.16);
+            text-align:center;
+        ">
+            <h3>No case reviews yet</h3>
+            <p style="opacity:.8;">
+                Create a case review from a saved import to see it here.
+            </p>
+        </div>
+
+        {% endif %}
+
+        <br>
+
+        <button type="button" onclick="location.href='/law/imports'">
+            📁 Saved Imports
+        </button>
+
+        <button type="button" onclick="location.href='/law/import'">
+            📥 Import Case Packet
+        </button>
+
+        <button type="button" onclick="location.href='/law'">
+            ⬅ Back To Law Study
+        </button>
+
+    </div>
+
+</div>
+
+<div style="
+    text-align:center;
+    margin-top:18px;
+    font-size:13px;
+    opacity:.65;
+">
+    DLMS Law Study Module Preview
+</div>
+
+</body>
+</html>
+""",
+    portal_title=portal_title,
+    cases=cases
+    )
+
 
 
 
