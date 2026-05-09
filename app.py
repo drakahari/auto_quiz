@@ -2727,6 +2727,19 @@ def law_view_case_review(case_id):
         </div>
         {% endif %}
 
+        {% if request.args.get('notes_updated') %}
+        <div style="
+            margin-bottom:18px;
+            padding:14px;
+            border-radius:12px;
+            background:rgba(0,180,100,.12);
+            border:1px solid rgba(0,180,100,.35);
+        ">
+            <strong>Student notes updated.</strong>
+            Your notes were saved successfully.
+        </div>
+        {% endif %}                          
+
         <div style="
             margin-bottom:18px;
             padding:14px;
@@ -2812,18 +2825,26 @@ def law_view_case_review(case_id):
         </div>
         {% endif %}
 
-        {% if case_data.student_notes %}
         <div class="portal-card" style="text-align:left; cursor:default; margin-bottom:16px;">
             <h2 style="margin-top:0;">📝 Student Notes</h2>
-            <pre style="
-                white-space:pre-wrap;
-                word-wrap:break-word;
-                font-family:inherit;
-                line-height:1.45;
-                margin-bottom:0;
-            ">{{ case_data.student_notes }}</pre>
+
+            <p style="opacity:.8;">
+                Add your own class notes, professor comments, questions, or reminders here.
+            </p>
+
+            <form method="POST" action="/law/cases/{{ case_data.id }}/update_notes">
+                <textarea name="student_notes"
+                        rows="10"
+                        placeholder="Add your own notes about this case..."
+                        style="width:100%; padding:12px; border-radius:10px; box-sizing:border-box;">{{ case_data.student_notes }}</textarea>
+
+                <br><br>
+
+                <button type="submit">
+                    💾 Save Student Notes
+                </button>
+            </form>
         </div>
-        {% endif %}
 
         <br>
 
@@ -3164,6 +3185,57 @@ document.getElementById("edit-quiz-form").addEventListener("submit", function(e)
 </body>
 </html>
 """, quiz=quiz, questions=question_list)
+
+
+# =========================
+# LAW STUDY MODULE - UPDATE CASE REVIEW NOTES
+# =========================
+@app.route("/law/cases/<case_id>/update_notes", methods=["POST"])
+def law_update_case_review_notes(case_id):
+    case_entry = get_law_case_by_id(case_id)
+
+    if not case_entry:
+        return "Law case review not found", 404
+
+    case_file = secure_filename(case_entry.get("file") or "")
+
+    if not case_file.lower().endswith(".json"):
+        return "Invalid case file", 400
+
+    case_path = os.path.join(LAW_CASES_FOLDER, case_file)
+
+    if not os.path.exists(case_path) or not os.path.isfile(case_path):
+        return "Law case file not found", 404
+
+    student_notes = request.form.get("student_notes", "").strip()
+
+    try:
+        with open(case_path, "r", encoding="utf-8") as f:
+            case_data = json.load(f) or {}
+
+        now = datetime.now().isoformat(timespec="seconds")
+
+        case_data["student_notes"] = student_notes
+        case_data["updated_at"] = now
+
+        with open(case_path, "w", encoding="utf-8") as f:
+            json.dump(case_data, f, indent=2)
+
+        registry = load_law_registry()
+
+        for case in registry.get("cases", []):
+            if str(case.get("id")) == str(case_id):
+                case["updated_at"] = now
+                break
+
+        save_law_registry(registry)
+
+    except Exception as e:
+        print(f"[LAW CASE ERROR] Failed updating case review notes: {e}")
+        return "Failed to update case review notes", 500
+
+    return redirect(f"/law/cases/{case_id}?notes_updated=1")
+
 
 
 
