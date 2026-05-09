@@ -1268,11 +1268,104 @@ def law_study_home():
 # =========================
 # LAW STUDY MODULE - CREATE CASE REVIEW FORM
 # =========================
-@app.route("/law/create")
+@app.route("/law/create", methods=["GET", "POST"])
 def law_create_case_review():
     portal_title = get_portal_title()
     law_registry = load_law_registry()
     law_folders = law_registry.get("folders", [])
+
+    case_name = ""
+    course = law_folders[0] if law_folders else "Torts"
+    ai_provider = "chatgpt"
+    generated_prompt = ""
+
+    include_case_brief = True
+    include_socratic = True
+    include_irac = True
+    include_flashcards = True
+
+    if request.method == "POST":
+        case_name = request.form.get("case_name", "").strip()
+        course = request.form.get("course", course).strip()
+        ai_provider = request.form.get("ai_provider", "chatgpt").strip().lower()
+
+        include_case_brief = "include_case_brief" in request.form
+        include_socratic = "include_socratic" in request.form
+        include_irac = "include_irac" in request.form
+        include_flashcards = "include_flashcards" in request.form
+
+        requested_sections = []
+
+        if include_case_brief:
+            requested_sections.append("""
+1. Case Brief
+   - Full case name and citation
+   - Court and year
+   - Procedural posture
+   - Key facts
+   - Issue
+   - Rule
+   - Holding
+   - Reasoning
+   - Important concurrence or dissent, if any
+""".strip())
+
+        if include_socratic:
+            requested_sections.append("""
+2. Socratic Review
+   - Five cold-call style questions
+   - A short model answer for each question
+   - One fact-change question
+   - One policy question
+""".strip())
+
+        if include_irac:
+            requested_sections.append("""
+3. IRAC Drill
+   - One short practice fact pattern based on the case
+   - Issue
+   - Rule
+   - Application / Analysis
+   - Conclusion
+   - Model IRAC answer
+""".strip())
+
+        if include_flashcards:
+            requested_sections.append("""
+4. Rule Flashcards
+   - Five active-recall flashcards
+   - Front: question
+   - Back: concise answer
+   - Focus on rule, holding, reasoning, and key facts
+""".strip())
+
+        if case_name:
+            generated_prompt = f"""You are helping a first-year law student study a judicial opinion.
+
+Case:
+{case_name}
+
+Course:
+{course}
+
+Please create a law-school study packet for this case.
+
+Use only accurate information. Do not invent citations, quotations, facts, holdings, or procedural history. If you are uncertain, say so clearly.
+
+Prefer a public legal source when available, such as an official court source, Cornell LII, Justia, or Oyez. If you cannot verify the case from a reliable source, clearly state that verification is needed.
+
+Create the following sections:
+
+{chr(10).join(requested_sections)}
+
+Formatting requirements:
+- Use clear headings.
+- Keep explanations beginner-friendly but law-school appropriate.
+- Avoid long block quotes.
+- Include a final warning reminding the student to verify the case against the original opinion or an approved legal research source.
+"""
+        else:
+            generated_prompt = "Please enter a case name before generating the AI prompt."
 
     return render_template_string("""
 <!DOCTYPE html>
@@ -1307,7 +1400,7 @@ def law_create_case_review():
             <div>
                 <h2 style="margin-bottom:6px;">New Law Case Study</h2>
                 <p style="opacity:.85; margin-top:0;">
-                    Start by entering the case and course details. In a later step, this form will generate an AI-ready prompt and save a structured case packet.
+                    Enter a case and choose the study tools you want. DLMS will generate a structured prompt for your selected AI provider.
                 </p>
             </div>
 
@@ -1321,15 +1414,16 @@ def law_create_case_review():
                 font-weight:700;
                 white-space:nowrap;
             ">
-                ✨ AI-ready preview
+                ✨ AI-ready
             </span>
         </div>
 
-        <form method="GET" action="/law/create">
+        <form method="POST" action="/law/create">
 
             <h3>Case Name</h3>
             <input type="text"
                    name="case_name"
+                   value="{{ case_name }}"
                    placeholder="Example: Palsgraf v. Long Island Railroad Co."
                    style="width:100%; padding:10px; border-radius:8px; box-sizing:border-box;">
 
@@ -1339,7 +1433,7 @@ def law_create_case_review():
             <select name="course"
                     style="width:100%; padding:10px; border-radius:8px; box-sizing:border-box;">
                 {% for folder in law_folders %}
-                    <option value="{{ folder }}">{{ folder }}</option>
+                    <option value="{{ folder }}" {% if folder == course %}selected{% endif %}>{{ folder }}</option>
                 {% endfor %}
             </select>
 
@@ -1348,10 +1442,10 @@ def law_create_case_review():
             <h3>AI Provider</h3>
             <select name="ai_provider"
                     style="width:100%; padding:10px; border-radius:8px; box-sizing:border-box;">
-                <option value="chatgpt">ChatGPT</option>
-                <option value="claude">Claude</option>
-                <option value="gemini">Gemini</option>
-                <option value="local">Local / Custom</option>
+                <option value="chatgpt" {% if ai_provider == "chatgpt" %}selected{% endif %}>ChatGPT</option>
+                <option value="claude" {% if ai_provider == "claude" %}selected{% endif %}>Claude</option>
+                <option value="gemini" {% if ai_provider == "gemini" %}selected{% endif %}>Gemini</option>
+                <option value="local" {% if ai_provider == "local" %}selected{% endif %}>Local / Custom</option>
             </select>
 
             <br><br>
@@ -1365,25 +1459,25 @@ def law_create_case_review():
                 margin-top:10px;
             ">
                 <label class="portal-card" style="cursor:pointer; text-align:left;">
-                    <input type="checkbox" name="include_case_brief" checked>
+                    <input type="checkbox" name="include_case_brief" {% if include_case_brief %}checked{% endif %}>
                     <strong>Case Brief</strong>
                     <p style="margin-bottom:0; opacity:.8;">Facts, issue, rule, holding, and reasoning.</p>
                 </label>
 
                 <label class="portal-card" style="cursor:pointer; text-align:left;">
-                    <input type="checkbox" name="include_socratic" checked>
+                    <input type="checkbox" name="include_socratic" {% if include_socratic %}checked{% endif %}>
                     <strong>Socratic Review</strong>
                     <p style="margin-bottom:0; opacity:.8;">Cold-call style questions for class prep.</p>
                 </label>
 
                 <label class="portal-card" style="cursor:pointer; text-align:left;">
-                    <input type="checkbox" name="include_irac" checked>
+                    <input type="checkbox" name="include_irac" {% if include_irac %}checked{% endif %}>
                     <strong>IRAC Drill</strong>
                     <p style="margin-bottom:0; opacity:.8;">Issue, rule, analysis, and conclusion practice.</p>
                 </label>
 
                 <label class="portal-card" style="cursor:pointer; text-align:left;">
-                    <input type="checkbox" name="include_flashcards" checked>
+                    <input type="checkbox" name="include_flashcards" {% if include_flashcards %}checked{% endif %}>
                     <strong>Rule Flashcards</strong>
                     <p style="margin-bottom:0; opacity:.8;">Active recall cards from the case rule and holding.</p>
                 </label>
@@ -1391,21 +1485,7 @@ def law_create_case_review():
 
             <br>
 
-            <div style="
-                margin-top:18px;
-                padding:14px;
-                border-radius:12px;
-                background:rgba(0,120,255,.08);
-                border:1px solid rgba(0,120,255,.25);
-            ">
-                <strong>Preview only:</strong>
-                This page does not save anything yet. The next step will make the button generate a structured AI prompt.
-            </div>
-
-            <br>
-
-            <button type="button"
-                    onclick="alert('Coming soon: generate AI prompt')">
+            <button type="submit">
                 ✨ Generate AI Prompt
             </button>
 
@@ -1415,6 +1495,26 @@ def law_create_case_review():
             </button>
 
         </form>
+
+        {% if generated_prompt %}
+        <hr style="margin:24px 0;">
+
+        <h2>Generated AI Prompt</h2>
+
+        <p style="opacity:.8;">
+            Copy this prompt into your selected AI provider. In a later step, DLMS can open the provider automatically.
+        </p>
+
+        <textarea id="lawPromptBox"
+                  rows="18"
+                  style="width:100%; padding:12px; border-radius:10px; box-sizing:border-box;">{{ generated_prompt }}</textarea>
+
+        <br><br>
+
+        <button type="button" onclick="copyLawPrompt()">
+            📋 Copy Prompt
+        </button>
+        {% endif %}
 
     </div>
 
@@ -1429,9 +1529,41 @@ def law_create_case_review():
     DLMS Law Study Module Preview
 </div>
 
+<script>
+function copyLawPrompt() {
+    const box = document.getElementById("lawPromptBox");
+
+    if (!box) {
+        alert("Prompt box not found.");
+        return;
+    }
+
+    box.select();
+    box.setSelectionRange(0, 999999);
+
+    navigator.clipboard.writeText(box.value)
+        .then(() => alert("Prompt copied to clipboard."))
+        .catch(() => {
+            document.execCommand("copy");
+            alert("Prompt copied to clipboard.");
+        });
+}
+</script>
+
 </body>
 </html>
-""", portal_title=portal_title, law_folders=law_folders)
+""",
+    portal_title=portal_title,
+    law_folders=law_folders,
+    case_name=case_name,
+    course=course,
+    ai_provider=ai_provider,
+    generated_prompt=generated_prompt,
+    include_case_brief=include_case_brief,
+    include_socratic=include_socratic,
+    include_irac=include_irac,
+    include_flashcards=include_flashcards
+    )
 
 
 
