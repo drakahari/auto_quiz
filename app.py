@@ -1212,7 +1212,7 @@ def law_study_home():
 
         <div class="portal-grid">
 
-            <div class="portal-card" onclick="alert('Coming soon: Create Case Review')">
+            <div class="portal-card" onclick="location.href='/law/create'">
                 <h2>📄 Create Case Review</h2>
                 <p>Build a case brief, Socratic questions, IRAC drill, and flashcards.</p>
             </div>
@@ -1263,6 +1263,175 @@ def law_study_home():
 </body>
 </html>
 """, portal_title=portal_title, law_registry=law_registry)
+
+
+# =========================
+# LAW STUDY MODULE - CREATE CASE REVIEW FORM
+# =========================
+@app.route("/law/create")
+def law_create_case_review():
+    portal_title = get_portal_title()
+    law_registry = load_law_registry()
+    law_folders = law_registry.get("folders", [])
+
+    return render_template_string("""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Create Case Review - DLMS</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="/static/favicon.ico">
+</head>
+
+<body>
+<div class="container">
+
+    <h1 class="hero-title">
+        ⚖️ Create Case Review<br>
+        <span style="font-size:20px;opacity:.85">
+            Case Brief • Socratic Questions • IRAC Drill • Flashcards
+        </span>
+    </h1>
+
+    <div class="card">
+
+        <div style="
+            display:flex;
+            justify-content:space-between;
+            align-items:flex-start;
+            gap:16px;
+            flex-wrap:wrap;
+            margin-bottom:20px;
+        ">
+            <div>
+                <h2 style="margin-bottom:6px;">New Law Case Study</h2>
+                <p style="opacity:.85; margin-top:0;">
+                    Start by entering the case and course details. In a later step, this form will generate an AI-ready prompt and save a structured case packet.
+                </p>
+            </div>
+
+            <span style="
+                display:inline-block;
+                padding:7px 12px;
+                border-radius:999px;
+                background:rgba(0,180,100,.14);
+                border:1px solid rgba(0,180,100,.35);
+                font-size:13px;
+                font-weight:700;
+                white-space:nowrap;
+            ">
+                ✨ AI-ready preview
+            </span>
+        </div>
+
+        <form method="GET" action="/law/create">
+
+            <h3>Case Name</h3>
+            <input type="text"
+                   name="case_name"
+                   placeholder="Example: Palsgraf v. Long Island Railroad Co."
+                   style="width:100%; padding:10px; border-radius:8px; box-sizing:border-box;">
+
+            <br><br>
+
+            <h3>Course / Folder</h3>
+            <select name="course"
+                    style="width:100%; padding:10px; border-radius:8px; box-sizing:border-box;">
+                {% for folder in law_folders %}
+                    <option value="{{ folder }}">{{ folder }}</option>
+                {% endfor %}
+            </select>
+
+            <br><br>
+
+            <h3>AI Provider</h3>
+            <select name="ai_provider"
+                    style="width:100%; padding:10px; border-radius:8px; box-sizing:border-box;">
+                <option value="chatgpt">ChatGPT</option>
+                <option value="claude">Claude</option>
+                <option value="gemini">Gemini</option>
+                <option value="local">Local / Custom</option>
+            </select>
+
+            <br><br>
+
+            <h3>Study Packet Options</h3>
+
+            <div style="
+                display:grid;
+                grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+                gap:12px;
+                margin-top:10px;
+            ">
+                <label class="portal-card" style="cursor:pointer; text-align:left;">
+                    <input type="checkbox" name="include_case_brief" checked>
+                    <strong>Case Brief</strong>
+                    <p style="margin-bottom:0; opacity:.8;">Facts, issue, rule, holding, and reasoning.</p>
+                </label>
+
+                <label class="portal-card" style="cursor:pointer; text-align:left;">
+                    <input type="checkbox" name="include_socratic" checked>
+                    <strong>Socratic Review</strong>
+                    <p style="margin-bottom:0; opacity:.8;">Cold-call style questions for class prep.</p>
+                </label>
+
+                <label class="portal-card" style="cursor:pointer; text-align:left;">
+                    <input type="checkbox" name="include_irac" checked>
+                    <strong>IRAC Drill</strong>
+                    <p style="margin-bottom:0; opacity:.8;">Issue, rule, analysis, and conclusion practice.</p>
+                </label>
+
+                <label class="portal-card" style="cursor:pointer; text-align:left;">
+                    <input type="checkbox" name="include_flashcards" checked>
+                    <strong>Rule Flashcards</strong>
+                    <p style="margin-bottom:0; opacity:.8;">Active recall cards from the case rule and holding.</p>
+                </label>
+            </div>
+
+            <br>
+
+            <div style="
+                margin-top:18px;
+                padding:14px;
+                border-radius:12px;
+                background:rgba(0,120,255,.08);
+                border:1px solid rgba(0,120,255,.25);
+            ">
+                <strong>Preview only:</strong>
+                This page does not save anything yet. The next step will make the button generate a structured AI prompt.
+            </div>
+
+            <br>
+
+            <button type="button"
+                    onclick="alert('Coming soon: generate AI prompt')">
+                ✨ Generate AI Prompt
+            </button>
+
+            <button type="button"
+                    onclick="location.href='/law'">
+                ⬅ Back To Law Study
+            </button>
+
+        </form>
+
+    </div>
+
+</div>
+
+<div style="
+    text-align:center;
+    margin-top:18px;
+    font-size:13px;
+    opacity:.65;
+">
+    DLMS Law Study Module Preview
+</div>
+
+</body>
+</html>
+""", portal_title=portal_title, law_folders=law_folders)
 
 
 
