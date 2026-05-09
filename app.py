@@ -2693,6 +2693,7 @@ def law_view_case_review(case_id):
 
     socratic_answer_key = sections.get("socratic_answer_key", "")
     socratic_questions = parse_socratic_questions(sections.get("socratic_review", ""))
+    socratic_student_answers = case_data.get("socratic_student_answers", {}) or {}
 
     return render_template_string("""
 <!DOCTYPE html>
@@ -2772,7 +2773,20 @@ def law_view_case_review(case_id):
             <strong>Student notes updated.</strong>
             Your notes were saved successfully.
         </div>
-        {% endif %}                          
+        {% endif %}   
+
+          {% if request.args.get('socratic_answers_updated') %}
+        <div style="
+            margin-bottom:18px;
+            padding:14px;
+            border-radius:12px;
+            background:rgba(0,180,100,.12);
+            border:1px solid rgba(0,180,100,.35);
+        ">
+            <strong>Socratic answers updated.</strong>
+            Your practice answers were saved successfully.
+        </div>
+        {% endif %}                     
 
         <div style="
             margin-bottom:18px;
@@ -2840,31 +2854,47 @@ def law_view_case_review(case_id):
     <h2 style="margin-top:0;">🎓 Socratic Practice</h2>
 
     <p style="opacity:.8;">
-        Try answering each question before revealing the answer key. Student answer boxes will be added in the next step.
+        Type your own answer before revealing the answer key. Your answers are saved with this case review.
     </p>
 
-    <div style="display:grid; gap:12px;">
-        {% for question in socratic_questions %}
-        <div style="
-            padding:14px;
-            border-radius:12px;
-            background:rgba(255,255,255,.06);
-            border:1px solid rgba(255,255,255,.16);
-        ">
-            <h3 style="margin-top:0;">Question {{ question.number }}</h3>
+    <form method="POST" action="/law/cases/{{ case_data.id }}/update_socratic_answers">
+        <div style="display:grid; gap:12px;">
+            {% for question in socratic_questions %}
+            <div style="
+                padding:14px;
+                border-radius:12px;
+                background:rgba(255,255,255,.06);
+                border:1px solid rgba(255,255,255,.16);
+            ">
+                <h3 style="margin-top:0;">Question {{ question.number }}</h3>
 
-            <pre style="
-                white-space:pre-wrap;
-                word-wrap:break-word;
-                font-family:inherit;
-                line-height:1.45;
-                margin-bottom:0;
-            ">{{ question.text }}</pre>
+                <pre style="
+                    white-space:pre-wrap;
+                    word-wrap:break-word;
+                    font-family:inherit;
+                    line-height:1.45;
+                    margin-bottom:12px;
+                ">{{ question.text }}</pre>
+
+                <label><strong>Your Answer</strong></label><br>
+                <textarea name="answer_{{ question.id }}"
+                          rows="5"
+                          placeholder="Type your answer before revealing the guidance..."
+                          style="width:100%; padding:12px; border-radius:10px; box-sizing:border-box;">{{ socratic_student_answers.get(question.id, "") }}</textarea>
+            </div>
+            {% endfor %}
         </div>
-        {% endfor %}
-    </div>
+
+        <br>
+
+        <button type="submit">
+            💾 Save Socratic Answers
+        </button>
+    </form>
 </div>
 {% endif %}
+
+    
                                                                     
         {% if socratic_answer_key %}
         <div class="portal-card" style="text-align:left; cursor:default; margin-bottom:16px;">
@@ -2967,6 +2997,7 @@ function toggleSocraticAnswerKey() {
     section_cards=section_cards,
     socratic_answer_key=socratic_answer_key,
     socratic_questions=socratic_questions,
+    socratic_student_answers=socratic_student_answers,
     law_folders=law_folders
     )
 
@@ -3305,6 +3336,67 @@ def law_update_case_review_notes(case_id):
         return "Failed to update case review notes", 500
 
     return redirect(f"/law/cases/{case_id}?notes_updated=1")
+
+
+# =========================
+# LAW STUDY MODULE - UPDATE SOCRATIC ANSWERS
+# =========================
+@app.route("/law/cases/<case_id>/update_socratic_answers", methods=["POST"])
+def law_update_socratic_answers(case_id):
+    case_entry = get_law_case_by_id(case_id)
+
+    if not case_entry:
+        return "Law case review not found", 404
+
+    case_file = secure_filename(case_entry.get("file") or "")
+
+    if not case_file.lower().endswith(".json"):
+        return "Invalid case file", 400
+
+    case_path = os.path.join(LAW_CASES_FOLDER, case_file)
+
+    if not os.path.exists(case_path) or not os.path.isfile(case_path):
+        return "Law case file not found", 404
+
+    try:
+        with open(case_path, "r", encoding="utf-8") as f:
+            case_data = json.load(f) or {}
+
+        sections = case_data.get("sections", {}) or {}
+        socratic_questions = parse_socratic_questions(sections.get("socratic_review", ""))
+
+        answers = {}
+
+        for question in socratic_questions:
+            qid = question.get("id")
+            if not qid:
+                continue
+
+            answers[qid] = request.form.get(f"answer_{qid}", "").strip()
+
+        now = datetime.now().isoformat(timespec="seconds")
+
+        case_data["socratic_student_answers"] = answers
+        case_data["updated_at"] = now
+
+        with open(case_path, "w", encoding="utf-8") as f:
+            json.dump(case_data, f, indent=2)
+
+        registry = load_law_registry()
+
+        for case in registry.get("cases", []):
+            if str(case.get("id")) == str(case_id):
+                case["updated_at"] = now
+                break
+
+        save_law_registry(registry)
+
+    except Exception as e:
+        print(f"[LAW CASE ERROR] Failed updating Socratic answers: {e}")
+        return "Failed to update Socratic answers", 500
+
+    return redirect(f"/law/cases/{case_id}?socratic_answers_updated=1")
+
 
 
 # =========================
