@@ -1666,6 +1666,18 @@ function copyPromptAndOpenAi(url) {
     )
 
 
+def safe_law_import_filename(filename):
+    """
+    Restrict Law import filenames to saved .txt files in LAW_IMPORTS_FOLDER.
+    Prevents path traversal.
+    """
+    filename = secure_filename(filename or "")
+
+    if not filename.lower().endswith(".txt"):
+        return ""
+
+    return filename
+
 
 # =========================
 # LAW STUDY MODULE - IMPORT CASE PACKET
@@ -1955,14 +1967,19 @@ def law_saved_imports():
         <div style="display:grid; gap:12px;">
             {% for item in imports %}
             <div class="portal-card" style="text-align:left; cursor:default;">
-                <h3 style="margin-bottom:6px;">📄 {{ item.filename }}</h3>
-                <p style="margin:4px 0; opacity:.85;">
-                    <strong>Size:</strong> {{ item.size }} bytes
-                </p>
-                <p style="margin:4px 0; opacity:.85;">
-                    <strong>Modified:</strong> {{ item.modified }}
-                </p>
-            </div>
+            <h3 style="margin-bottom:6px;">📄 {{ item.filename }}</h3>
+            <p style="margin:4px 0; opacity:.85;">
+                <strong>Size:</strong> {{ item.size }} bytes
+            </p>
+            <p style="margin:4px 0; opacity:.85;">
+                <strong>Modified:</strong> {{ item.modified }}
+            </p>
+
+            <button type="button"
+                    onclick="location.href='/law/imports/{{ item.filename }}'">
+                👁 Open Import
+            </button>
+        </div>
             {% endfor %}
         </div>
 
@@ -2011,6 +2028,160 @@ def law_saved_imports():
 """,
     portal_title=portal_title,
     imports=imports
+    )
+
+
+# =========================
+# LAW STUDY MODULE - VIEW SAVED RAW IMPORT
+# =========================
+@app.route("/law/imports/<path:filename>")
+def law_view_saved_import(filename):
+    portal_title = get_portal_title()
+
+    safe_name = safe_law_import_filename(filename)
+
+    if not safe_name:
+        return "Invalid import filename", 400
+
+    import_path = os.path.join(LAW_IMPORTS_FOLDER, safe_name)
+
+    if not os.path.exists(import_path) or not os.path.isfile(import_path):
+        return "Saved import not found", 404
+
+    try:
+        with open(import_path, "r", encoding="utf-8") as f:
+            raw_packet = f.read()
+    except Exception as e:
+        print(f"[LAW IMPORT ERROR] Failed reading saved import: {e}")
+        return "Failed to read saved import", 500
+
+    line_count = len(raw_packet.splitlines())
+    char_count = len(raw_packet)
+
+    modified = datetime.fromtimestamp(os.stat(import_path).st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+    size = os.stat(import_path).st_size
+
+    return render_template_string("""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>View Law Import - DLMS</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="/static/favicon.ico">
+</head>
+
+<body>
+<div class="container">
+
+    <h1 class="hero-title">
+        📄 View Law Import<br>
+        <span style="font-size:20px;opacity:.85">
+            Raw Case Packet Preview
+        </span>
+    </h1>
+
+    <div class="card">
+
+        <div style="
+            display:flex;
+            justify-content:space-between;
+            align-items:flex-start;
+            gap:16px;
+            flex-wrap:wrap;
+            margin-bottom:20px;
+        ">
+            <div>
+                <h2 style="margin-bottom:6px;">{{ filename }}</h2>
+                <p style="opacity:.85; margin-top:0;">
+                    This is the saved raw text packet. Parsing into a structured case review will come later.
+                </p>
+            </div>
+
+            <span style="
+                display:inline-block;
+                padding:7px 12px;
+                border-radius:999px;
+                background:rgba(0,120,255,.12);
+                border:1px solid rgba(0,120,255,.35);
+                font-size:13px;
+                font-weight:700;
+                white-space:nowrap;
+            ">
+                Raw import
+            </span>
+        </div>
+
+        <div style="
+            display:grid;
+            grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
+            gap:12px;
+            margin-bottom:18px;
+        ">
+            <div class="portal-card" style="text-align:left; cursor:default;">
+                <h3>Lines</h3>
+                <p style="font-size:28px; font-weight:900; margin:0;">{{ line_count }}</p>
+            </div>
+
+            <div class="portal-card" style="text-align:left; cursor:default;">
+                <h3>Characters</h3>
+                <p style="font-size:28px; font-weight:900; margin:0;">{{ char_count }}</p>
+            </div>
+
+            <div class="portal-card" style="text-align:left; cursor:default;">
+                <h3>Size</h3>
+                <p style="font-size:28px; font-weight:900; margin:0;">{{ size }} bytes</p>
+            </div>
+
+            <div class="portal-card" style="text-align:left; cursor:default;">
+                <h3>Modified</h3>
+                <p style="margin:0;">{{ modified }}</p>
+            </div>
+        </div>
+
+        <h3>Raw Packet Text</h3>
+
+        <textarea readonly
+                  rows="24"
+                  style="width:100%; padding:12px; border-radius:10px; box-sizing:border-box;">{{ raw_packet }}</textarea>
+
+        <br><br>
+
+        <button type="button" onclick="location.href='/law/imports'">
+            ⬅ Back To Saved Imports
+        </button>
+
+        <button type="button" onclick="location.href='/law/import'">
+            📥 Import Another Packet
+        </button>
+
+        <button type="button" onclick="location.href='/law'">
+            ⚖️ Law Study Hub
+        </button>
+
+    </div>
+
+</div>
+
+<div style="
+    text-align:center;
+    margin-top:18px;
+    font-size:13px;
+    opacity:.65;
+">
+    DLMS Law Study Module Preview
+</div>
+
+</body>
+</html>
+""",
+    portal_title=portal_title,
+    filename=safe_name,
+    raw_packet=raw_packet,
+    line_count=line_count,
+    char_count=char_count,
+    modified=modified,
+    size=size
     )
 
 
