@@ -1516,10 +1516,16 @@ Formatting requirements:
         </p>
 
         <textarea id="lawPromptBox"
-                  rows="18"
-                  style="width:100%; padding:12px; border-radius:10px; box-sizing:border-box;">{{ generated_prompt }}</textarea>
+                rows="18"
+                style="width:100%; padding:12px; border-radius:10px; box-sizing:border-box;">{{ generated_prompt }}</textarea>
 
         <br><br>
+
+        {% if ai_provider_url %}
+        <button type="button" onclick="copyPromptAndOpenAi('{{ ai_provider_url }}')">
+            ✨ Copy Prompt & Open AI
+        </button>
+        {% endif %}
 
         <button type="button" onclick="copyLawPrompt()">
             📋 Copy Prompt
@@ -1527,14 +1533,15 @@ Formatting requirements:
 
         {% if ai_provider_url %}
         <button type="button" onclick="openSelectedAi('{{ ai_provider_url }}')">
-            ✨ Open Selected AI
+            🌐 Open Selected AI
         </button>
         {% else %}
         <p style="opacity:.75; margin-top:10px;">
             No custom AI URL is configured for Local / Custom.
         </p>
         {% endif %}
-                {% endif %}
+
+        {% endif %}
 
     </div>
 
@@ -1550,12 +1557,14 @@ Formatting requirements:
 </div>
 
 <script>
-function copyLawPrompt() {
+function copyLawPromptToClipboard(showAlert = true) {
     const box = document.getElementById("lawPromptBox");
 
     if (!box) {
-        alert("Prompt box not found.");
-        return;
+        if (showAlert) {
+            alert("Prompt box not found.");
+        }
+        return false;
     }
 
     box.focus();
@@ -1571,31 +1580,44 @@ function copyLawPrompt() {
     }
 
     if (copied) {
-        alert("Prompt copied to clipboard.");
-        return;
+        if (showAlert) {
+            alert("Prompt copied to clipboard.");
+        }
+        return true;
     }
 
-    if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(box.value)
-            .then(() => {
-                alert("Prompt copied to clipboard.");
-            })
-            .catch(() => {
-                alert("Copy failed. The prompt is selected, so press Ctrl+C manually.");
-            });
-    } else {
+    if (showAlert) {
         alert("Copy failed. The prompt is selected, so press Ctrl+C manually.");
     }
+
+    return false;
 }
-                                  
-   function openSelectedAi(url) {
+
+
+function copyLawPrompt() {
+    copyLawPromptToClipboard(true);
+}
+
+
+function openSelectedAi(url) {
     if (!url) {
         alert("No AI provider URL is configured.");
         return;
     }
 
     window.open(url, "_blank", "noopener,noreferrer");
-}                               
+}
+
+
+function copyPromptAndOpenAi(url) {
+    const copied = copyLawPromptToClipboard(false);
+
+    if (!copied) {
+        alert("The prompt could not be copied automatically. It is selected, so press Ctrl+C manually. The AI site will now open.");
+    }
+
+    openSelectedAi(url);
+}
 </script>
 
 </body>
