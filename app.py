@@ -1673,14 +1673,35 @@ def law_import_case_packet():
     packet_submitted = False
     line_count = 0
     char_count = 0
+    saved_file = ""
+    save_message = ""
 
     if request.method == "POST":
         raw_packet = request.form.get("raw_packet", "").strip()
+        action = request.form.get("action", "preview")
+
         packet_submitted = bool(raw_packet)
 
         if raw_packet:
             line_count = len(raw_packet.splitlines())
             char_count = len(raw_packet)
+
+            if action == "save_raw":
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                saved_file = f"law_import_{ts}.txt"
+                save_path = os.path.join(LAW_IMPORTS_FOLDER, saved_file)
+
+                try:
+                    os.makedirs(LAW_IMPORTS_FOLDER, exist_ok=True)
+
+                    with open(save_path, "w", encoding="utf-8") as f:
+                        f.write(raw_packet)
+
+                    save_message = f"Saved raw case packet as {saved_file}"
+
+                except Exception as e:
+                    print(f"[LAW IMPORT ERROR] Failed saving raw packet: {e}")
+                    save_message = "Error: failed to save raw case packet."
 
     return render_template_string("""
 <!DOCTYPE html>
@@ -1744,8 +1765,12 @@ def law_import_case_packet():
 
             <br><br>
 
-            <button type="submit">
+            <button type="submit" name="action" value="preview">
                 🔎 Preview Packet
+            </button>
+
+            <button type="submit" name="action" value="save_raw">
+                💾 Save Raw Packet
             </button>
 
             <button type="button"
@@ -1759,6 +1784,18 @@ def law_import_case_packet():
             </button>
 
         </form>
+
+                    {% if save_message %}
+                    <div style="
+                        margin-top:18px;
+                        padding:14px;
+                        border-radius:12px;
+                        background:rgba(0,180,100,.12);
+                        border:1px solid rgba(0,180,100,.35);
+                    ">
+                        <strong>{{ save_message }}</strong>
+                    </div>
+                    {% endif %}                                
 
         {% if packet_submitted %}
         <hr style="margin:24px 0;">
@@ -1819,7 +1856,9 @@ def law_import_case_packet():
     raw_packet=raw_packet,
     packet_submitted=packet_submitted,
     line_count=line_count,
-    char_count=char_count
+    char_count=char_count,
+    saved_file=saved_file,
+    save_message=save_message
     )
 
 
