@@ -1327,12 +1327,18 @@ def law_create_case_review():
 
         if include_socratic:
             requested_sections.append("""
-2. Socratic Review
-   - Five cold-call style questions
-   - A short model answer for each question
-   - One fact-change question
-   - One policy question
-""".strip())
+    2. Socratic Review
+    - Five cold-call style questions
+    - One fact-change question
+    - One policy question
+    - Do not place the model answers directly under the questions
+
+    2A. Socratic Answer Key
+    - Provide short model guidance for each Socratic question
+    - Keep each answer concise
+    - This section should be treated as hidden-by-default in DLMS
+    - Label each answer so it clearly matches the question number
+    """.strip())
 
         if include_irac:
             requested_sections.append("""
@@ -1377,7 +1383,20 @@ Formatting requirements:
 - Use clear headings.
 - Keep explanations beginner-friendly but law-school appropriate.
 - Avoid long block quotes.
-- Include a final warning reminding the student to verify the case against the original opinion or an approved legal research source.
+- Do not invent citations, quotations, facts, holdings, or procedural history.
+- Include a final warning outside the DLMS import block reminding the student to verify the case against the original opinion or an approved legal research source.
+
+At the end of your response, provide a clearly marked section titled:
+
+DLMS IMPORT BLOCK
+
+Inside the DLMS IMPORT BLOCK:
+- This entire block should be downloadable.
+- Include only the requested study sections.
+- Include only sections 1, 2, 2A, 3, and 4 when those sections were requested.
+- Do not include extra commentary inside the DLMS IMPORT BLOCK.
+- Do not include the verification warning inside the DLMS IMPORT BLOCK.
+- Use clean plain-text headings so the block can be pasted into DLMS.
 """
         else:
             generated_prompt = "Please enter a case name before generating the AI prompt."
