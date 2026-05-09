@@ -2848,6 +2848,10 @@ def law_view_case_review(case_id):
 
         <br>
 
+        <button type="button" onclick="location.href='/law/cases/{{ case_data.id }}/export.txt'">
+            ⬇️ Export Case Review
+        </button>
+
         <button type="button" onclick="location.href='/law/cases'">
             ⬅ Back To My Case Reviews
         </button>
@@ -3235,6 +3239,111 @@ def law_update_case_review_notes(case_id):
         return "Failed to update case review notes", 500
 
     return redirect(f"/law/cases/{case_id}?notes_updated=1")
+
+
+# =========================
+# LAW STUDY MODULE - EXPORT CASE REVIEW
+# =========================
+@app.route("/law/cases/<case_id>/export.txt")
+def law_export_case_review_txt(case_id):
+    case_entry = get_law_case_by_id(case_id)
+
+    if not case_entry:
+        return "Law case review not found", 404
+
+    case_file = secure_filename(case_entry.get("file") or "")
+
+    if not case_file.lower().endswith(".json"):
+        return "Invalid case file", 400
+
+    case_path = os.path.join(LAW_CASES_FOLDER, case_file)
+
+    if not os.path.exists(case_path) or not os.path.isfile(case_path):
+        return "Law case file not found", 404
+
+    try:
+        with open(case_path, "r", encoding="utf-8") as f:
+            case_data = json.load(f) or {}
+    except Exception as e:
+        print(f"[LAW CASE ERROR] Failed exporting case review: {e}")
+        return "Failed to export case review", 500
+
+    sections = case_data.get("sections", {}) or {}
+
+    exported_on = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    title = case_data.get("title") or "Untitled Case Review"
+    course = case_data.get("course") or "Uncategorized"
+    source_import = case_data.get("source_import") or ""
+    created_at = case_data.get("created_at") or ""
+    updated_at = case_data.get("updated_at") or ""
+
+    lines = []
+
+    lines.append("# DLMS Law Case Review Export")
+    lines.append(f"# Exported from DLMS v{APP_VERSION}")
+    lines.append(f"# Exported on: {exported_on}")
+    lines.append("# Format: DLMS Law Study text")
+    lines.append("")
+
+    lines.append("=" * 60)
+    lines.append(f"CASE REVIEW: {title}")
+    lines.append(f"COURSE: {course}")
+    lines.append(f"SOURCE IMPORT: {source_import}")
+    lines.append(f"CREATED: {created_at}")
+    lines.append(f"UPDATED: {updated_at}")
+    lines.append("=" * 60)
+    lines.append("")
+
+    section_order = [
+        ("1. Case Brief", sections.get("case_brief", "")),
+        ("2. Socratic Review", sections.get("socratic_review", "")),
+        ("2A. Socratic Answer Key", sections.get("socratic_answer_key", "")),
+        ("3. IRAC Drill", sections.get("irac_drill", "")),
+        ("4. Rule Flashcards", sections.get("rule_flashcards", "")),
+    ]
+
+    for heading, content in section_order:
+        if not content:
+            continue
+
+        lines.append(heading)
+        lines.append("-" * len(heading))
+        lines.append(content.strip())
+        lines.append("")
+        lines.append("")
+
+    student_notes = case_data.get("student_notes", "")
+
+    if student_notes:
+        lines.append("Student Notes")
+        lines.append("-------------")
+        lines.append(student_notes.strip())
+        lines.append("")
+        lines.append("")
+
+    lines.append("Verification Reminder")
+    lines.append("---------------------")
+    lines.append("Verify citations, holdings, quotations, and procedural history against the original opinion or an approved legal research source.")
+    lines.append("")
+
+    export_text = "\n".join(lines)
+
+    safe_title = re.sub(r"[^A-Za-z0-9_-]+", "_", title).strip("_")
+
+    if not safe_title:
+        safe_title = case_id
+
+    filename = f"dlms_law_case_{safe_title}.txt"
+
+    return Response(
+        export_text,
+        mimetype="text/plain",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        }
+    )
+
 
 
 
