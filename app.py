@@ -1775,33 +1775,76 @@ def get_law_case_by_id(case_id):
 
 def parse_socratic_questions(socratic_text):
     """
-    Best-effort parser for numbered Socratic questions.
-    Returns a list of question dictionaries for preview/practice display.
+    Best-effort parser for Socratic questions.
+    Supports common AI formats:
+    - 1. Question text
+    - 1) Question text
+    - Q1. Question text
+    - Question 1: Question text
+    - 1. **Question text**
     """
     questions = []
 
     if not socratic_text:
         return questions
 
-    # Match common formats:
+    text = socratic_text.strip()
+
+    # Match numbered question blocks.
+    # Captures:
     # 1. Question text
     # 1) Question text
     # Q1. Question text
+    # Q1) Question text
+    # Question 1: Question text
     pattern = re.compile(
-        r"(?im)^\s*(?:Q)?(\d+)[\.\)]\s+(.+?)(?=^\s*(?:Q)?\d+[\.\)]\s+|\Z)",
-        re.DOTALL | re.MULTILINE
+        r"""(?imsx)
+        ^\s*
+        (?:
+            Question\s+(\d+)\s*[:\.\)]      # Question 1:
+            |
+            Q?(\d+)\s*[\.\)]                # 1. / 1) / Q1.
+        )
+        \s+
+        (.*?)
+        (?=
+            ^\s*(?:Question\s+\d+\s*[:\.\)]|Q?\d+\s*[\.\)])\s+
+            |
+            \Z
+        )
+        """
     )
 
-    for match in pattern.finditer(socratic_text):
-        number = match.group(1).strip()
-        text = match.group(2).strip()
+    for match in pattern.finditer(text):
+        number = match.group(1) or match.group(2)
+        question_text = match.group(3).strip()
 
-        if text:
+        # Clean common markdown wrapping.
+        question_text = re.sub(r"^\*+", "", question_text).strip()
+        question_text = re.sub(r"\*+$", "", question_text).strip()
+
+        if number and question_text:
             questions.append({
                 "id": f"q{number}",
                 "number": number,
-                "text": text
+                "text": question_text
             })
+
+    # Fallback: detect bullet questions if no numbered questions were found.
+    # Example:
+    # - What fact mattered most to the court?
+    if not questions:
+        bullet_pattern = re.compile(r"(?im)^\s*[-*]\s+(.+\?)\s*$")
+
+        for idx, match in enumerate(bullet_pattern.finditer(text), start=1):
+            question_text = match.group(1).strip()
+
+            if question_text:
+                questions.append({
+                    "id": f"q{idx}",
+                    "number": str(idx),
+                    "text": question_text
+                })
 
     return questions
 
