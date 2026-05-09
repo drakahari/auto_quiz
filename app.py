@@ -1278,6 +1278,7 @@ def law_create_case_review():
     course = law_folders[0] if law_folders else "Torts"
     ai_provider = "chatgpt"
     generated_prompt = ""
+    ai_provider_url = ""
 
     include_case_brief = True
     include_socratic = True
@@ -1288,6 +1289,15 @@ def law_create_case_review():
         case_name = request.form.get("case_name", "").strip()
         course = request.form.get("course", course).strip()
         ai_provider = request.form.get("ai_provider", "chatgpt").strip().lower()
+
+        provider_urls = {
+            "chatgpt": "https://chatgpt.com/",
+            "claude": "https://claude.ai/",
+            "gemini": "https://gemini.google.com/",
+            "local": load_portal_config().get("ai_custom_url", "")
+        }
+
+        ai_provider_url = provider_urls.get(ai_provider, "")
 
         include_case_brief = "include_case_brief" in request.form
         include_socratic = "include_socratic" in request.form
@@ -1514,7 +1524,17 @@ Formatting requirements:
         <button type="button" onclick="copyLawPrompt()">
             📋 Copy Prompt
         </button>
+
+        {% if ai_provider_url %}
+        <button type="button" onclick="openSelectedAi('{{ ai_provider_url }}')">
+            ✨ Open Selected AI
+        </button>
+        {% else %}
+        <p style="opacity:.75; margin-top:10px;">
+            No custom AI URL is configured for Local / Custom.
+        </p>
         {% endif %}
+                {% endif %}
 
     </div>
 
@@ -1538,16 +1558,44 @@ function copyLawPrompt() {
         return;
     }
 
+    box.focus();
     box.select();
-    box.setSelectionRange(0, 999999);
+    box.setSelectionRange(0, box.value.length);
 
-    navigator.clipboard.writeText(box.value)
-        .then(() => alert("Prompt copied to clipboard."))
-        .catch(() => {
-            document.execCommand("copy");
-            alert("Prompt copied to clipboard.");
-        });
+    let copied = false;
+
+    try {
+        copied = document.execCommand("copy");
+    } catch (err) {
+        copied = false;
+    }
+
+    if (copied) {
+        alert("Prompt copied to clipboard.");
+        return;
+    }
+
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(box.value)
+            .then(() => {
+                alert("Prompt copied to clipboard.");
+            })
+            .catch(() => {
+                alert("Copy failed. The prompt is selected, so press Ctrl+C manually.");
+            });
+    } else {
+        alert("Copy failed. The prompt is selected, so press Ctrl+C manually.");
+    }
 }
+                                  
+   function openSelectedAi(url) {
+    if (!url) {
+        alert("No AI provider URL is configured.");
+        return;
+    }
+
+    window.open(url, "_blank", "noopener,noreferrer");
+}                               
 </script>
 
 </body>
@@ -1559,6 +1607,7 @@ function copyLawPrompt() {
     course=course,
     ai_provider=ai_provider,
     generated_prompt=generated_prompt,
+    ai_provider_url=ai_provider_url,
     include_case_brief=include_case_brief,
     include_socratic=include_socratic,
     include_irac=include_irac,
