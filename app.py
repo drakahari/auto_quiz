@@ -2547,6 +2547,19 @@ def law_case_reviews():
             </span>
         </div>
 
+                 {% if request.args.get('deleted') %}
+        <div style="
+            margin-bottom:18px;
+            padding:14px;
+            border-radius:12px;
+            background:rgba(0,180,100,.12);
+            border:1px solid rgba(0,180,100,.35);
+        ">
+            <strong>Case review deleted.</strong>
+            The case review was removed from the Law Study registry.
+        </div>
+        {% endif %}                                                
+
         {% if cases %}
 
         <div style="display:grid; gap:12px;">
@@ -2574,6 +2587,14 @@ def law_case_reviews():
                         onclick="location.href='/law/cases/{{ case.id }}'">
                     👁 Open Case Review
                 </button>
+                 <form method="POST"
+                    action="/law/cases/{{ case.id }}/delete"
+                    style="display:inline-block; margin-left:8px;"
+                    onsubmit="return confirm('Delete this Law Case Review? This will remove the saved case review JSON file, but it will not delete the original raw import.');">
+                    <button type="submit" class="btn-delete">
+                        🗑 Delete Case Review
+                    </button>
+                </form>                 
             </div>
             {% endfor %}
         </div>
@@ -3162,6 +3183,46 @@ def law_update_case_review_details(case_id):
         return "Failed to update case review details", 500
 
     return redirect(f"/law/cases/{case_id}?updated=1")
+
+
+# =========================
+# LAW STUDY MODULE - DELETE CASE REVIEW
+# =========================
+@app.route("/law/cases/<case_id>/delete", methods=["POST"])
+def law_delete_case_review(case_id):
+    case_entry = get_law_case_by_id(case_id)
+
+    if not case_entry:
+        return "Law case review not found", 404
+
+    case_file = secure_filename(case_entry.get("file") or "")
+
+    if not case_file.lower().endswith(".json"):
+        return "Invalid case file", 400
+
+    case_path = os.path.join(LAW_CASES_FOLDER, case_file)
+
+    try:
+        # Remove case JSON file
+        if os.path.exists(case_path) and os.path.isfile(case_path):
+            os.remove(case_path)
+
+        # Remove case from registry
+        registry = load_law_registry()
+
+        remaining_cases = [
+            case for case in registry.get("cases", [])
+            if str(case.get("id")) != str(case_id)
+        ]
+
+        registry["cases"] = remaining_cases
+        save_law_registry(registry)
+
+    except Exception as e:
+        print(f"[LAW CASE ERROR] Failed deleting case review: {e}")
+        return "Failed to delete case review", 500
+
+    return redirect("/law/cases?deleted=1")
 
 
 
