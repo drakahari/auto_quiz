@@ -1727,6 +1727,30 @@ def parse_law_packet_sections(raw_text):
     return sections
 
 
+def extract_law_case_title(raw_text, fallback_filename="Untitled Case Review"):
+    """
+    Best-effort title extraction from a Law Study import packet.
+    """
+    patterns = [
+        r"(?im)^\s*Full case name and citation\s*:\s*(.+)$",
+        r"(?im)^\s*Case\s*:\s*(.+)$",
+        r"(?im)^\s*Case Name\s*:\s*(.+)$",
+        r"(?im)^\s*#\s*(.+)$",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, raw_text)
+        if match:
+            title = match.group(1).strip()
+            if title:
+                return title[:160]
+
+    name = os.path.splitext(fallback_filename)[0]
+    name = name.replace("law_import_", "Case Review ")
+    name = name.replace("_", " ")
+    return name.strip() or "Untitled Case Review"
+
+
 
 
 # =========================
@@ -2190,6 +2214,19 @@ def law_view_saved_import(filename):
             </div>
         </div>
 
+                {% if request.args.get('created_case') %}
+        <div style="
+            margin:18px 0;
+            padding:14px;
+            border-radius:12px;
+            background:rgba(0,180,100,.12);
+            border:1px solid rgba(0,180,100,.35);
+        ">
+            <strong>Case review created.</strong>
+            The structured case file has been saved and added to the Law Study registry.
+        </div>
+        {% endif %}
+
         <h3>Parse Preview</h3>
 
         {% if parsed_sections %}
@@ -2223,6 +2260,16 @@ def law_view_saved_import(filename):
             DLMS found {{ parsed_sections|length }} recognized section{% if parsed_sections|length != 1 %}s{% endif %}.
             This is only a preview. Nothing has been saved as a structured case review yet.
         </div>
+
+        <form method="POST"
+              action="/law/imports/{{ filename }}/create_case"
+              style="margin-bottom:18px;">
+            <button type="submit"
+                    onclick="return confirm('Create a structured Law Case Review from this import?');">
+                💾 Create Case Review From Import
+            </button>
+        </form>
+
         {% else %}
         <div style="
             margin-bottom:18px;
@@ -2240,8 +2287,8 @@ def law_view_saved_import(filename):
             and <code>4. Rule Flashcards</code>.
         </div>
         {% endif %}
-                                  
-            <h3>Raw Packet Text</h3>
+
+        <h3>Raw Packet Text</h3>
 
         <textarea readonly
                   rows="24"
@@ -2286,6 +2333,96 @@ def law_view_saved_import(filename):
     size=size,
     parsed_sections=parsed_sections
     )
+
+
+
+# =========================
+# LAW STUDY MODULE - CREATE CASE REVIEW FROM IMPORT
+# =========================
+@app.route("/law/imports/<path:filename>/create_case", methods=["POST"])
+def law_create_case_from_import(filename):
+    safe_name = safe_law_import_filename(filename)
+
+    if not safe_name:
+        return "Invalid import filename", 400
+
+    import_path = os.path.join(LAW_IMPORTS_FOLDER, safe_name)
+
+    if not os.path.exists(import_path) or not os.path.isfile(import_path):
+        return "Saved import not found", 404
+
+    try:
+        with open(import_path, "r", encoding="utf-8") as f:
+            raw_packet = f.read()
+    except Exception as e:
+        print(f"[LAW CASE ERROR] Failed reading import: {e}")
+        return "Failed to read saved import", 500
+
+    parsed_sections = parse_law_packet_sections(raw_packet)
+
+    if not parsed_sections:
+        return "No recognized Law Study sections were found. Cannot create case review yet.", 400
+
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    case_id = f"law_case_{ts}"
+    case_file = f"{case_id}.json"
+    case_path = os.path.join(LAW_CASES_FOLDER, case_file)
+
+    section_map = {
+        section["key"]: section["content"]
+        for section in parsed_sections
+    }
+
+    title = extract_law_case_title(raw_packet, safe_name)
+
+    case_data = {
+        "id": case_id,
+        "type": "law_case_review",
+        "title": title,
+        "course": "Uncategorized",
+        "source_import": safe_name,
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+        "updated_at": datetime.now().isoformat(timespec="seconds"),
+        "verified": False,
+        "sections": {
+            "case_brief": section_map.get("case_brief", ""),
+            "socratic_review": section_map.get("socratic_review", ""),
+            "socratic_answer_key": section_map.get("socratic_answer_key", ""),
+            "irac_drill": section_map.get("irac_drill", ""),
+            "rule_flashcards": section_map.get("rule_flashcards", "")
+        },
+        "student_notes": ""
+    }
+
+    try:
+        os.makedirs(LAW_CASES_FOLDER, exist_ok=True)
+
+        with open(case_path, "w", encoding="utf-8") as f:
+            json.dump(case_data, f, indent=2)
+
+        registry = load_law_registry()
+        cases = registry.get("cases", [])
+
+        cases.append({
+            "id": case_id,
+            "title": title,
+            "course": "Uncategorized",
+            "file": case_file,
+            "source_import": safe_name,
+            "created_at": case_data["created_at"],
+            "updated_at": case_data["updated_at"],
+            "hidden": False
+        })
+
+        registry["cases"] = cases
+        save_law_registry(registry)
+
+    except Exception as e:
+        print(f"[LAW CASE ERROR] Failed creating case review: {e}")
+        return "Failed to create case review", 500
+
+    return redirect(f"/law/imports/{safe_name}?created_case={case_id}")
+
 
 
 
