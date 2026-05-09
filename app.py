@@ -1220,7 +1220,12 @@ def law_study_home():
             <div class="portal-card" onclick="location.href='/law/import'">
                 <h2>📥 Import Case Packet</h2>
                 <p>Paste AI-generated case study output for preview and future saving.</p>
-            </div>                   
+            </div>   
+
+            <div class="portal-card" onclick="location.href='/law/imports'">
+                <h2>📁 Saved Imports</h2>
+                <p>View raw AI-generated case packets saved for future parsing.</p>
+            </div>                                    
 
             <div class="portal-card" onclick="alert('Coming soon: My Case Reviews')">
                 <h2>⚖️ My Case Reviews</h2>
@@ -1859,6 +1864,153 @@ def law_import_case_packet():
     char_count=char_count,
     saved_file=saved_file,
     save_message=save_message
+    )
+
+
+# =========================
+# LAW STUDY MODULE - SAVED RAW IMPORTS
+# =========================
+@app.route("/law/imports")
+def law_saved_imports():
+    portal_title = get_portal_title()
+
+    imports = []
+
+    try:
+        os.makedirs(LAW_IMPORTS_FOLDER, exist_ok=True)
+
+        for name in sorted(os.listdir(LAW_IMPORTS_FOLDER), reverse=True):
+            if not name.lower().endswith(".txt"):
+                continue
+
+            path = os.path.join(LAW_IMPORTS_FOLDER, name)
+
+            if not os.path.isfile(path):
+                continue
+
+            stat = os.stat(path)
+
+            imports.append({
+                "filename": name,
+                "size": stat.st_size,
+                "modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+            })
+
+    except Exception as e:
+        print(f"[LAW IMPORTS ERROR] Failed loading saved imports: {e}")
+
+    return render_template_string("""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Saved Law Imports - DLMS</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="/static/favicon.ico">
+</head>
+
+<body>
+<div class="container">
+
+    <h1 class="hero-title">
+        📁 Saved Law Imports<br>
+        <span style="font-size:20px;opacity:.85">
+            Raw Case Packets Saved For Future Parsing
+        </span>
+    </h1>
+
+    <div class="card">
+
+        <div style="
+            display:flex;
+            justify-content:space-between;
+            align-items:flex-start;
+            gap:16px;
+            flex-wrap:wrap;
+            margin-bottom:20px;
+        ">
+            <div>
+                <h2 style="margin-bottom:6px;">Saved Raw Packets</h2>
+                <p style="opacity:.85; margin-top:0;">
+                    These are pasted AI-generated case packets saved as raw text files. Parsing into structured case reviews will come later.
+                </p>
+            </div>
+
+            <span style="
+                display:inline-block;
+                padding:7px 12px;
+                border-radius:999px;
+                background:rgba(0,120,255,.12);
+                border:1px solid rgba(0,120,255,.35);
+                font-size:13px;
+                font-weight:700;
+                white-space:nowrap;
+            ">
+                {{ imports|length }} saved import{% if imports|length != 1 %}s{% endif %}
+            </span>
+        </div>
+
+        {% if imports %}
+
+        <div style="display:grid; gap:12px;">
+            {% for item in imports %}
+            <div class="portal-card" style="text-align:left; cursor:default;">
+                <h3 style="margin-bottom:6px;">📄 {{ item.filename }}</h3>
+                <p style="margin:4px 0; opacity:.85;">
+                    <strong>Size:</strong> {{ item.size }} bytes
+                </p>
+                <p style="margin:4px 0; opacity:.85;">
+                    <strong>Modified:</strong> {{ item.modified }}
+                </p>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% else %}
+
+        <div style="
+            padding:18px;
+            border-radius:12px;
+            background:rgba(255,255,255,.06);
+            border:1px solid rgba(255,255,255,.16);
+            text-align:center;
+        ">
+            <h3>No saved imports yet</h3>
+            <p style="opacity:.8;">
+                Use Import Case Packet to paste and save an AI-generated study packet.
+            </p>
+        </div>
+
+        {% endif %}
+
+        <br>
+
+        <button type="button" onclick="location.href='/law/import'">
+            📥 Import Case Packet
+        </button>
+
+        <button type="button" onclick="location.href='/law'">
+            ⬅ Back To Law Study
+        </button>
+
+    </div>
+
+</div>
+
+<div style="
+    text-align:center;
+    margin-top:18px;
+    font-size:13px;
+    opacity:.65;
+">
+    DLMS Law Study Module Preview
+</div>
+
+</body>
+</html>
+""",
+    portal_title=portal_title,
+    imports=imports
     )
 
 
