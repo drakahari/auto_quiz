@@ -2579,6 +2579,10 @@ def law_view_saved_import(filename):
             ⬅ Back To Saved Imports
         </button>
 
+        <button type="button" onclick="location.href='/law/cases'">
+            ⚖️ My Case Reviews
+        </button>
+
         <button type="button" onclick="location.href='/law/import'">
             📥 Import Another Packet
         </button>
