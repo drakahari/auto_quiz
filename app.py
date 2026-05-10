@@ -1289,6 +1289,7 @@ def law_create_case_review():
     ai_provider = "chatgpt"
     generated_prompt = ""
     ai_provider_url = ""
+    case_slug = ""
 
     include_case_brief = True
     include_socratic = True
@@ -1299,6 +1300,17 @@ def law_create_case_review():
         case_name = request.form.get("case_name", "").strip()
         course = request.form.get("course", course).strip()
         ai_provider = request.form.get("ai_provider", "chatgpt").strip().lower()
+
+        case_slug = make_law_case_slug(case_name)
+
+        if case_name:
+            law_registry["pending_case_workflow"] = {
+                "case_name": case_name,
+                "case_slug": case_slug,
+                "course": course,
+                "created_at": datetime.now().isoformat(timespec="seconds")
+            }
+            save_law_registry(law_registry)
 
         provider_urls = {
             "chatgpt": "https://chatgpt.com/",
@@ -1464,10 +1476,11 @@ Inside the DLMS IMPORT BLOCK:
 
             <h3>Case Name</h3>
             <input type="text"
-                   name="case_name"
-                   value="{{ case_name }}"
-                   placeholder="Example: Palsgraf v. Long Island Railroad Co."
-                   style="width:100%; padding:10px; border-radius:8px; box-sizing:border-box;">
+                name="case_name"
+                value="{{ case_name }}"
+                required
+                placeholder="Example: Palsgraf v. Long Island Railroad Co."
+                style="width:100%; padding:10px; border-radius:8px; box-sizing:border-box;">
 
             <br><br>
 
@@ -1552,20 +1565,9 @@ Inside the DLMS IMPORT BLOCK:
                 style="width:100%; padding:12px; border-radius:10px; box-sizing:border-box;">{{ generated_prompt }}</textarea>
 
         <br><br>
-
         {% if ai_provider_url %}
         <button type="button" onclick="copyPromptAndOpenAi('{{ ai_provider_url }}')">
             ✨ Copy Prompt & Open AI
-        </button>
-        {% endif %}
-
-        <button type="button" onclick="copyLawPrompt()">
-            📋 Copy Prompt
-        </button>
-
-        {% if ai_provider_url %}
-        <button type="button" onclick="openSelectedAi('{{ ai_provider_url }}')">
-            🌐 Open Selected AI
         </button>
         {% else %}
         <p style="opacity:.75; margin-top:10px;">
@@ -1573,7 +1575,13 @@ Inside the DLMS IMPORT BLOCK:
         </p>
         {% endif %}
 
+        <button type="button" onclick="copyLawPrompt()">
+            📋 Copy Prompt
+        </button>
+
         {% endif %}
+
+        
 
     </div>
 
@@ -1658,6 +1666,7 @@ function copyPromptAndOpenAi(url) {
     portal_title=portal_title,
     law_folders=law_folders,
     case_name=case_name,
+    case_slug=case_slug,
     course=course,
     ai_provider=ai_provider,
     generated_prompt=generated_prompt,
@@ -1671,6 +1680,33 @@ function copyPromptAndOpenAi(url) {
 # =========================
 # LAW STUDY HELPER FUNCTIONS
 # =========================
+
+def make_law_case_slug(case_name):
+    """
+    Create a safe, readable slug from a case name for filenames.
+    Example: Hadley v. Baxendale -> hadley_v_baxendale
+    """
+    slug = str(case_name or "").strip().lower()
+
+    # Normalize common case-name punctuation/spacing
+    slug = slug.replace(" v. ", " v ")
+    slug = slug.replace(" vs. ", " v ")
+    slug = slug.replace(" versus ", " v ")
+
+    # Keep only letters, numbers, and underscores
+    slug = re.sub(r"[^a-z0-9]+", "_", slug)
+    slug = re.sub(r"_+", "_", slug).strip("_")
+
+    return slug[:80] or "untitled_case"
+
+
+
+
+
+
+
+
+
 def safe_law_import_filename(filename):
     """
     Restrict Law import filenames to saved .txt files in LAW_IMPORTS_FOLDER.
@@ -1864,6 +1900,21 @@ def parse_socratic_questions(socratic_text):
 def law_import_case_packet():
     portal_title = get_portal_title()
 
+    law_registry = load_law_registry()
+    pending_workflow = law_registry.get("pending_case_workflow", {}) or {}
+
+    case_name = request.values.get("case_name", "").strip()
+    case_slug = request.values.get("case_slug", "").strip()
+
+    if not case_name:
+        case_name = str(pending_workflow.get("case_name", "")).strip()
+
+    if not case_slug:
+        case_slug = str(pending_workflow.get("case_slug", "")).strip()
+
+    if case_name and not case_slug:
+        case_slug = make_law_case_slug(case_name)
+
     raw_packet = ""
     packet_submitted = False
     line_count = 0
@@ -1883,7 +1934,12 @@ def law_import_case_packet():
 
             if action == "save_raw":
                 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-                saved_file = f"law_import_{ts}.txt"
+
+                if case_slug:
+                    saved_file = f"law_import_{ts}_{case_slug}.txt"
+                else:
+                    saved_file = f"law_import_{ts}.txt"
+
                 save_path = os.path.join(LAW_IMPORTS_FOLDER, saved_file)
 
                 try:
@@ -1949,9 +2005,26 @@ def law_import_case_packet():
             </span>
         </div>
 
-        <form method="POST" action="/law/import">
+                {% if case_name %}
+                <div style="
+                    margin-bottom:18px;
+                    padding:14px;
+                    border-radius:12px;
+                    background:rgba(0,120,255,.08);
+                    border:1px solid rgba(0,120,255,.25);
+                ">
+                    <strong>Case Review Workflow:</strong><br>
+                    Case Name: {{ case_name }}<br>
+                    File Slug: {{ case_slug }}
+                </div>
+                {% endif %}
 
-            <h3>Case Packet Text</h3>
+                <form method="POST" action="/law/import">
+
+                    <input type="hidden" name="case_name" value="{{ case_name }}">
+                    <input type="hidden" name="case_slug" value="{{ case_slug }}">
+
+                    <h3>Case Packet Text</h3>
 
             <textarea name="raw_packet"
                       rows="22"
@@ -2048,6 +2121,8 @@ def law_import_case_packet():
 </html>
 """,
     portal_title=portal_title,
+    case_name=case_name,
+    case_slug=case_slug,
     raw_packet=raw_packet,
     packet_submitted=packet_submitted,
     line_count=line_count,
