@@ -2785,30 +2785,13 @@ def law_view_case_review(case_id):
     section_cards = [
         {
             "key": "case_brief",
-            "title": "1. Case Brief",
+            "title": "Case Brief",
             "icon": "📄",
             "content": sections.get("case_brief", "")
-        },
-        {
-            "key": "socratic_review",
-            "title": "2. Socratic Review",
-            "icon": "🎓",
-            "content": sections.get("socratic_review", "")
-        },
-        {
-            "key": "irac_drill",
-            "title": "3. IRAC Drill",
-            "icon": "🧠",
-            "content": sections.get("irac_drill", "")
-        },
-        {
-            "key": "rule_flashcards",
-            "title": "4. Rule Flashcards",
-            "icon": "🃏",
-            "content": sections.get("rule_flashcards", "")
         }
     ]
 
+    irac_drill_content = sections.get("irac_drill", "")
     socratic_answer_key = sections.get("socratic_answer_key", "")
     socratic_questions = parse_socratic_questions(sections.get("socratic_review", ""))
     socratic_student_answers = case_data.get("socratic_student_answers", {}) or {}
@@ -2993,53 +2976,77 @@ def law_view_case_review(case_id):
         {% endfor %}
 
   {% if case_data.sections.irac_drill %}
-<div class="portal-card" style="text-align:left; cursor:default; margin-bottom:16px;">
-    <h2 style="margin-top:0;">🧠 IRAC Practice Response</h2>
+    <div class="portal-card" style="text-align:left; cursor:default; margin-bottom:16px;">
+        <h2 style="margin-top:0;">🧠 IRAC Practice Response</h2>
 
-    <p style="opacity:.8;">
-        Write your own IRAC response before comparing it to any model answer in the imported drill.
-    </p>
+        <p style="opacity:.8;">
+            Write your own IRAC response before revealing the imported IRAC Drill guidance.
+        </p>
 
-    <form method="POST" action="/law/cases/{{ case_data.id }}/update_irac_response">
-        <label><strong>Issue</strong></label><br>
-        <textarea name="irac_issue"
-                  rows="4"
-                  placeholder="State the legal issue..."
-                  style="width:100%; padding:12px; border-radius:10px; box-sizing:border-box;">{{ irac_student_response.get("issue", "") }}</textarea>
+        <form method="POST" action="/law/cases/{{ case_data.id }}/update_irac_response">
+            <label><strong>Issue</strong></label><br>
+            <textarea name="irac_issue"
+                    rows="4"
+                    placeholder="State the legal issue..."
+                    style="width:100%; padding:12px; border-radius:10px; box-sizing:border-box;">{{ irac_student_response.get("issue", "") }}</textarea>
 
-        <br><br>
+            <br><br>
 
-        <label><strong>Rule</strong></label><br>
-        <textarea name="irac_rule"
-                  rows="4"
-                  placeholder="State the governing rule..."
-                  style="width:100%; padding:12px; border-radius:10px; box-sizing:border-box;">{{ irac_student_response.get("rule", "") }}</textarea>
+            <label><strong>Rule</strong></label><br>
+            <textarea name="irac_rule"
+                    rows="4"
+                    placeholder="State the governing rule..."
+                    style="width:100%; padding:12px; border-radius:10px; box-sizing:border-box;">{{ irac_student_response.get("rule", "") }}</textarea>
 
-        <br><br>
+            <br><br>
 
-        <label><strong>Analysis / Application</strong></label><br>
-        <textarea name="irac_analysis"
-                  rows="7"
-                  placeholder="Apply the rule to the facts..."
-                  style="width:100%; padding:12px; border-radius:10px; box-sizing:border-box;">{{ irac_student_response.get("analysis", "") }}</textarea>
+            <label><strong>Analysis / Application</strong></label><br>
+            <textarea name="irac_analysis"
+                    rows="7"
+                    placeholder="Apply the rule to the facts..."
+                    style="width:100%; padding:12px; border-radius:10px; box-sizing:border-box;">{{ irac_student_response.get("analysis", "") }}</textarea>
 
-        <br><br>
+            <br><br>
 
-        <label><strong>Conclusion</strong></label><br>
-        <textarea name="irac_conclusion"
-                  rows="4"
-                  placeholder="State the likely result..."
-                  style="width:100%; padding:12px; border-radius:10px; box-sizing:border-box;">{{ irac_student_response.get("conclusion", "") }}</textarea>
+            <label><strong>Conclusion</strong></label><br>
+            <textarea name="irac_conclusion"
+                    rows="4"
+                    placeholder="State the likely result..."
+                    style="width:100%; padding:12px; border-radius:10px; box-sizing:border-box;">{{ irac_student_response.get("conclusion", "") }}</textarea>
 
-        <br><br>
+            <br><br>
 
-        <button type="submit">
-            💾 Save IRAC Response
+            <button type="submit">
+                💾 Save IRAC Response
+            </button>
+        </form>
+    </div>
+
+    <div class="portal-card" style="text-align:left; cursor:default; margin-bottom:16px;">
+        <h2 style="margin-top:0;">🔒 IRAC Drill</h2>
+
+        <p style="opacity:.8;">
+            Hidden by default for active recall. Try writing your own IRAC response first, then reveal the imported drill guidance.
+        </p>
+
+        <button type="button" onclick="toggleIracDrill()">
+            👁 Reveal / Hide IRAC Drill
         </button>
-    </form>
-</div>
-{% endif %}                                
-                                  
+
+        <div id="iracDrillBox" style="display:none; margin-top:14px;">
+            <pre style="
+                white-space:pre-wrap;
+                word-wrap:break-word;
+                font-family:inherit;
+                line-height:1.45;
+                margin-bottom:0;
+            ">{{ case_data.sections.irac_drill }}</pre>
+        </div>
+    </div>
+    {% endif %}                                
+
+                                 
+
                                   
 {% if socratic_questions %}
 <div class="portal-card" style="text-align:left; cursor:default; margin-bottom:16px;">
@@ -3113,7 +3120,7 @@ def law_view_case_review(case_id):
                                                                     
         {% if socratic_answer_key %}
         <div class="portal-card" style="text-align:left; cursor:default; margin-bottom:16px;">
-            <h2 style="margin-top:0;">🔒 2A. Socratic Answer Key</h2>
+            <h2 style="margin-top:0;">🔒 Socratic Answer Key</h2>
 
             <p style="opacity:.8;">
                 Hidden by default for active recall. Try answering the Socratic questions first, then reveal the guidance.
@@ -3188,6 +3195,20 @@ def law_view_case_review(case_id):
 </div>
 
 <script>
+function toggleIracDrill() {
+    const box = document.getElementById("iracDrillBox");
+
+    if (!box) {
+        return;
+    }
+
+    if (box.style.display === "none" || box.style.display === "") {
+        box.style.display = "block";
+    } else {
+        box.style.display = "none";
+    }
+}
+
 function toggleSocraticAnswerKey() {
     const box = document.getElementById("socraticAnswerKey");
 
@@ -3217,6 +3238,7 @@ function toggleSocraticAnswerKey() {
     socratic_answered=socratic_answered,
     socratic_progress_text=socratic_progress_text,
     irac_student_response=irac_student_response,
+    irac_drill_content=irac_drill_content,
     law_folders=law_folders
     )
 
