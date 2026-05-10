@@ -2792,6 +2792,7 @@ def law_view_case_review(case_id):
     ]
 
     irac_drill_content = sections.get("irac_drill", "")
+    rule_flashcards_content = sections.get("rule_flashcards", "")
     socratic_answer_key = sections.get("socratic_answer_key", "")
     socratic_questions = parse_socratic_questions(sections.get("socratic_review", ""))
     socratic_student_answers = case_data.get("socratic_student_answers", {}) or {}
@@ -3142,6 +3143,20 @@ def law_view_case_review(case_id):
         </div>
         {% endif %}
 
+        {% if rule_flashcards_content %}
+        <div class="portal-card" style="text-align:left; cursor:default; margin-bottom:16px;">
+            <h2 style="margin-top:0;">🃏 Rule Flashcards</h2>
+
+            <pre style="
+                white-space:pre-wrap;
+                word-wrap:break-word;
+                font-family:inherit;
+                line-height:1.45;
+                margin-bottom:0;
+            ">{{ rule_flashcards_content }}</pre>
+        </div>
+        {% endif %}
+                                  
         <div class="portal-card" style="text-align:left; cursor:default; margin-bottom:16px;">
             <h2 style="margin-top:0;">📝 Student Notes</h2>
 
@@ -3230,6 +3245,7 @@ function toggleSocraticAnswerKey() {
     portal_title=portal_title,
     case_entry=case_entry,
     case_data=case_data,
+    rule_flashcards_content=rule_flashcards_content,
     section_cards=section_cards,
     socratic_answer_key=socratic_answer_key,
     socratic_questions=socratic_questions,
