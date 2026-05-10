@@ -2043,8 +2043,13 @@ def law_import_case_packet():
                     border:1px solid rgba(255,180,0,.35);
                 ">
                     <strong>No active case workflow.</strong><br>
-                    You can still paste and save a raw packet, but the filename will use only a timestamp.
-                    To use a readable case filename, start from <strong>Create Case Review</strong> first.
+                    Start from <strong>Create Case Review</strong> first if you want DLMS to attach this import to a case name, course, and readable filename.
+
+                    <br><br>
+
+                    <button type="button" onclick="location.href='/law/create'">
+                        📄 Start Create Case Review
+                    </button>
                 </div>
                 {% endif %}
 
