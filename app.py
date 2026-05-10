@@ -1403,12 +1403,14 @@ Formatting requirements:
 - Do not invent citations, quotations, facts, holdings, or procedural history.
 - Include a final warning outside the DLMS import block reminding the student to verify the case against the original opinion or an approved legal research source.
 
-At the end of your response, provide a clearly marked section titled:
+Return your response as one clearly marked, copyable fenced code block using plain text format.
+
+The fenced code block must begin with this heading:
 
 DLMS IMPORT BLOCK
 
 Inside the DLMS IMPORT BLOCK:
-- This entire block should be downloadable.
+- This entire block should be downloadable/copyable as a single plain-text block.
 - Include a Sources Used section at the top of the block.
 - In Sources Used, list the public legal sources used to verify the case, including source name and URL when available.
 - Prefer official court sources, Cornell LII, Justia, Oyez, CourtListener, or other reliable public legal sources.
@@ -1417,6 +1419,33 @@ Inside the DLMS IMPORT BLOCK:
 - Do not include extra commentary inside the DLMS IMPORT BLOCK.
 - Do not include the verification warning inside the DLMS IMPORT BLOCK.
 - Use clean plain-text headings so the block can be pasted into DLMS.
+
+Do not provide a separate explanation before the fenced code block.
+Do not provide a separate explanation after the fenced code block.
+
+The response format should be:
+
+```text
+DLMS IMPORT BLOCK
+
+Sources Used
+- Source name: URL
+
+1. Case Brief
+...
+
+2. Socratic Review
+...
+
+2A. Socratic Answer Key
+...
+
+3. IRAC Drill
+...
+
+4. Rule Flashcards
+...
+```
 """
         else:
             generated_prompt = "Please enter a case name before generating the AI prompt."
