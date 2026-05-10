@@ -1700,7 +1700,24 @@ def make_law_case_slug(case_name):
     return slug[:80] or "untitled_case"
 
 
+def extract_law_slug_from_import_filename(filename):
+    """
+    Extract the case slug from a raw Law import filename.
 
+    Example:
+    law_import_20260510_133709_hadley_v_baxendale.txt
+    -> hadley_v_baxendale
+    """
+    name = secure_filename(filename or "")
+    base = os.path.splitext(name)[0]
+
+    match = re.match(r"^law_import_\d{8}_\d{6}_(.+)$", base)
+
+    if match:
+        slug = match.group(1).strip("_")
+        return slug[:80] or ""
+
+    return ""
 
 
 
@@ -2594,7 +2611,13 @@ def law_create_case_from_import(filename):
         return "No recognized Law Study sections were found. Cannot create case review yet.", 400
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    case_id = f"law_case_{ts}"
+    case_slug = extract_law_slug_from_import_filename(safe_name)
+
+    if case_slug:
+        case_id = f"law_case_{ts}_{case_slug}"
+    else:
+        case_id = f"law_case_{ts}"
+
     case_file = f"{case_id}.json"
     case_path = os.path.join(LAW_CASES_FOLDER, case_file)
 
@@ -2604,12 +2627,27 @@ def law_create_case_from_import(filename):
     }
 
     title = extract_law_case_title(raw_packet, safe_name)
+    course = "Uncategorized"
+
+    registry = load_law_registry()
+    pending_workflow = registry.get("pending_case_workflow", {}) or {}
+
+    pending_slug = str(pending_workflow.get("case_slug", "")).strip()
+    pending_case_name = str(pending_workflow.get("case_name", "")).strip()
+    pending_course = str(pending_workflow.get("course", "")).strip()
+
+    if case_slug and pending_slug and case_slug == pending_slug:
+        if pending_case_name:
+            title = pending_case_name
+
+        if pending_course:
+            course = pending_course
 
     case_data = {
         "id": case_id,
         "type": "law_case_review",
         "title": title,
-        "course": "Uncategorized",
+        "course": course,
         "source_import": safe_name,
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "updated_at": datetime.now().isoformat(timespec="seconds"),
@@ -2631,13 +2669,12 @@ def law_create_case_from_import(filename):
         with open(case_path, "w", encoding="utf-8") as f:
             json.dump(case_data, f, indent=2)
 
-        registry = load_law_registry()
         cases = registry.get("cases", [])
 
         cases.append({
             "id": case_id,
             "title": title,
-            "course": "Uncategorized",
+            "course": course,
             "file": case_file,
             "source_import": safe_name,
             "created_at": case_data["created_at"],
