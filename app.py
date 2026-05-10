@@ -1569,14 +1569,20 @@ Sources Used
 
             <br>
 
-            <button type="submit">
-                ✨ Generate AI Prompt
-            </button>
+                <button type="submit">
+                    ✨ Generate AI Prompt
+                </button>
 
-            <button type="button"
-                    onclick="location.href='/law'">
-                ⬅ Back To Law Study
-            </button>
+                <button type="button"
+                        onclick="location.href='/law/import'"
+                        title="If you generated a prompt first, DLMS will carry the active case name, course, and filename slug into the import workflow. If no prompt was generated, the import page will show a no active workflow warning and saved raw imports will use a timestamp-only filename.">
+                    📥 Proceed To Import Case Packet
+                </button>
+
+                <button type="button"
+                        onclick="location.href='/law'">
+                    ⬅ Back To Law Study
+                </button>
 
         </form>
 
@@ -2144,7 +2150,14 @@ def law_import_case_packet():
             </button>
 
             <button type="button"
-                    onclick="location.href='/law/create'">
+                    onclick="location.href='/law/imports'"
+                    title="View raw case packets that were already saved. If a saved import was created from an active case workflow, its filename may include the case slug. From Saved Imports, you can open a raw packet and create a structured Case Review.">
+                📁 Proceed to Saved Imports
+            </button>
+
+            <button type="button"
+                    onclick="location.href='/law/create'"
+                    title="Start a new Law Study workflow by entering a case name and course, then generate an AI prompt before importing the AI output.">
                 ✨ Create Another Prompt
             </button>
 
