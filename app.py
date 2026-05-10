@@ -2683,6 +2683,12 @@ def law_create_case_from_import(filename):
         })
 
         registry["cases"] = cases
+
+        # Clear completed pending workflow so a future unrelated import
+        # does not accidentally reuse the previous case name/slug/course.
+        if "pending_case_workflow" in registry:
+            registry.pop("pending_case_workflow", None)
+
         save_law_registry(registry)
 
     except Exception as e:
