@@ -2034,6 +2034,18 @@ def law_import_case_packet():
                     Case Name: {{ case_name }}<br>
                     File Slug: {{ case_slug }}
                 </div>
+                {% else %}
+                <div style="
+                    margin-bottom:18px;
+                    padding:14px;
+                    border-radius:12px;
+                    background:rgba(255,180,0,.10);
+                    border:1px solid rgba(255,180,0,.35);
+                ">
+                    <strong>No active case workflow.</strong><br>
+                    You can still paste and save a raw packet, but the filename will use only a timestamp.
+                    To use a readable case filename, start from <strong>Create Case Review</strong> first.
+                </div>
                 {% endif %}
 
                 <form method="POST" action="/law/import">
