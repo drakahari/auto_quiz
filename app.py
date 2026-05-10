@@ -2816,10 +2816,33 @@ def law_view_case_review(case_id):
     <title>{{ case_data.title }} - DLMS Law Study</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="icon" href="/static/favicon.ico">
+
+    <style>
+    /* Law Study case viewer: disable portal-card push/press effects */
+    .law-study-view .portal-card,
+    .law-study-view .portal-card:hover,
+    .law-study-view .portal-card:active,
+    .law-study-view .portal-card:focus,
+    .law-study-view .portal-card:focus-within {
+        transform: none !important;
+        transition: none !important;
+        animation: none !important;
+    }
+
+    /* Keep Law Study form controls stable */
+    .law-study-view textarea,
+    .law-study-view input,
+    .law-study-view select,
+    .law-study-view button {
+        transform: none !important;
+        transition: none !important;
+        animation: none !important;
+    }
+    </style>
 </head>
 
 <body>
-<div class="container">
+<div class="container law-study-view">
 
     <h1 class="hero-title">
         ⚖️ Case Review<br>
@@ -3080,7 +3103,9 @@ def law_view_case_review(case_id):
         </span>
     </div>
 
-    <form method="POST" action="/law/cases/{{ case_data.id }}/update_socratic_answers">
+    <form id="socraticAnswersForm"
+      method="POST"
+      action="/law/cases/{{ case_data.id }}/update_socratic_answers">
         <div style="display:grid; gap:12px;">
             {% for question in socratic_questions %}
             <div style="
@@ -3110,7 +3135,7 @@ def law_view_case_review(case_id):
 
         <br>
 
-        <button type="submit">
+        <button type="submit" form="socraticAnswersForm">
             💾 Save Socratic Answers
         </button>
     </form>
@@ -4876,6 +4901,9 @@ def quiz_library():
     <title>Quiz Library</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="icon" href="/static/favicon.ico">
+                                  
+
+                                  
 
     <!-- Drag + Drop -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
