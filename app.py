@@ -1907,6 +1907,20 @@ def parse_socratic_questions(socratic_text):
 
 
 
+# =========================
+# LAW STUDY MODULE - CANCEL PENDING WORKFLOW
+# =========================
+@app.route("/law/workflow/cancel", methods=["POST"])
+def law_cancel_pending_workflow():
+    registry = load_law_registry()
+
+    if "pending_case_workflow" in registry:
+        registry.pop("pending_case_workflow", None)
+        save_law_registry(registry)
+
+    return redirect("/law/import?workflow_cancelled=1")
+
+
 
 
 
@@ -2022,6 +2036,20 @@ def law_import_case_packet():
             </span>
         </div>
 
+                 {% if request.args.get('workflow_cancelled') %}
+                    <div style="
+                        margin-bottom:18px;
+                        padding:14px;
+                        border-radius:12px;
+                        background:rgba(0,180,100,.12);
+                        border:1px solid rgba(0,180,100,.35);
+                    ">
+                        <strong>Active case workflow cancelled.</strong><br>
+                        DLMS cleared the pending case name, course, and filename slug.
+                    </div>
+                    {% endif %}                 
+
+
                 {% if case_name %}
                 <div style="
                     margin-bottom:18px;
@@ -2033,6 +2061,17 @@ def law_import_case_packet():
                     <strong>Case Review Workflow:</strong><br>
                     Case Name: {{ case_name }}<br>
                     File Slug: {{ case_slug }}
+
+                    <br><br>
+
+                    <form method="POST"
+                        action="/law/workflow/cancel"
+                        style="display:inline-block;"
+                        onsubmit="return confirm('Cancel the active Law Study workflow? This will not delete saved imports or case reviews.');">
+                        <button type="submit">
+                            ✖ Cancel Active Workflow
+                        </button>
+                    </form>
                 </div>
                 {% else %}
                 <div style="
