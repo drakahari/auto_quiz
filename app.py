@@ -1378,7 +1378,7 @@ Please create a law-school study packet for this case.
 
 Use only accurate information. Do not invent citations, quotations, facts, holdings, or procedural history. If you are uncertain, say so clearly.
 
-Prefer a public legal source when available, such as an official court source, Cornell LII, Justia, or Oyez. If you cannot verify the case from a reliable source, clearly state that verification is needed.
+Prefer public legal sources when available, such as official court sources, Cornell LII, Justia, Oyez, CourtListener, or other reliable public legal sources. If you cannot verify the case from a reliable source, clearly state that verification is needed. Include the source links used in the Sources Used section of the DLMS IMPORT BLOCK.
 
 Create the following sections:
 
@@ -1397,8 +1397,11 @@ DLMS IMPORT BLOCK
 
 Inside the DLMS IMPORT BLOCK:
 - This entire block should be downloadable.
-- Include only the requested study sections.
-- Include only sections 1, 2, 2A, 3, and 4 when those sections were requested.
+- Include a Sources Used section at the top of the block.
+- In Sources Used, list the public legal sources used to verify the case, including source name and URL when available.
+- Prefer official court sources, Cornell LII, Justia, Oyez, CourtListener, or other reliable public legal sources.
+- Include only the requested study sections after Sources Used.
+- Include only Sources Used and sections 1, 2, 2A, 3, and 4 when those sections were requested.
 - Do not include extra commentary inside the DLMS IMPORT BLOCK.
 - Do not include the verification warning inside the DLMS IMPORT BLOCK.
 - Use clean plain-text headings so the block can be pasted into DLMS.
@@ -1688,6 +1691,7 @@ def parse_law_packet_sections(raw_text):
     Does not save anything. It only splits recognized headings.
     """
     headings = [
+        ("sources_used", "Sources Used"),
         ("case_brief", "1. Case Brief"),
         ("socratic_review", "2. Socratic Review"),
         ("socratic_answer_key", "2A. Socratic Answer Key"),
@@ -2535,6 +2539,7 @@ def law_create_case_from_import(filename):
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "updated_at": datetime.now().isoformat(timespec="seconds"),
         "verified": False,
+        "sources_used": section_map.get("sources_used", ""),
         "sections": {
             "case_brief": section_map.get("case_brief", ""),
             "socratic_review": section_map.get("socratic_review", ""),
@@ -2781,6 +2786,7 @@ def law_view_case_review(case_id):
         return "Failed to read case review", 500
 
     sections = case_data.get("sections", {}) or {}
+    sources_used = case_data.get("sources_used", "")
 
     section_cards = [
         {
@@ -2869,6 +2875,27 @@ def law_view_case_review(case_id):
                     <strong>Created:</strong> {{ case_data.created_at }}<br>
                     <strong>Source Import:</strong> {{ case_data.source_import }}
                 </p>
+
+        {% if sources_used %}
+        <div style="
+            margin-top:12px;
+            padding:12px;
+            border-radius:12px;
+            background:rgba(0,120,255,.08);
+            border:1px solid rgba(0,120,255,.25);
+        ">
+            <strong>Sources Used:</strong>
+
+            <pre style="
+                white-space:pre-wrap;
+                word-wrap:break-word;
+                font-family:inherit;
+                line-height:1.45;
+                margin:8px 0 0 0;
+            ">{{ sources_used }}</pre>
+        </div>
+        {% endif %}
+                                                                             
             </div>
 
             <span style="
@@ -3278,6 +3305,7 @@ function toggleSocraticAnswerKey() {
     socratic_total=socratic_total,
     socratic_answered=socratic_answered,
     socratic_progress_text=socratic_progress_text,
+    sources_used=sources_used,
     irac_student_response=irac_student_response,
     irac_drill_content=irac_drill_content,
     law_folders=law_folders
