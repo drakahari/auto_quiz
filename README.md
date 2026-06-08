@@ -1,6 +1,17 @@
 ## Latest Release
 
-**DLMS v2.0** is now available.
+DLMS v2.1.0 is now available.
+
+Added a new Law Study workflow for structured legal study and case review
+Added AI-assisted Law Study prompt generation
+Added case packet import support with preview before saving
+Added saved law study imports and raw import viewing
+Added case review creation and a My Case Reviews page
+Added editable case review notes, IRAC-style fields, and Socratic Q&A support
+Added rule flashcard support for legal study review
+Added text export support for saved case reviews
+Improved Law Study workflow navigation, warnings, cancel options, and tooltips
+Updated binaries for Windows 11, macOS Apple Silicon, Fedora 44, Ubuntu 24.04, and Ubuntu 26.04
 
 - Added ability to edit/delete/add questions and answers
 - Added ability to create quick quizzes as a thrid option of creation.
